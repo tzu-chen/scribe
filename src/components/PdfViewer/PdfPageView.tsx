@@ -49,12 +49,21 @@ export function PdfPageView({
       const page = await pdfDoc.getPage(pageNumber);
       if (cancelled) return;
 
+      const dpr = window.devicePixelRatio || 1;
+      // CSS-size viewport (for display dimensions and text layer)
       const viewport = page.getViewport({ scale });
+      // High-res viewport for sharp canvas rendering on HiDPI displays
+      const renderViewport = page.getViewport({ scale: scale * dpr });
+
       const canvas = canvasRef.current;
       const textLayerDiv = textLayerRef.current;
       if (!canvas || !textLayerDiv) return;
 
-      // Set canvas CSS dimensions to match the viewport
+      // Set actual canvas pixel dimensions (high-res for sharp rendering)
+      canvas.width = Math.floor(renderViewport.width);
+      canvas.height = Math.floor(renderViewport.height);
+
+      // Set CSS display dimensions (normal-res)
       canvas.style.width = `${Math.floor(viewport.width)}px`;
       canvas.style.height = `${Math.floor(viewport.height)}px`;
 
@@ -67,7 +76,8 @@ export function PdfPageView({
       // Cancel previous render
       renderTaskRef.current?.cancel();
 
-      const renderTask = page.render({ canvas, viewport });
+      // Render at high-res viewport so canvas pixels are fully utilized
+      const renderTask = page.render({ canvas, viewport: renderViewport });
       renderTaskRef.current = renderTask;
 
       try {
@@ -86,7 +96,7 @@ export function PdfPageView({
       // Cancel previous text layer
       textLayerInstanceRef.current?.cancel();
 
-      // Clear and size the text layer div
+      // Clear and size the text layer div using the CSS-size viewport
       textLayerDiv.innerHTML = '';
       setLayerDimensions(textLayerDiv, viewport);
 
