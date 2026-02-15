@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { ThemeMenu } from '../ThemeMenu/ThemeMenu';
 import styles from './Layout.module.css';
 
 interface LayoutProps {
@@ -19,19 +20,19 @@ export function Layout({ children }: LayoutProps) {
             Scribe
           </Link>
           <nav className={styles.nav}>
-            {!isHome && (
-              <Link to="/" className={styles.navLink}>
-                Library
-              </Link>
-            )}
-            {!isFlowcharts && (
-              <Link to="/flowcharts" className={styles.navLink}>
-                Flowcharts
-              </Link>
-            )}
-            <Link to="/note/new" className={styles.newButton}>
-              + New Note
+            <Link
+              to="/"
+              className={`${styles.navLink} ${isHome ? styles.navLinkActive : ''}`}
+            >
+              Library
             </Link>
+            <Link
+              to="/flowcharts"
+              className={`${styles.navLink} ${isFlowcharts ? styles.navLinkActive : ''}`}
+            >
+              Flowcharts
+            </Link>
+            <ThemeMenu />
           </nav>
         </div>
       </header>
