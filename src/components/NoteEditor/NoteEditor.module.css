@@ -1,0 +1,14 @@
+.editor {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.editor :global(.w-md-editor) {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.editor :global(.w-md-editor-toolbar) {
+  border-bottom: 1px solid var(--color-border-light);
+}
