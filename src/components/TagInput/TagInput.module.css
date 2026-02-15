@@ -57,6 +57,7 @@
   border: none;
   outline: none;
   font-size: 0.875rem;
+  color: var(--color-text);
   background: transparent;
   padding: 2px 4px;
 }
