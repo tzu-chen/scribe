@@ -1,0 +1,67 @@
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.titleInput {
+  width: 100%;
+  padding: var(--spacing-sm) 0;
+  border: none;
+  outline: none;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+  background: transparent;
+  margin-bottom: var(--spacing-sm);
+}
+
+.titleInput::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.tagsRow {
+  margin-bottom: var(--spacing-md);
+}
+
+.helpHint {
+  margin-top: var(--spacing-lg);
+}
+
+.helpHint details {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.helpHint summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.helpContent {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.helpContent code {
+  background: var(--color-tag-bg);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.helpContent pre {
+  background: var(--color-tag-bg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  overflow-x: auto;
+}
