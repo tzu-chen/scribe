@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
+import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
@@ -22,13 +23,15 @@ export function PdfViewerPage() {
   const [filename, setFilename] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const { pdfDoc, numPages, pageWidth, outline, loading, error: pdfError } = usePdfDocument(blob);
+  const { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
 
-  const [zoom, setZoom] = useState(1.0);
-  const [fitWidth, setFitWidth] = useState(false);
+  const savedPrefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
+
+  const [zoom, setZoom] = useState(savedPrefs?.zoom ?? 1.0);
+  const [fitWidth, setFitWidth] = useState(savedPrefs?.fitWidth ?? false);
   const [showToc, setShowToc] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<{
@@ -80,6 +83,62 @@ export function PdfViewerPage() {
     load();
     return () => { cancelled = true; };
   }, [attachmentId, subject]);
+
+  // Scroll to saved page once the PDF is loaded
+  const initialScrollDone = useRef(false);
+
+  useEffect(() => {
+    if (!pdfDoc || initialScrollDone.current) return;
+    if (savedPrefs && savedPrefs.currentPage > 1) {
+      requestAnimationFrame(() => {
+        docViewRef.current?.scrollToPage(savedPrefs.currentPage);
+        initialScrollDone.current = true;
+      });
+    } else {
+      initialScrollDone.current = true;
+    }
+  }, [pdfDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced save of viewer preferences
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    if (!attachmentId || !initialScrollDone.current) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      viewerPrefsStorage.save(attachmentId, {
+        zoom,
+        fitWidth,
+        currentPage,
+      });
+    }, 1000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [attachmentId, zoom, fitWidth, currentPage]);
+
+  // Immediate save on tab close
+  useEffect(() => {
+    if (!attachmentId) return;
+
+    const handleBeforeUnload = () => {
+      viewerPrefsStorage.save(attachmentId, {
+        zoom,
+        fitWidth,
+        currentPage,
+      });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [attachmentId, zoom, fitWidth, currentPage]);
 
   const handleReturnToFlowchart = useCallback(() => {
     navigate(`/flowcharts${flowchartId ? `?view=${flowchartId}` : ''}`);
@@ -218,6 +277,8 @@ export function PdfViewerPage() {
           pdfDoc={pdfDoc}
           numPages={numPages}
           scale={effectiveZoom}
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
           highlights={annotations.highlights}
           onTextSelected={handleTextSelected}
           onSelectionCleared={handleSelectionCleared}
