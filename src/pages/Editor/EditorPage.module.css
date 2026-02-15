@@ -24,6 +24,8 @@
   display: flex;
   gap: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
+  position: relative;
+  z-index: 20;
 }
 
 .subjectInput {
@@ -43,6 +45,8 @@
 
 .tagsRow {
   margin-bottom: var(--spacing-md);
+  position: relative;
+  z-index: 10;
 }
 
 .helpHint {

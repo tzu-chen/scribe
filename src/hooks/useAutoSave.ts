@@ -18,7 +18,7 @@ export function useAutoSave(note: Note | null, delayMs = 1500) {
   useEffect(() => {
     if (!note) return;
 
-    const noteKey = `${note.title}|${note.content}|${note.tags.join(',')}`;
+    const noteKey = `${note.title}|${note.content}|${note.tags.join(',')}|${note.category || ''}|${note.subject || ''}`;
     if (noteKey === prevNoteRef.current) return;
     prevNoteRef.current = noteKey;
 
