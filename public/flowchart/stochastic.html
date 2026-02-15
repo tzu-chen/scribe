@@ -105,8 +105,6 @@ window.MathJax = {
   .chart-title{position:absolute;width:100%;text-align:center;top:6px;z-index:2;}
   .chart-title h1{color:#2a2a28;font-size:1.45rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;}
   .chart-title .sub{color:#8a8a80;font-size:0.7rem;letter-spacing:5px;text-transform:uppercase;}
-  .hint{position:absolute;text-align:center;width:100%;top:42px;font-size:0.7rem;color:#aaa89e;z-index:2;transition:opacity 0.5s;}
-  .hint.hidden{opacity:0;}
 
   .timeline-bar{position:absolute;display:flex;border-radius:5px;overflow:hidden;border:1px solid #d0ccc0;z-index:2;}
   .timeline-bar>div{padding:8px 6px;text-align:center;font-size:0.68rem;font-weight:700;}
@@ -127,7 +125,6 @@ window.MathJax = {
     <h1>From Analysis to Stochastic Frontiers</h1>
     <div class="sub">A Study Roadmap</div>
   </div>
-  <div class="hint" id="hint">Click any node to highlight its prerequisite chain</div>
 
   <!-- ===== STAGE 0: y~95 ===== -->
   <div class="stage-lbl" style="left:50px;top:65px;color:#7a6530;">Stage 0 — Audit &amp; Fill (weeks 1–4)</div>
@@ -472,9 +469,17 @@ function injectNodeActions() {
     badge.textContent = '0';
     viewBtn.appendChild(badge);
 
+    // View notes (file-text)
+    const notesBtn = document.createElement('button');
+    notesBtn.className = 'node-action-btn';
+    notesBtn.setAttribute('data-action', 'view-notes');
+    notesBtn.setAttribute('title', 'View notes');
+    notesBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+
     actions.appendChild(writeBtn);
     actions.appendChild(attachBtn);
     actions.appendChild(viewBtn);
+    actions.appendChild(notesBtn);
     nodeEl.appendChild(actions);
   });
 }
@@ -498,7 +503,6 @@ window.addEventListener('message', e => {
 });
 
 function highlightChain(nodeId) {
-  document.getElementById('hint')?.classList.add('hidden');
   if (selectedNode===nodeId){clearHighlight();return;}
   selectedNode=nodeId;
   const anc=getAncestors(nodeId), set=new Set(Object.keys(anc));
@@ -555,7 +559,7 @@ document.addEventListener('click',e=>{
   }
   // Original node/background click logic
   const n=e.target.closest('.node');
-  if(n&&n.id){e.stopPropagation();highlightChain(n.id);}else{clearHighlight();document.getElementById('hint')?.classList.remove('hidden');}
+  if(n&&n.id){e.stopPropagation();highlightChain(n.id);}else{clearHighlight();}
 });
 
 // ===== ARROW DRAWING =====

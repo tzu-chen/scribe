@@ -90,6 +90,9 @@ export function FlowchartsPage() {
               setAttachmentPanel({ subject: nodeTitle, files });
             });
             break;
+          case 'view-notes':
+            navigate(`/?subject=${encodeURIComponent(nodeTitle)}`);
+            break;
         }
       }
     };
