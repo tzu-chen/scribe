@@ -1,0 +1,10 @@
+{
+  "flowcharts": [
+    {
+      "id": "stochastic",
+      "name": "From Analysis to Stochastic Frontiers",
+      "filename": "stochastic.html",
+      "description": "A study roadmap covering analysis, probability, PDEs, stochastic calculus, and research frontiers"
+    }
+  ]
+}

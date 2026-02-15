@@ -1,16 +1,19 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { NoteEditor } from '../../components/NoteEditor/NoteEditor';
 import { TagInput } from '../../components/TagInput/TagInput';
+import { CategorySelect } from '../../components/CategorySelect/CategorySelect';
 import { NoteToolbar } from '../../components/NoteToolbar/NoteToolbar';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useNotes } from '../../hooks/useNotes';
 import { useTags } from '../../hooks/useTags';
+import { useCategories } from '../../hooks/useCategories';
+import { useSubjects } from '../../hooks/useSubjects';
 import type { Note, NoteStatus } from '../../types/note';
 import styles from './EditorPage.module.css';
 
-function createNewNote(): Note {
+function createNewNote(defaults?: { subject?: string; category?: string }): Note {
   const now = new Date().toISOString();
   return {
     id: uuidv4(),
@@ -18,6 +21,8 @@ function createNewNote(): Note {
     content: '',
     tags: [],
     status: 'draft',
+    category: defaults?.category,
+    subject: defaults?.subject,
     createdAt: now,
     updatedAt: now,
   };
@@ -26,15 +31,20 @@ function createNewNote(): Note {
 export function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { notes, saveNote, deleteNote } = useNotes();
   const { allTags } = useTags(notes);
+  const { allCategories } = useCategories(notes);
+  const { allSubjects } = useSubjects(notes);
 
   const [note, setNote] = useState<Note>(() => {
     if (id) {
       const existing = notes.find(n => n.id === id);
       if (existing) return existing;
     }
-    return createNewNote();
+    return createNewNote({
+      subject: searchParams.get('subject') || undefined,
+    });
   });
 
   // Redirect if editing a non-existent note
@@ -45,7 +55,7 @@ export function EditorPage() {
   }, [id, notes, note, navigate]);
 
   const tagsKey = note.tags.join(',');
-  const autoSaveNote = useMemo(() => note, [note.title, note.content, tagsKey]);
+  const autoSaveNote = useMemo(() => note, [note.title, note.content, tagsKey, note.category, note.subject]);
   const saveStatus = useAutoSave(autoSaveNote);
 
   const updateField = useCallback(<K extends keyof Note>(field: K, value: Note[K]) => {
@@ -102,6 +112,24 @@ export function EditorPage() {
         onChange={e => updateField('title', e.target.value)}
         placeholder="Note title..."
       />
+      <div className={styles.metaRow}>
+        <CategorySelect
+          value={note.category || ''}
+          onChange={val => updateField('category', val || undefined)}
+          suggestions={allCategories}
+        />
+        <input
+          type="text"
+          className={styles.subjectInput}
+          value={note.subject || ''}
+          onChange={e => updateField('subject', e.target.value || undefined)}
+          placeholder="Subject..."
+          list="subject-suggestions"
+        />
+        <datalist id="subject-suggestions">
+          {allSubjects.map(s => <option key={s} value={s} />)}
+        </datalist>
+      </div>
       <div className={styles.tagsRow}>
         <TagInput
           tags={note.tags}

@@ -107,6 +107,29 @@
   color: var(--color-text-secondary);
 }
 
+.noteMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.category {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  text-transform: capitalize;
+}
+
+.subject {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;

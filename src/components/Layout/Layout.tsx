@@ -8,6 +8,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isFlowcharts = location.pathname === '/flowcharts';
 
   return (
     <div className={styles.layout}>
@@ -20,6 +21,11 @@ export function Layout({ children }: LayoutProps) {
             {!isHome && (
               <Link to="/" className={styles.navLink}>
                 Library
+              </Link>
+            )}
+            {!isFlowcharts && (
+              <Link to="/flowcharts" className={styles.navLink}>
+                Flowcharts
               </Link>
             )}
             <Link to="/note/new" className={styles.newButton}>

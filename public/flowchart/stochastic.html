@@ -435,12 +435,23 @@ function highlightChain(nodeId) {
     if(activeEdges.has(k)){p.setAttribute('stroke','#5a5a50');p.setAttribute('stroke-width','2');p.setAttribute('stroke-opacity','1');p.setAttribute('marker-end','url(#ah-hi)');p.removeAttribute('stroke-dasharray');}
     else{p.setAttribute('stroke-opacity','0.08');p.setAttribute('stroke-width','0.8');}
   });
+  // Notify parent frame of node selection
+  if (window.parent !== window) {
+    const nodeEl = document.getElementById(nodeId);
+    const titleEl = nodeEl?.querySelector('.node-title');
+    const nodeTitle = titleEl ? titleEl.textContent.replace(/^\d+[A-Z]?\.\s*/, '').trim() : nodeId;
+    window.parent.postMessage({ type: 'node-selected', nodeId: nodeId, nodeTitle: nodeTitle }, '*');
+  }
 }
 
 function clearHighlight(){
   selectedNode=null;
   document.querySelectorAll('.node').forEach(el=>{el.classList.remove('dimmed','highlighted','selected');el.querySelector('.depth-badge').textContent='';});
   drawAllArrows();
+  // Notify parent frame of deselection
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: 'node-deselected' }, '*');
+  }
 }
 
 document.addEventListener('click',e=>{

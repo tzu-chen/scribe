@@ -72,6 +72,33 @@
   -webkit-box-orient: vertical;
 }
 
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.category {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  text-transform: capitalize;
+}
+
+.subject {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
 .footer {
   display: flex;
   align-items: center;
