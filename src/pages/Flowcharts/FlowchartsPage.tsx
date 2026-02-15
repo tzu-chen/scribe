@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { attachmentStorage } from '../../services/attachmentStorage';
+import type { AttachmentMeta } from '../../types/attachment';
 import styles from './FlowchartsPage.module.css';
 
 interface FlowchartEntry {
@@ -14,13 +16,24 @@ interface NodeSelection {
   nodeTitle: string;
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function FlowchartsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [flowcharts, setFlowcharts] = useState<FlowchartEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedNode, setSelectedNode] = useState<NodeSelection | null>(null);
+  const [, setSelectedNode] = useState<NodeSelection | null>(null);
+  const [attachmentPanel, setAttachmentPanel] = useState<{
+    subject: string;
+    files: AttachmentMeta[];
+  } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeFlowchart = searchParams.get('view');
 
@@ -32,39 +45,109 @@ export function FlowchartsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'node-selected') {
-        setSelectedNode({
-          nodeId: event.data.nodeId,
-          nodeTitle: event.data.nodeTitle,
-        });
-      } else if (event.data?.type === 'node-deselected') {
-        setSelectedNode(null);
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+  const sendAttachmentCounts = useCallback(async () => {
+    try {
+      const counts = await attachmentStorage.getCountsBySubject();
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'attachment-counts', counts },
+        '*',
+      );
+    } catch (err) {
+      console.error('Failed to send attachment counts:', err);
+    }
   }, []);
 
-  const handleWriteNote = useCallback(() => {
-    if (selectedNode) {
-      navigate(`/note/new?subject=${encodeURIComponent(selectedNode.nodeTitle)}`);
-    }
-  }, [selectedNode, navigate]);
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data?.type) return;
+
+      if (data.type === 'node-selected') {
+        setSelectedNode({ nodeId: data.nodeId, nodeTitle: data.nodeTitle });
+        setAttachmentPanel(null);
+      } else if (data.type === 'node-deselected') {
+        setSelectedNode(null);
+        setAttachmentPanel(null);
+      } else if (data.type === 'node-action') {
+        const { action, nodeTitle } = data as {
+          action: string;
+          nodeId: string;
+          nodeTitle: string;
+        };
+
+        switch (action) {
+          case 'write-note':
+            navigate(`/note/new?subject=${encodeURIComponent(nodeTitle)}`);
+            break;
+          case 'attach-file':
+            if (fileInputRef.current) {
+              fileInputRef.current.setAttribute('data-subject', nodeTitle);
+              fileInputRef.current.click();
+            }
+            break;
+          case 'view-attachments':
+            attachmentStorage.getBySubject(nodeTitle).then(files => {
+              setAttachmentPanel({ subject: nodeTitle, files });
+            });
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigate]);
+
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      const subject = fileInputRef.current?.getAttribute('data-subject');
+      if (!file || !subject) return;
+
+      await attachmentStorage.add(subject, file);
+      await sendAttachmentCounts();
+      e.target.value = '';
+    },
+    [sendAttachmentCounts],
+  );
+
+  const handleOpenFile = useCallback(async (id: string) => {
+    await attachmentStorage.openFile(id);
+  }, []);
+
+  const handleDeleteAttachment = useCallback(
+    async (id: string) => {
+      if (!attachmentPanel) return;
+      await attachmentStorage.delete(id);
+      const files = await attachmentStorage.getBySubject(attachmentPanel.subject);
+      setAttachmentPanel(prev => (prev ? { ...prev, files } : null));
+      await sendAttachmentCounts();
+    },
+    [attachmentPanel, sendAttachmentCounts],
+  );
+
+  const closeAttachmentPanel = useCallback(() => {
+    setAttachmentPanel(null);
+  }, []);
 
   const selectFlowchart = (id: string) => {
     setSearchParams({ view: id });
     setSelectedNode(null);
+    setAttachmentPanel(null);
   };
 
   const goBack = () => {
     setSearchParams({});
     setSelectedNode(null);
+    setAttachmentPanel(null);
   };
 
   if (loading) {
-    return <div className={styles.page}><p className={styles.loading}>Loading flowcharts...</p></div>;
+    return (
+      <div className={styles.page}>
+        <p className={styles.loading}>Loading flowcharts...</p>
+      </div>
+    );
   }
 
   if (activeFlowchart) {
@@ -73,7 +156,9 @@ export function FlowchartsPage() {
       return (
         <div className={styles.page}>
           <p>Flowchart not found.</p>
-          <button className={styles.backButton} onClick={goBack}>Back to list</button>
+          <button className={styles.backButton} onClick={goBack}>
+            Back to list
+          </button>
         </div>
       );
     }
@@ -92,16 +177,68 @@ export function FlowchartsPage() {
             src={`/flowchart/${flowchart.filename}`}
             className={styles.iframe}
             title={flowchart.name}
+            onLoad={sendAttachmentCounts}
           />
         </div>
-        {selectedNode && (
-          <div className={styles.nodePanel}>
-            <span className={styles.nodePanelTitle}>
-              Selected: <strong>{selectedNode.nodeTitle}</strong>
-            </span>
-            <button className={styles.writeNoteButton} onClick={handleWriteNote}>
-              Write note
-            </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className={styles.hiddenInput}
+          onChange={handleFileSelected}
+        />
+
+        {attachmentPanel && (
+          <div
+            className={styles.attachmentOverlay}
+            onClick={closeAttachmentPanel}
+          >
+            <div
+              className={styles.attachmentPanel}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className={styles.attachmentHeader}>
+                <h3 className={styles.attachmentTitle}>
+                  Attachments: {attachmentPanel.subject}
+                </h3>
+                <button
+                  className={styles.attachmentClose}
+                  onClick={closeAttachmentPanel}
+                  aria-label="Close"
+                >
+                  &times;
+                </button>
+              </div>
+              {attachmentPanel.files.length === 0 ? (
+                <p className={styles.attachmentEmpty}>
+                  No files attached yet.
+                </p>
+              ) : (
+                <ul className={styles.attachmentList}>
+                  {attachmentPanel.files.map(file => (
+                    <li key={file.id} className={styles.attachmentItem}>
+                      <button
+                        className={styles.attachmentFilename}
+                        onClick={() => handleOpenFile(file.id)}
+                        title={`Open ${file.filename}`}
+                      >
+                        {file.filename}
+                      </button>
+                      <span className={styles.attachmentSize}>
+                        {formatFileSize(file.size)}
+                      </span>
+                      <button
+                        className={styles.attachmentDelete}
+                        onClick={() => handleDeleteAttachment(file.id)}
+                        title="Remove attachment"
+                      >
+                        &times;
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -122,10 +259,14 @@ export function FlowchartsPage() {
               onClick={() => selectFlowchart(fc.id)}
               role="button"
               tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter') selectFlowchart(fc.id); }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') selectFlowchart(fc.id);
+              }}
             >
               <h3 className={styles.cardTitle}>{fc.name}</h3>
-              {fc.description && <p className={styles.cardDesc}>{fc.description}</p>}
+              {fc.description && (
+                <p className={styles.cardDesc}>{fc.description}</p>
+              )}
             </article>
           ))}
         </div>
