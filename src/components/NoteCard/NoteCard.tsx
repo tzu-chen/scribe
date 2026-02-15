@@ -43,6 +43,12 @@ export function NoteCard({ note }: NoteCardProps) {
       {note.content && (
         <p className={styles.preview}>{getPreview(note.content)}</p>
       )}
+      {(note.category || note.subject) && (
+        <div className={styles.cardMeta}>
+          {note.category && <span className={styles.category}>{note.category}</span>}
+          {note.subject && <span className={styles.subject}>{note.subject}</span>}
+        </div>
+      )}
       <div className={styles.footer}>
         <div className={styles.tags}>
           {note.tags.slice(0, 4).map(tag => (

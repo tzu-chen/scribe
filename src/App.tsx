@@ -3,6 +3,7 @@ import { Layout } from './components/Layout/Layout';
 import { LibraryPage } from './pages/Library/LibraryPage';
 import { EditorPage } from './pages/Editor/EditorPage';
 import { ViewPage } from './pages/View/ViewPage';
+import { FlowchartsPage } from './pages/Flowcharts/FlowchartsPage';
 import './global.css';
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<LibraryPage />} />
+          <Route path="/flowcharts" element={<FlowchartsPage />} />
           <Route path="/note/new" element={<EditorPage />} />
           <Route path="/note/:id/edit" element={<EditorPage />} />
           <Route path="/note/:id" element={<ViewPage />} />

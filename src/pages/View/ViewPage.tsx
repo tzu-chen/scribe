@@ -77,6 +77,16 @@ export function ViewPage() {
               Updated {format(new Date(note.updatedAt), 'MMMM d, yyyy')}
             </time>
           </div>
+          {(note.category || note.subject) && (
+            <div className={styles.noteMeta}>
+              {note.category && (
+                <span className={styles.category}>{note.category}</span>
+              )}
+              {note.subject && (
+                <span className={styles.subject}>{note.subject}</span>
+              )}
+            </div>
+          )}
           {note.tags.length > 0 && (
             <div className={styles.tags}>
               {note.tags.map(tag => (

@@ -6,6 +6,8 @@ export interface Note {
   content: string;
   tags: string[];
   status: NoteStatus;
+  category?: string;
+  subject?: string;
   createdAt: string;
   updatedAt: string;
 }

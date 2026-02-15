@@ -5,6 +5,8 @@ import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { TagFilter } from '../../components/TagFilter/TagFilter';
 import { useNotes } from '../../hooks/useNotes';
 import { useTags } from '../../hooks/useTags';
+import { useCategories } from '../../hooks/useCategories';
+import { useSubjects } from '../../hooks/useSubjects';
 import type { NoteStatus } from '../../types/note';
 import styles from './LibraryPage.module.css';
 
@@ -13,9 +15,13 @@ type StatusFilter = 'all' | NoteStatus;
 export function LibraryPage() {
   const { notes } = useNotes();
   const { allTags } = useTags(notes);
+  const { allCategories } = useCategories(notes);
+  const { allSubjects } = useSubjects(notes);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState('all');
 
   const toggleTag = useCallback((tag: string) => {
     setSelectedTags(prev =>
@@ -27,6 +33,8 @@ export function LibraryPage() {
     return notes
       .filter(note => {
         if (statusFilter !== 'all' && note.status !== statusFilter) return false;
+        if (selectedCategory !== 'all' && (note.category || '') !== selectedCategory) return false;
+        if (selectedSubject !== 'all' && (note.subject || '') !== selectedSubject) return false;
         if (selectedTags.length > 0 && !selectedTags.every(t => note.tags.includes(t))) return false;
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
@@ -37,7 +45,7 @@ export function LibraryPage() {
         return true;
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [notes, statusFilter, selectedTags, searchQuery]);
+  }, [notes, statusFilter, selectedCategory, selectedSubject, selectedTags, searchQuery]);
 
   return (
     <div className={styles.page}>
@@ -62,6 +70,37 @@ export function LibraryPage() {
             </button>
           ))}
         </div>
+
+        <div className={styles.statusTabs}>
+          <button
+            className={`${styles.statusTab} ${selectedCategory === 'all' ? styles.activeTab : ''}`}
+            onClick={() => setSelectedCategory('all')}
+          >
+            All Categories
+          </button>
+          {allCategories.map(cat => (
+            <button
+              key={cat}
+              className={`${styles.statusTab} ${selectedCategory === cat ? styles.activeTab : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {allSubjects.length > 0 && (
+          <select
+            className={styles.subjectFilter}
+            value={selectedSubject}
+            onChange={e => setSelectedSubject(e.target.value)}
+          >
+            <option value="all">All Subjects</option>
+            {allSubjects.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        )}
 
         <TagFilter tags={allTags} selectedTags={selectedTags} onToggle={toggleTag} />
       </div>
