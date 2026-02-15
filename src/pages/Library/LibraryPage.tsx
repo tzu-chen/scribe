@@ -54,9 +54,6 @@ export function LibraryPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Library</h1>
-        <Link to="/note/new" className={styles.newButton}>
-          + New Note
-        </Link>
       </div>
 
       <div className={styles.filters}>
