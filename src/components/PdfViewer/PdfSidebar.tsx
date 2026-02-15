@@ -3,17 +3,17 @@ import styles from './PdfSidebar.module.css';
 
 interface Props {
   outline: OutlineItem[];
-  onNavigate: (page: number) => void;
+  onNavigate: (page: number, destTop: number | null) => void;
 }
 
-function OutlineTree({ items, depth, onNavigate }: { items: OutlineItem[]; depth: number; onNavigate: (page: number) => void }) {
+function OutlineTree({ items, depth, onNavigate }: { items: OutlineItem[]; depth: number; onNavigate: (page: number, destTop: number | null) => void }) {
   return (
     <ul className={styles.list} style={{ paddingLeft: depth > 0 ? 16 : 0 }}>
       {items.map((item, i) => (
         <li key={`${item.pageNumber}-${i}`}>
           <button
             className={styles.item}
-            onClick={() => onNavigate(item.pageNumber)}
+            onClick={() => onNavigate(item.pageNumber, item.destTop)}
             title={`Go to page ${item.pageNumber}`}
           >
             <span className={styles.itemTitle}>{item.title}</span>

@@ -10,7 +10,60 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 export interface OutlineItem {
   title: string;
   pageNumber: number;
+  /** Y offset from the top of the page in viewport units at scale 1 (null = top of page) */
+  destTop: number | null;
   children: OutlineItem[];
+}
+
+/**
+ * Extract the Y offset from the top of the page (in viewport units at scale 1)
+ * from a resolved PDF destination array.
+ *
+ * PDF destinations encode a position type and parameters:
+ *   [pageRef, { name: "XYZ" }, left, top, zoom]
+ *   [pageRef, { name: "FitH" }, top]
+ *   [pageRef, { name: "FitBH" }, top]
+ *   etc.
+ *
+ * The `top` value is in PDF user-space coordinates (origin at bottom-left,
+ * Y increases upward).  We convert it to an offset from the *top* of the
+ * rendered page: offsetFromTop = viewportHeight − top.
+ */
+function extractDestTop(
+  dest: unknown[],
+  viewportHeight: number,
+): number | null {
+  if (dest.length < 2) return null;
+
+  const typeObj = dest[1];
+  const typeName =
+    typeof typeObj === 'object' && typeObj !== null && 'name' in typeObj
+      ? (typeObj as { name: string }).name
+      : String(typeObj);
+
+  let pdfTop: number | null = null;
+
+  switch (typeName) {
+    case 'XYZ':
+      // [ref, XYZ, left, top, zoom]
+      pdfTop = typeof dest[3] === 'number' ? dest[3] : null;
+      break;
+    case 'FitH':
+    case 'FitBH':
+      // [ref, FitH/FitBH, top]
+      pdfTop = typeof dest[2] === 'number' ? dest[2] : null;
+      break;
+    case 'FitR':
+      // [ref, FitR, left, bottom, right, top]
+      pdfTop = typeof dest[5] === 'number' ? dest[5] : null;
+      break;
+    // Fit, FitV, FitB, FitBV → scroll to page top
+    default:
+      return null;
+  }
+
+  if (pdfTop === null) return null;
+  return viewportHeight - pdfTop;
 }
 
 async function resolveOutline(
@@ -21,24 +74,35 @@ async function resolveOutline(
   const result: OutlineItem[] = [];
   for (const item of items) {
     let pageNumber = 1;
+    let destTop: number | null = null;
     try {
+      let dest: unknown[] | null = null;
+
       if (typeof item.dest === 'string') {
-        const dest = await doc.getDestination(item.dest);
+        dest = await doc.getDestination(item.dest);
         if (dest) {
-          const ref = dest[0];
+          const ref = dest[0] as Parameters<PDFDocumentProxy['getPageIndex']>[0];
           pageNumber = (await doc.getPageIndex(ref)) + 1;
         }
       } else if (Array.isArray(item.dest) && item.dest.length > 0) {
-        pageNumber = (await doc.getPageIndex(item.dest[0])) + 1;
+        dest = item.dest as unknown[];
+        const ref = item.dest[0] as Parameters<PDFDocumentProxy['getPageIndex']>[0];
+        pageNumber = (await doc.getPageIndex(ref)) + 1;
+      }
+
+      if (dest) {
+        const page = await doc.getPage(pageNumber);
+        const vp = page.getViewport({ scale: 1 });
+        destTop = extractDestTop(dest, vp.height);
       }
     } catch {
-      // fallback to page 1
+      // fallback to page 1, top of page
     }
     const children = await resolveOutline(
       doc,
       item.items as { title: string; dest: unknown; items: unknown[] }[],
     );
-    result.push({ title: item.title, pageNumber, children });
+    result.push({ title: item.title, pageNumber, destTop, children });
   }
   return result;
 }
