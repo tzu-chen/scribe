@@ -8,6 +8,8 @@ interface Props {
   pdfDoc: PDFDocumentProxy;
   numPages: number;
   scale: number;
+  pageWidth: number;
+  pageHeight: number;
   highlights: PdfHighlight[];
   onTextSelected: (selection: TextSelection) => void;
   onSelectionCleared: () => void;
@@ -23,7 +25,7 @@ const BUFFER = 2;
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, highlights, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, highlights, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -116,7 +118,13 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
               onHighlightClick={onHighlightClick}
             />
           ) : (
-            <div className={styles.placeholder} />
+            <div
+              className={styles.placeholder}
+              style={{
+                width: Math.floor(pageWidth * scale),
+                height: Math.floor(pageHeight * scale),
+              }}
+            />
           )}
         </div>,
       );

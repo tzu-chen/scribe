@@ -111,6 +111,7 @@ export function usePdfDocument(blob: Blob | null) {
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [pageWidth, setPageWidth] = useState(612);
+  const [pageHeight, setPageHeight] = useState(792);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [loading, setLoading] = useState(!!blob);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +139,7 @@ export function usePdfDocument(blob: Blob | null) {
         if (!cancelled) {
           const vp = firstPage.getViewport({ scale: 1 });
           setPageWidth(vp.width);
+          setPageHeight(vp.height);
         }
 
         const rawOutline = await doc.getOutline();
@@ -161,5 +163,5 @@ export function usePdfDocument(blob: Blob | null) {
     };
   }, [blob]);
 
-  return { pdfDoc, numPages, pageWidth, outline, loading, error };
+  return { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error };
 }
