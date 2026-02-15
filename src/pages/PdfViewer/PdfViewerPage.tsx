@@ -156,8 +156,8 @@ export function PdfViewerPage() {
     setActiveHighlight(null);
   }, []);
 
-  const handleTocNavigate = useCallback((page: number) => {
-    docViewRef.current?.scrollToPage(page);
+  const handleTocNavigate = useCallback((page: number, destTop: number | null) => {
+    docViewRef.current?.scrollToPage(page, destTop);
   }, []);
 
   // Compute fit-width scale using actual container width and PDF page width

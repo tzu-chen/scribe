@@ -16,7 +16,7 @@ interface Props {
 }
 
 export interface PdfDocumentViewHandle {
-  scrollToPage: (page: number) => void;
+  scrollToPage: (page: number, offsetTop?: number | null) => void;
 }
 
 const BUFFER = 2;
@@ -33,15 +33,30 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     });
 
     useImperativeHandle(ref, () => ({
-      scrollToPage(page: number) {
+      scrollToPage(page: number, offsetTop?: number | null) {
         const container = containerRef.current;
         if (!container) return;
         const pageEl = container.querySelector(`[data-page-wrapper="${page}"]`);
-        if (pageEl) {
+        if (!pageEl) return;
+
+        if (offsetTop == null) {
+          // No sub-page offset – just scroll to the top of the page
           pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
         }
+
+        // Compute the precise scroll position within the container.
+        // offsetTop is in viewport units at scale 1; multiply by current
+        // scale to get the pixel offset inside the rendered page.
+        const containerRect = container.getBoundingClientRect();
+        const pageRect = (pageEl as HTMLElement).getBoundingClientRect();
+        const pageTopInContainer =
+          pageRect.top - containerRect.top + container.scrollTop;
+        const target = pageTopInContainer + offsetTop * scale;
+
+        container.scrollTo({ top: target, behavior: 'smooth' });
       },
-    }));
+    }), [scale]);
 
     // Track which pages are in view using IntersectionObserver
     useEffect(() => {
