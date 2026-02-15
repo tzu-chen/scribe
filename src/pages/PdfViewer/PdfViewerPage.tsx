@@ -22,7 +22,7 @@ export function PdfViewerPage() {
   const [filename, setFilename] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const { pdfDoc, numPages, outline, loading, error: pdfError } = usePdfDocument(blob);
+  const { pdfDoc, numPages, pageWidth, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
 
   const [zoom, setZoom] = useState(1.0);
@@ -37,6 +37,21 @@ export function PdfViewerPage() {
   } | null>(null);
 
   const docViewRef = useRef<PdfDocumentViewHandle>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Track the document area width for fit-width calculation
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Load the attachment blob
   useEffect(() => {
@@ -145,9 +160,9 @@ export function PdfViewerPage() {
     docViewRef.current?.scrollToPage(page);
   }, []);
 
-  // Compute fit-width scale
-  // This is a rough approach; we use a default page width of 612 (standard US letter in PDF points)
-  const effectiveZoom = fitWidth ? Math.max(0.5, (window.innerWidth - (showToc ? 280 : 0) - 80) / 612) : zoom;
+  // Compute fit-width scale using actual container width and PDF page width
+  const availableWidth = containerWidth > 0 ? containerWidth - (showToc ? 280 : 0) - 40 : 0;
+  const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / pageWidth) : zoom;
 
   const errorMessage = loadError || pdfError;
 
@@ -194,7 +209,7 @@ export function PdfViewerPage() {
         onReturnToFlowchart={handleReturnToFlowchart}
         onCreateNote={handleCreateNote}
       />
-      <div className={styles.body}>
+      <div ref={bodyRef} className={styles.body}>
         {showToc && (
           <PdfSidebar outline={outline} onNavigate={handleTocNavigate} />
         )}
