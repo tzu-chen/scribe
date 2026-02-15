@@ -1,0 +1,19 @@
+.container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: #e8e8e8;
+  padding: var(--spacing-md);
+}
+
+.pageWrapper {
+  margin-bottom: var(--spacing-sm);
+  display: flex;
+  justify-content: center;
+}
+
+.placeholder {
+  width: 100%;
+  min-height: 800px;
+  background: #f0f0f0;
+}

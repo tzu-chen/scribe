@@ -1,0 +1,31 @@
+.page {
+  position: relative;
+  margin: 0 auto var(--spacing-sm);
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  line-height: 0;
+}
+
+.canvas {
+  display: block;
+}
+
+.textLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1;
+}
+
+.textLayer span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  pointer-events: all;
+}
+
+.textLayer ::selection {
+  background: rgba(66, 99, 235, 0.3);
+}

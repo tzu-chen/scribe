@@ -1,0 +1,239 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { attachmentStorage } from '../../services/attachmentStorage';
+import { usePdfDocument } from '../../hooks/usePdfDocument';
+import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
+import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
+import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
+import { PdfDocumentView, type PdfDocumentViewHandle } from '../../components/PdfViewer/PdfDocumentView';
+import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionToolbar';
+import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
+import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
+import styles from './PdfViewerPage.module.css';
+
+export function PdfViewerPage() {
+  const { attachmentId } = useParams<{ attachmentId: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const subject = searchParams.get('subject') || '';
+  const flowchartId = searchParams.get('flowchart') || '';
+
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [filename, setFilename] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const { pdfDoc, numPages, outline, loading, error: pdfError } = usePdfDocument(blob);
+  const annotations = usePdfAnnotations(attachmentId || '');
+
+  const [zoom, setZoom] = useState(1.0);
+  const [fitWidth, setFitWidth] = useState(false);
+  const [showToc, setShowToc] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
+  const [activeHighlight, setActiveHighlight] = useState<{
+    highlightId: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+
+  const docViewRef = useRef<PdfDocumentViewHandle>(null);
+
+  // Load the attachment blob
+  useEffect(() => {
+    if (!attachmentId) return;
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const b = await attachmentStorage.getBlob(attachmentId);
+        if (cancelled) return;
+        if (!b) {
+          setLoadError('Attachment not found.');
+          return;
+        }
+        setBlob(b);
+
+        // Get filename from metadata
+        const subjects = await attachmentStorage.getBySubject(subject);
+        const meta = subjects.find(f => f.id === attachmentId);
+        if (meta) setFilename(meta.filename);
+      } catch {
+        if (!cancelled) setLoadError('Failed to load attachment.');
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [attachmentId, subject]);
+
+  const handleReturnToFlowchart = useCallback(() => {
+    navigate(`/flowcharts${flowchartId ? `?view=${flowchartId}` : ''}`);
+  }, [navigate, flowchartId]);
+
+  const handleCreateNote = useCallback(() => {
+    if (subject) {
+      navigate(`/note/new?subject=${encodeURIComponent(subject)}`);
+    } else {
+      navigate('/note/new');
+    }
+  }, [navigate, subject]);
+
+  const handleZoomChange = useCallback((newZoom: number) => {
+    setFitWidth(false);
+    setZoom(newZoom);
+  }, []);
+
+  const handleFitWidthToggle = useCallback(() => {
+    setFitWidth(prev => !prev);
+  }, []);
+
+  const handleTocToggle = useCallback(() => {
+    setShowToc(prev => !prev);
+  }, []);
+
+  const handleTextSelected = useCallback((selection: TextSelection) => {
+    setTextSelection(selection);
+    setActiveHighlight(null);
+  }, []);
+
+  const handleSelectionCleared = useCallback(() => {
+    setTextSelection(null);
+  }, []);
+
+  const handleHighlightClick = useCallback((highlightId: string, anchorRect: DOMRect) => {
+    setActiveHighlight({ highlightId, anchorRect });
+    setTextSelection(null);
+  }, []);
+
+  const handleHighlight = useCallback(async () => {
+    if (!textSelection) return;
+    await annotations.addHighlight(
+      textSelection.pageNumber,
+      textSelection.rects,
+      textSelection.text,
+    );
+    window.getSelection()?.removeAllRanges();
+    setTextSelection(null);
+  }, [textSelection, annotations]);
+
+  const handleHighlightAndComment = useCallback(async () => {
+    if (!textSelection) return;
+    const hl = await annotations.addHighlight(
+      textSelection.pageNumber,
+      textSelection.rects,
+      textSelection.text,
+    );
+    window.getSelection()?.removeAllRanges();
+    setTextSelection(null);
+    // Open comment popover for the new highlight
+    setActiveHighlight({
+      highlightId: hl.id,
+      anchorRect: new DOMRect(
+        textSelection.anchorPosition.x,
+        textSelection.anchorPosition.y,
+        0,
+        0,
+      ),
+    });
+  }, [textSelection, annotations]);
+
+  const handleClosePopover = useCallback(() => {
+    setActiveHighlight(null);
+  }, []);
+
+  const handleTocNavigate = useCallback((page: number) => {
+    docViewRef.current?.scrollToPage(page);
+  }, []);
+
+  // Compute fit-width scale
+  // This is a rough approach; we use a default page width of 612 (standard US letter in PDF points)
+  const effectiveZoom = fitWidth ? Math.max(0.5, (window.innerWidth - (showToc ? 280 : 0) - 80) / 612) : zoom;
+
+  const errorMessage = loadError || pdfError;
+
+  if (errorMessage) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.errorContainer}>
+          <p className={styles.error}>{errorMessage}</p>
+          <button className={styles.backBtn} onClick={handleReturnToFlowchart}>
+            &larr; Return to Flowchart
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !pdfDoc) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.loadingContainer}>
+          <p className={styles.loading}>Loading PDF...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const activeHl = activeHighlight
+    ? annotations.highlights.find(h => h.id === activeHighlight.highlightId)
+    : null;
+
+  return (
+    <div className={styles.page}>
+      <PdfToolbar
+        filename={filename}
+        currentPage={currentPage}
+        numPages={numPages}
+        zoom={effectiveZoom}
+        fitWidth={fitWidth}
+        showToc={showToc}
+        hasOutline={outline.length > 0}
+        onZoomChange={handleZoomChange}
+        onFitWidthToggle={handleFitWidthToggle}
+        onTocToggle={handleTocToggle}
+        onReturnToFlowchart={handleReturnToFlowchart}
+        onCreateNote={handleCreateNote}
+      />
+      <div className={styles.body}>
+        {showToc && (
+          <PdfSidebar outline={outline} onNavigate={handleTocNavigate} />
+        )}
+        <PdfDocumentView
+          ref={docViewRef}
+          pdfDoc={pdfDoc}
+          numPages={numPages}
+          scale={effectiveZoom}
+          highlights={annotations.highlights}
+          onTextSelected={handleTextSelected}
+          onSelectionCleared={handleSelectionCleared}
+          onHighlightClick={handleHighlightClick}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+
+      {textSelection && (
+        <PdfSelectionToolbar
+          position={textSelection.anchorPosition}
+          onHighlight={handleHighlight}
+          onHighlightAndComment={handleHighlightAndComment}
+        />
+      )}
+
+      {activeHl && activeHighlight && (
+        <PdfCommentPopover
+          highlight={activeHl}
+          comments={annotations.comments[activeHl.id] || []}
+          anchorRect={activeHighlight.anchorRect}
+          onAddComment={annotations.addComment}
+          onUpdateComment={annotations.updateComment}
+          onDeleteComment={annotations.deleteComment}
+          onDeleteHighlight={(id) => {
+            annotations.deleteHighlight(id);
+            setActiveHighlight(null);
+          }}
+          onClose={handleClosePopover}
+        />
+      )}
+    </div>
+  );
+}
