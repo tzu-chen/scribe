@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TextLayer } from 'pdfjs-dist';
+import { TextLayer, setLayerDimensions } from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfHighlight, HighlightRect } from '../../types/annotation';
 import { PdfHighlightLayer } from './PdfHighlightLayer';
@@ -37,7 +37,6 @@ export function PdfPageView({
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const textLayerInstanceRef = useRef<TextLayer | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  // Keep a ref copy so the mouseup handler doesn't need dimensions as a dep
   const dimensionsRef = useRef(dimensions);
   useEffect(() => {
     dimensionsRef.current = dimensions;
@@ -73,8 +72,12 @@ export function PdfPageView({
 
       try {
         await renderTask.promise;
-      } catch {
-        // Render cancelled
+      } catch (err) {
+        // Only return silently on cancellation; log real errors
+        if (err instanceof Error && err.name === 'RenderingCancelledException') {
+          return;
+        }
+        console.error(`Failed to render page ${pageNumber}:`, err);
         return;
       }
 
@@ -83,10 +86,9 @@ export function PdfPageView({
       // Cancel previous text layer
       textLayerInstanceRef.current?.cancel();
 
-      // Clear text layer
+      // Clear and size the text layer div
       textLayerDiv.innerHTML = '';
-      textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
-      textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
+      setLayerDimensions(textLayerDiv, viewport);
 
       const textContent = await page.getTextContent();
       if (cancelled) return;
@@ -97,7 +99,12 @@ export function PdfPageView({
         viewport,
       });
       textLayerInstanceRef.current = textLayer;
-      await textLayer.render();
+
+      try {
+        await textLayer.render();
+      } catch {
+        // Text layer render can fail on some PDFs; canvas still works
+      }
     };
 
     renderPage();
@@ -164,11 +171,11 @@ export function PdfPageView({
     <div
       ref={containerRef}
       className={styles.page}
-      data-page-number={pageNumber}
       onMouseUp={handleMouseUp}
     >
       <canvas ref={canvasRef} className={styles.canvas} />
-      <div ref={textLayerRef} className={styles.textLayer} />
+      {/* Use unscoped "textLayer" class so pdfjs-dist/web/pdf_viewer.css applies */}
+      <div ref={textLayerRef} className="textLayer" />
       <PdfHighlightLayer
         highlights={pageHighlights}
         pageWidth={dimensions.width}

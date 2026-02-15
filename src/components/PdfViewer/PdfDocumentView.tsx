@@ -19,19 +19,24 @@ export interface PdfDocumentViewHandle {
   scrollToPage: (page: number) => void;
 }
 
+const BUFFER = 2;
+
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
     { pdfDoc, numPages, scale, highlights, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({ start: 1, end: 3 });
+    const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({
+      start: 1,
+      end: Math.min(numPages, 5),
+    });
 
     useImperativeHandle(ref, () => ({
       scrollToPage(page: number) {
         const container = containerRef.current;
         if (!container) return;
-        const pageEl = container.querySelector(`[data-page-number="${page}"]`);
+        const pageEl = container.querySelector(`[data-page-wrapper="${page}"]`);
         if (pageEl) {
           pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -43,16 +48,13 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       const container = containerRef.current;
       if (!container) return;
 
-      const pageElements = container.querySelectorAll('[data-page-number]');
-      if (pageElements.length === 0) return;
-
       const visiblePages = new Set<number>();
 
       const observer = new IntersectionObserver(
         entries => {
           for (const entry of entries) {
             const pageNum = Number(
-              (entry.target as HTMLElement).dataset.pageNumber,
+              (entry.target as HTMLElement).dataset.pageWrapper,
             );
             if (entry.isIntersecting) {
               visiblePages.add(pageNum);
@@ -64,15 +66,18 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
             const sorted = Array.from(visiblePages).sort((a, b) => a - b);
             onPageChange(sorted[0]);
             setVisibleRange({
-              start: Math.max(1, sorted[0] - 2),
-              end: Math.min(numPages, sorted[sorted.length - 1] + 2),
+              start: Math.max(1, sorted[0] - BUFFER),
+              end: Math.min(numPages, sorted[sorted.length - 1] + BUFFER),
             });
           }
         },
-        { root: container, threshold: 0.1 },
+        { root: container, threshold: 0.01 },
       );
 
-      pageElements.forEach(el => observer.observe(el));
+      // Observe all wrapper elements
+      const wrappers = container.querySelectorAll('[data-page-wrapper]');
+      wrappers.forEach(el => observer.observe(el));
+
       return () => observer.disconnect();
     }, [numPages, onPageChange, scale]);
 
@@ -84,7 +89,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     const pages = [];
     for (let i = 1; i <= numPages; i++) {
       pages.push(
-        <div key={i} data-page-number={i} className={styles.pageWrapper}>
+        <div key={i} data-page-wrapper={i} className={styles.pageWrapper}>
           {isPageVisible(i) ? (
             <PdfPageView
               pdfDoc={pdfDoc}

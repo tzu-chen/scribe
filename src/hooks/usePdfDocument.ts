@@ -46,6 +46,7 @@ async function resolveOutline(
 export function usePdfDocument(blob: Blob | null) {
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState(0);
+  const [pageWidth, setPageWidth] = useState(612);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [loading, setLoading] = useState(!!blob);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +69,13 @@ export function usePdfDocument(blob: Blob | null) {
         setPdfDoc(doc);
         setNumPages(doc.numPages);
 
+        // Get actual first page width for fit-width calculation
+        const firstPage = await doc.getPage(1);
+        if (!cancelled) {
+          const vp = firstPage.getViewport({ scale: 1 });
+          setPageWidth(vp.width);
+        }
+
         const rawOutline = await doc.getOutline();
         if (!cancelled) {
           const resolved = await resolveOutline(doc, rawOutline);
@@ -89,5 +97,5 @@ export function usePdfDocument(blob: Blob | null) {
     };
   }, [blob]);
 
-  return { pdfDoc, numPages, outline, loading, error };
+  return { pdfDoc, numPages, pageWidth, outline, loading, error };
 }
