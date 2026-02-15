@@ -114,9 +114,24 @@ export function FlowchartsPage() {
     [sendAttachmentCounts],
   );
 
-  const handleOpenFile = useCallback(async (id: string) => {
-    await attachmentStorage.openFile(id);
-  }, []);
+  const handleOpenFile = useCallback(
+    async (file: AttachmentMeta) => {
+      if (file.type === 'application/pdf') {
+        const params = new URLSearchParams();
+        if (attachmentPanel?.subject) {
+          params.set('subject', attachmentPanel.subject);
+        }
+        if (activeFlowchart) {
+          params.set('flowchart', activeFlowchart);
+        }
+        const qs = params.toString();
+        navigate(`/pdf/${file.id}${qs ? `?${qs}` : ''}`);
+      } else {
+        await attachmentStorage.openFile(file.id);
+      }
+    },
+    [navigate, attachmentPanel, activeFlowchart],
+  );
 
   const handleDeleteAttachment = useCallback(
     async (id: string) => {
@@ -222,7 +237,7 @@ export function FlowchartsPage() {
                     <li key={file.id} className={styles.attachmentItem}>
                       <button
                         className={styles.attachmentFilename}
-                        onClick={() => handleOpenFile(file.id)}
+                        onClick={() => handleOpenFile(file)}
                         title={`Open ${file.filename}`}
                       >
                         {file.filename}

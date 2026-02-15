@@ -9,6 +9,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isHome = location.pathname === '/';
   const isFlowcharts = location.pathname === '/flowcharts';
+  const isPdfViewer = location.pathname.startsWith('/pdf/');
 
   return (
     <div className={styles.layout}>
@@ -34,7 +35,7 @@ export function Layout({ children }: LayoutProps) {
           </nav>
         </div>
       </header>
-      <main className={styles.main}>{children}</main>
+      <main className={isPdfViewer ? styles.mainFullWidth : styles.main}>{children}</main>
     </div>
   );
 }
