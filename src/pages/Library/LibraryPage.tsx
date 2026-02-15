@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { NoteCard } from '../../components/NoteCard/NoteCard';
 import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { TagFilter } from '../../components/TagFilter/TagFilter';
@@ -13,6 +13,7 @@ import styles from './LibraryPage.module.css';
 type StatusFilter = 'all' | NoteStatus;
 
 export function LibraryPage() {
+  const [searchParams] = useSearchParams();
   const { notes } = useNotes();
   const { allTags } = useTags(notes);
   const { allCategories } = useCategories(notes);
@@ -21,7 +22,9 @@ export function LibraryPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState(
+    () => searchParams.get('subject') || 'all',
+  );
 
   const toggleTag = useCallback((tag: string) => {
     setSelectedTags(prev =>
