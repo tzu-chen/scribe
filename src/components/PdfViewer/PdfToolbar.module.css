@@ -130,6 +130,25 @@
   border-color: var(--color-primary);
 }
 
+.panelBtn {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
+}
+
+.panelBtn:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.panelBtnActive {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
 .noteBtn {
   font-size: 0.85rem;
   padding: 6px 14px;

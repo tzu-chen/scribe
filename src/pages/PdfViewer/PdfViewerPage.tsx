@@ -4,8 +4,10 @@ import { attachmentStorage } from '../../services/attachmentStorage';
 import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
+import { useNotes } from '../../hooks/useNotes';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
 import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
+import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
 import { PdfDocumentView, type PdfDocumentViewHandle } from '../../components/PdfViewer/PdfDocumentView';
 import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionToolbar';
 import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
@@ -25,12 +27,14 @@ export function PdfViewerPage() {
 
   const { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
+  const { notes } = useNotes();
 
   const savedPrefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
 
   const [zoom, setZoom] = useState(savedPrefs?.zoom ?? 1.0);
   const [fitWidth, setFitWidth] = useState(savedPrefs?.fitWidth ?? false);
   const [showToc, setShowToc] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
@@ -167,6 +171,18 @@ export function PdfViewerPage() {
     setShowToc(prev => !prev);
   }, []);
 
+  const handleRightPanelToggle = useCallback(() => {
+    setShowRightPanel(prev => !prev);
+  }, []);
+
+  const handlePanelScrollToPage = useCallback((page: number) => {
+    docViewRef.current?.scrollToPage(page);
+  }, []);
+
+  const handleNavigateToNote = useCallback((noteId: string) => {
+    navigate(`/note/${noteId}`);
+  }, [navigate]);
+
   const handleTextSelected = useCallback((selection: TextSelection) => {
     setTextSelection(selection);
     setActiveHighlight(null);
@@ -222,7 +238,7 @@ export function PdfViewerPage() {
   }, []);
 
   // Compute fit-width scale using actual container width and PDF page width
-  const availableWidth = containerWidth > 0 ? containerWidth - (showToc ? 280 : 0) - 40 : 0;
+  const availableWidth = containerWidth > 0 ? containerWidth - (showToc ? 280 : 0) - (showRightPanel ? 300 : 0) - 40 : 0;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / pageWidth) : zoom;
 
   const errorMessage = loadError || pdfError;
@@ -267,6 +283,8 @@ export function PdfViewerPage() {
         onZoomChange={handleZoomChange}
         onFitWidthToggle={handleFitWidthToggle}
         onTocToggle={handleTocToggle}
+        showRightPanel={showRightPanel}
+        onRightPanelToggle={handleRightPanelToggle}
         onReturnToFlowchart={handleReturnToFlowchart}
         onCreateNote={handleCreateNote}
       />
@@ -287,6 +305,16 @@ export function PdfViewerPage() {
           onHighlightClick={handleHighlightClick}
           onPageChange={setCurrentPage}
         />
+        {showRightPanel && (
+          <PdfRightPanel
+            highlights={annotations.highlights}
+            comments={annotations.comments}
+            notes={notes}
+            subject={subject}
+            onScrollToPage={handlePanelScrollToPage}
+            onNavigateToNote={handleNavigateToNote}
+          />
+        )}
       </div>
 
       {textSelection && (
