@@ -38,7 +38,7 @@ export function ViewPage() {
     return (
       <div className={styles.notFound}>
         <p>Note not found.</p>
-        <Link to="/">Back to Library</Link>
+        <Link to="/notes">Back to Notes</Link>
       </div>
     );
   }
@@ -46,15 +46,15 @@ export function ViewPage() {
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
       deleteNote(note.id);
-      navigate('/');
+      navigate('/notes');
     }
   };
 
   return (
     <div className={styles.page}>
       <div className={styles.actions}>
-        <Link to="/" className={styles.backLink}>
-          &larr; Library
+        <Link to="/notes" className={styles.backLink}>
+          &larr; Notes
         </Link>
         <div className={styles.actionButtons}>
           <Link to={`/note/${note.id}/edit`} className={styles.editButton}>

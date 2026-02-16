@@ -77,7 +77,7 @@ export function EditorPage() {
   const handleDelete = useCallback(() => {
     if (window.confirm('Are you sure you want to delete this note?')) {
       deleteNote(note.id);
-      navigate('/');
+      navigate('/notes');
     }
   }, [note.id, deleteNote, navigate]);
 

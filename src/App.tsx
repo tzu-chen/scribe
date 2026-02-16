@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Layout } from './components/Layout/Layout';
 import { LibraryPage } from './pages/Library/LibraryPage';
+import { NotesPage } from './pages/Notes/NotesPage';
 import { EditorPage } from './pages/Editor/EditorPage';
 import { ViewPage } from './pages/View/ViewPage';
 import { FlowchartsPage } from './pages/Flowcharts/FlowchartsPage';
@@ -15,6 +16,7 @@ export default function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<LibraryPage />} />
+            <Route path="/notes" element={<NotesPage />} />
             <Route path="/flowcharts" element={<FlowchartsPage />} />
             <Route path="/pdf/:attachmentId" element={<PdfViewerPage />} />
             <Route path="/note/new" element={<EditorPage />} />

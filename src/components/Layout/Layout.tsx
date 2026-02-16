@@ -9,6 +9,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isNotes = location.pathname === '/notes';
   const isFlowcharts = location.pathname === '/flowcharts';
   const isPdfViewer = location.pathname.startsWith('/pdf/');
 
@@ -25,6 +26,12 @@ export function Layout({ children }: LayoutProps) {
               className={`${styles.navLink} ${isHome ? styles.navLinkActive : ''}`}
             >
               Library
+            </Link>
+            <Link
+              to="/notes"
+              className={`${styles.navLink} ${isNotes ? styles.navLinkActive : ''}`}
+            >
+              Notes
             </Link>
             <Link
               to="/flowcharts"
