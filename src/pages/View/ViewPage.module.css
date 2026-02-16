@@ -53,7 +53,7 @@
 }
 
 .deleteButton:hover {
-  background: rgba(224, 49, 49, 0.08);
+  background: var(--color-danger-light);
 }
 
 .article {

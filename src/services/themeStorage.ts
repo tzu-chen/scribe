@@ -1,8 +1,11 @@
-export type ThemeName = 'default' | 'dark' | 'warm' | 'ocean' | 'high-contrast';
+export type ThemeName = 'default' | 'dark' | 'warm' | 'ocean' | 'high-contrast' | 'rose' | 'forest' | 'sunset' | 'lavender' | 'slate';
 
 const STORAGE_KEY = 'scribe_theme';
 
-const VALID_THEMES: ThemeName[] = ['default', 'dark', 'warm', 'ocean', 'high-contrast'];
+const VALID_THEMES: ThemeName[] = [
+  'default', 'dark', 'warm', 'ocean', 'high-contrast',
+  'rose', 'forest', 'sunset', 'lavender', 'slate',
+];
 
 export const themeStorage = {
   get(): ThemeName {

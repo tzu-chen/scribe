@@ -23,11 +23,11 @@
 
 .active {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-primary-text);
   border-color: var(--color-primary);
 }
 
 .active:hover {
   background: var(--color-primary-hover);
-  color: white;
+  color: var(--color-primary-text);
 }
