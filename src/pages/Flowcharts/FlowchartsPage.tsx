@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
+import { BookPicker } from '../../components/BookPicker/BookPicker';
 import type { AttachmentMeta } from '../../types/attachment';
 import styles from './FlowchartsPage.module.css';
 
@@ -33,7 +34,7 @@ export function FlowchartsPage() {
     files: AttachmentMeta[];
   } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bookPickerSubject, setBookPickerSubject] = useState<string | null>(null);
 
   const activeFlowchart = searchParams.get('view');
 
@@ -80,10 +81,7 @@ export function FlowchartsPage() {
             navigate(`/note/new?subject=${encodeURIComponent(nodeTitle)}`);
             break;
           case 'attach-file':
-            if (fileInputRef.current) {
-              fileInputRef.current.setAttribute('data-subject', nodeTitle);
-              fileInputRef.current.click();
-            }
+            setBookPickerSubject(nodeTitle);
             break;
           case 'view-attachments':
             attachmentStorage.getBySubject(nodeTitle).then(files => {
@@ -91,7 +89,7 @@ export function FlowchartsPage() {
             });
             break;
           case 'view-notes':
-            navigate(`/?subject=${encodeURIComponent(nodeTitle)}`);
+            navigate(`/notes?subject=${encodeURIComponent(nodeTitle)}`);
             break;
         }
       }
@@ -101,18 +99,21 @@ export function FlowchartsPage() {
     return () => window.removeEventListener('message', handleMessage);
   }, [navigate]);
 
-  const handleFileSelected = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      const subject = fileInputRef.current?.getAttribute('data-subject');
-      if (!file || !subject) return;
-
-      await attachmentStorage.add(subject, file);
+  const handleBookSelected = useCallback(
+    async (book: AttachmentMeta) => {
+      if (bookPickerSubject === null) return;
+      const blob = await attachmentStorage.getBlob(book.id);
+      if (!blob) return;
+      await attachmentStorage.addFromBlob(bookPickerSubject, book.filename, book.type, blob);
       await sendAttachmentCounts();
-      e.target.value = '';
+      setBookPickerSubject(null);
     },
-    [sendAttachmentCounts],
+    [bookPickerSubject, sendAttachmentCounts],
   );
+
+  const handleBookPickerCancel = useCallback(() => {
+    setBookPickerSubject(null);
+  }, []);
 
   const handleOpenFile = useCallback(
     async (file: AttachmentMeta) => {
@@ -199,12 +200,12 @@ export function FlowchartsPage() {
           />
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          className={styles.hiddenInput}
-          onChange={handleFileSelected}
-        />
+        {bookPickerSubject !== null && (
+          <BookPicker
+            onSelect={handleBookSelected}
+            onCancel={handleBookPickerCancel}
+          />
+        )}
 
         {attachmentPanel && (
           <div

@@ -88,6 +88,34 @@ export const attachmentStorage = {
     return record?.data ?? null;
   },
 
+  async getAll(): Promise<AttachmentMeta[]> {
+    const db = await openDB();
+    const store = txStore(db, 'readonly');
+    const all: Attachment[] = await reqToPromise(store.getAll());
+    db.close();
+    return all
+      .map(({ data: _, ...meta }) => meta)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  async addFromBlob(subject: string, filename: string, type: string, blob: Blob): Promise<AttachmentMeta> {
+    const record: Attachment = {
+      id: uuidv4(),
+      subject,
+      filename,
+      type,
+      size: blob.size,
+      data: blob,
+      createdAt: new Date().toISOString(),
+    };
+    const db = await openDB();
+    const store = txStore(db, 'readwrite');
+    await reqToPromise(store.add(record));
+    db.close();
+    const { data: _, ...meta } = record;
+    return meta;
+  },
+
   async openFile(id: string): Promise<void> {
     const db = await openDB();
     const store = txStore(db, 'readonly');
