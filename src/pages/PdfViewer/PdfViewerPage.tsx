@@ -12,6 +12,7 @@ import { PdfDocumentView, type PdfDocumentViewHandle } from '../../components/Pd
 import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionToolbar';
 import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
+import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import styles from './PdfViewerPage.module.css';
 
 export function PdfViewerPage() {
@@ -24,6 +25,8 @@ export function PdfViewerPage() {
   const [blob, setBlob] = useState<Blob | null>(null);
   const [filename, setFilename] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useReadingTimeTracker(attachmentId, filename);
 
   const { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
