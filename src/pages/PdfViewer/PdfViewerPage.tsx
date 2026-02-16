@@ -43,7 +43,9 @@ export function PdfViewerPage() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Track the document area width for fit-width calculation
+  // Track the document area width for fit-width calculation.
+  // Depend on pdfDoc so the observer is set up once the body div mounts
+  // (it is conditionally rendered only after the PDF has loaded).
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
@@ -54,7 +56,7 @@ export function PdfViewerPage() {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [pdfDoc]);
 
   // Load the attachment blob
   useEffect(() => {
