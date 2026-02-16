@@ -13,6 +13,8 @@ interface Props {
   onZoomChange: (zoom: number) => void;
   onFitWidthToggle: () => void;
   onTocToggle: () => void;
+  showRightPanel: boolean;
+  onRightPanelToggle: () => void;
   onReturnToFlowchart: () => void;
   onCreateNote: () => void;
 }
@@ -28,6 +30,8 @@ export function PdfToolbar({
   onZoomChange,
   onFitWidthToggle,
   onTocToggle,
+  showRightPanel,
+  onRightPanelToggle,
   onReturnToFlowchart,
   onCreateNote,
 }: Props) {
@@ -96,6 +100,13 @@ export function PdfToolbar({
       </div>
 
       <div className={styles.right}>
+        <button
+          className={`${styles.panelBtn} ${showRightPanel ? styles.panelBtnActive : ''}`}
+          onClick={onRightPanelToggle}
+          title="Comments & Notes panel"
+        >
+          Panel
+        </button>
         <button className={styles.noteBtn} onClick={onCreateNote}>
           + Create Note
         </button>
