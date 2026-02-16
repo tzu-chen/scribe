@@ -47,7 +47,7 @@
 }
 
 .removeTag:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--color-overlay-light);
   color: var(--color-text);
 }
 
