@@ -116,6 +116,17 @@ export const attachmentStorage = {
     return meta;
   },
 
+  async updateSubject(id: string, subject: string): Promise<void> {
+    const db = await openDB();
+    const store = txStore(db, 'readwrite');
+    const record: Attachment | undefined = await reqToPromise(store.get(id));
+    if (record) {
+      record.subject = subject;
+      await reqToPromise(store.put(record));
+    }
+    db.close();
+  },
+
   async openFile(id: string): Promise<void> {
     const db = await openDB();
     const store = txStore(db, 'readonly');

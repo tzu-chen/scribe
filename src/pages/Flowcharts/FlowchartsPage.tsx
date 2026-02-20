@@ -102,9 +102,7 @@ export function FlowchartsPage() {
   const handleBookSelected = useCallback(
     async (book: AttachmentMeta) => {
       if (bookPickerSubject === null) return;
-      const blob = await attachmentStorage.getBlob(book.id);
-      if (!blob) return;
-      await attachmentStorage.addFromBlob(bookPickerSubject, book.filename, book.type, blob);
+      await attachmentStorage.updateSubject(book.id, bookPickerSubject);
       await sendAttachmentCounts();
       setBookPickerSubject(null);
     },
