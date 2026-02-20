@@ -119,9 +119,12 @@ export function useReadingSummary() {
       book.roundedSeconds = roundDown30Min(bookTotal);
     }
 
+    // Only show books with at least 30 minutes of reading time
+    const filteredBooks = booksArray.filter((book) => book.roundedSeconds >= 1800);
+
     const total = roundDown30Min(entries.reduce((sum, e) => sum + e.totalSeconds, 0));
 
-    return { days: daysArray, books: booksArray, totalSeconds: total };
+    return { days: daysArray, books: filteredBooks, totalSeconds: total };
   }, [viewMode, refreshKey]);
 
   return { viewMode, setViewMode, days, books, totalSeconds, refresh };
