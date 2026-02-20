@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,6 +12,8 @@ import {
 } from 'recharts';
 import { useReadingSummary, type ViewMode } from '../../hooks/useReadingSummary';
 import styles from './SummaryPage.module.css';
+
+const ACTIVE_THRESHOLD = 1800; // 30 minutes in seconds
 
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
@@ -67,7 +69,7 @@ function BarEndLabel(props: {
 }
 
 export function SummaryPage() {
-  const { viewMode, setViewMode, books, totalSeconds, refresh } =
+  const { viewMode, setViewMode, days, books, totalSeconds, refresh } =
     useReadingSummary();
 
   // Refresh data when the page becomes visible (returning from reading)
@@ -115,57 +117,111 @@ export function SummaryPage() {
         <span className={styles.totalValue}>{formatDuration(totalSeconds)}</span>
       </div>
 
-      {books.length === 0 ? (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No reading data yet</p>
-          <p className={styles.emptyText}>
-            Open a book from the Library to start tracking your reading time.
-          </p>
-        </div>
-      ) : (
-        <div className={styles.chartContainer}>
-          <ResponsiveContainer width="100%" height={Math.max(200, books.length * 50 + 40)}>
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 10, right: 80, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-border-light)"
-                horizontal={false}
-              />
-              <XAxis
-                type="number"
-                tickFormatter={(value: number) => formatDuration(value)}
-                tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
-                tickLine={{ stroke: 'var(--color-border)' }}
-                axisLine={{ stroke: 'var(--color-border)' }}
-              />
-              <YAxis
-                type="category"
-                dataKey="displayName"
-                width={150}
-                tick={{ fill: 'var(--color-text)', fontSize: 13 }}
-                tickLine={false}
-                axisLine={{ stroke: 'var(--color-border)' }}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-primary-light)' }} />
-              <Bar dataKey="totalSeconds" radius={[0, 4, 4, 0]} barSize={30}>
-                {chartData.map((entry) => (
-                  <Cell key={entry.attachmentId} fill={entry.color} />
+      {viewMode === 'week' ? (
+        books.length === 0 ? (
+          <div className={styles.empty}>
+            <p className={styles.emptyTitle}>No reading data yet</p>
+            <p className={styles.emptyText}>
+              Open a book from the Library to start tracking your reading time.
+            </p>
+          </div>
+        ) : (
+          <div className={styles.heatmapWrapper}>
+            <div className={styles.heatmapScroll}>
+              <div className={styles.heatmapGrid}>
+                {/* Header row: empty corner + 7 day labels + Total */}
+                <div className={styles.heatmapLabelCell} />
+                {days.map((day) => (
+                  <div key={day.dateCST} className={styles.heatmapDayHeader}>
+                    {day.label}
+                  </div>
                 ))}
-                <LabelList
-                  dataKey="totalSeconds"
-                  content={<BarEndLabel />}
+                <div className={styles.heatmapTotalHeader}>Total</div>
+
+                {/* One row per book */}
+                {books.map((book) => (
+                  <React.Fragment key={book.attachmentId}>
+                    <div className={styles.heatmapBookLabel}>
+                      <span
+                        className={styles.heatmapBookDot}
+                        style={{ backgroundColor: book.color }}
+                      />
+                      <span className={styles.heatmapBookName}>{book.displayName}</span>
+                    </div>
+                    {days.map((day) => {
+                      const seconds = day.books[book.attachmentId] ?? 0;
+                      const isActive = seconds >= ACTIVE_THRESHOLD;
+                      return (
+                        <div
+                          key={day.dateCST}
+                          className={`${styles.heatmapCell} ${isActive ? styles.heatmapCellActive : styles.heatmapCellInactive}`}
+                          style={isActive ? { backgroundColor: book.color } : undefined}
+                          title={isActive ? `${book.displayName} · ${day.label}: ${formatDuration(seconds)}` : undefined}
+                        />
+                      );
+                    })}
+                    <div className={styles.heatmapRowTotal}>
+                      {formatDuration(book.roundedSeconds)}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      ) : (
+        books.length === 0 ? (
+          <div className={styles.empty}>
+            <p className={styles.emptyTitle}>No reading data yet</p>
+            <p className={styles.emptyText}>
+              Open a book from the Library to start tracking your reading time.
+            </p>
+          </div>
+        ) : (
+          <div className={styles.chartContainer}>
+            <ResponsiveContainer width="100%" height={Math.max(200, books.length * 50 + 40)}>
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ top: 10, right: 80, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--color-border-light)"
+                  horizontal={false}
                 />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+                <XAxis
+                  type="number"
+                  tickFormatter={(value: number) => formatDuration(value)}
+                  tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
+                  tickLine={{ stroke: 'var(--color-border)' }}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="displayName"
+                  width={150}
+                  tick={{ fill: 'var(--color-text)', fontSize: 13 }}
+                  tickLine={false}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-primary-light)' }} />
+                <Bar dataKey="totalSeconds" radius={[0, 4, 4, 0]} barSize={30}>
+                  {chartData.map((entry) => (
+                    <Cell key={entry.attachmentId} fill={entry.color} />
+                  ))}
+                  <LabelList
+                    dataKey="totalSeconds"
+                    content={<BarEndLabel />}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )
       )}
 
-      {books.length > 0 && (
+      {viewMode === 'month' && books.length > 0 && (
         <div className={styles.legend}>
           <h3 className={styles.legendTitle}>Books</h3>
           <ul className={styles.legendList}>

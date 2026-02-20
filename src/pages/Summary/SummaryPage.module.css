@@ -196,3 +196,114 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ── Weekly Heatmap ─────────────────────────── */
+
+.heatmapWrapper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.heatmapScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--spacing-lg);
+}
+
+.heatmapGrid {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) repeat(7, 1fr) auto;
+  gap: var(--spacing-xs);
+  min-width: 480px;
+  align-items: center;
+}
+
+.heatmapLabelCell {
+  /* empty corner spacer */
+}
+
+.heatmapDayHeader {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.heatmapTotalHeader {
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: 0 0 var(--spacing-xs) var(--spacing-sm);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.heatmapBookLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  padding-right: var(--spacing-sm);
+}
+
+.heatmapBookDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.heatmapBookName {
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heatmapCell {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.heatmapCellActive {
+  opacity: 0.85;
+  cursor: default;
+}
+
+.heatmapCellActive:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.heatmapCellInactive {
+  background: var(--color-border-light);
+  opacity: 0.4;
+}
+
+.heatmapRowTotal {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-align: right;
+  padding-left: var(--spacing-sm);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .heatmapGrid {
+    grid-template-columns: minmax(80px, 120px) repeat(7, 1fr) auto;
+  }
+}
