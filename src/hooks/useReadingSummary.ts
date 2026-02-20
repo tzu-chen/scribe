@@ -20,7 +20,18 @@ export interface DayData {
 export interface BookInfo {
   attachmentId: string;
   filename: string;
+  displayName: string;
   color: string;
+  totalSeconds: number;
+  roundedSeconds: number;
+}
+
+function stripPdfExtension(filename: string): string {
+  return filename.replace(/\.pdf$/i, '');
+}
+
+function roundDown30Min(totalSeconds: number): number {
+  return Math.floor(totalSeconds / 1800) * 1800;
 }
 
 const BOOK_COLORS = [
@@ -88,14 +99,27 @@ export function useReadingSummary() {
         bookMap.set(entry.attachmentId, {
           attachmentId: entry.attachmentId,
           filename: entry.filename,
+          displayName: stripPdfExtension(entry.filename),
           color: BOOK_COLORS[bookMap.size % BOOK_COLORS.length],
+          totalSeconds: 0,
+          roundedSeconds: 0,
         });
       }
     }
 
     const daysArray = Array.from(dayMap.values());
     const booksArray = Array.from(bookMap.values());
-    const total = entries.reduce((sum, e) => sum + e.totalSeconds, 0);
+
+    for (const book of booksArray) {
+      const bookTotal = daysArray.reduce(
+        (sum, day) => sum + (day.books[book.attachmentId] || 0),
+        0,
+      );
+      book.totalSeconds = bookTotal;
+      book.roundedSeconds = roundDown30Min(bookTotal);
+    }
+
+    const total = roundDown30Min(entries.reduce((sum, e) => sum + e.totalSeconds, 0));
 
     return { days: daysArray, books: booksArray, totalSeconds: total };
   }, [viewMode, refreshKey]);

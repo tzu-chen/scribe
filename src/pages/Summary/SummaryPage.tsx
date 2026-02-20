@@ -6,8 +6,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Cell,
+  LabelList,
 } from 'recharts';
 import { useReadingSummary, type ViewMode } from '../../hooks/useReadingSummary';
 import styles from './SummaryPage.module.css';
@@ -17,32 +18,56 @@ function formatDuration(totalSeconds: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;
   if (minutes > 0) return `${minutes}m`;
-  if (totalSeconds > 0) return '<1m';
   return '0m';
 }
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; color: string; name: string }>; label?: string }) {
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: { displayName: string; totalSeconds: number; color: string } }>;
+}) {
   if (!active || !payload?.length) return null;
-  const nonZero = payload.filter((e) => e.value > 0);
-  if (nonZero.length === 0) return null;
+  const data = payload[0].payload;
   return (
     <div className={styles.tooltip}>
-      <p className={styles.tooltipLabel}>{label}</p>
-      {nonZero.map((entry) => (
-        <p key={entry.dataKey} className={styles.tooltipItem}>
-          <span
-            className={styles.tooltipColor}
-            style={{ backgroundColor: entry.color }}
-          />
-          {entry.name}: {formatDuration(entry.value)}
-        </p>
-      ))}
+      <p className={styles.tooltipLabel}>{data.displayName}</p>
+      <p className={styles.tooltipItem}>
+        <span
+          className={styles.tooltipColor}
+          style={{ backgroundColor: data.color }}
+        />
+        {formatDuration(data.totalSeconds)}
+      </p>
     </div>
   );
 }
 
+function BarEndLabel(props: {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  value?: number;
+}) {
+  const { x = 0, y = 0, width = 0, height = 0, value = 0 } = props;
+  return (
+    <text
+      x={x + width + 8}
+      y={y + height / 2}
+      dy={4}
+      fill="var(--color-text-secondary)"
+      fontSize={12}
+      textAnchor="start"
+    >
+      {formatDuration(value)}
+    </text>
+  );
+}
+
 export function SummaryPage() {
-  const { viewMode, setViewMode, days, books, totalSeconds, refresh } =
+  const { viewMode, setViewMode, books, totalSeconds, refresh } =
     useReadingSummary();
 
   // Refresh data when the page becomes visible (returning from reading)
@@ -54,13 +79,12 @@ export function SummaryPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [refresh]);
 
-  const chartData = days.map((day) => {
-    const point: Record<string, string | number> = { label: day.label };
-    for (const book of books) {
-      point[book.attachmentId] = day.books[book.attachmentId] || 0;
-    }
-    return point;
-  });
+  const chartData = books.map((book) => ({
+    displayName: book.displayName,
+    totalSeconds: book.roundedSeconds,
+    color: book.color,
+    attachmentId: book.attachmentId,
+  }));
 
   const handleViewChange = (mode: ViewMode) => setViewMode(mode);
 
@@ -100,43 +124,42 @@ export function SummaryPage() {
         </div>
       ) : (
         <div className={styles.chartContainer}>
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={Math.max(200, books.length * 50 + 40)}>
             <BarChart
               data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              layout="vertical"
+              margin={{ top: 10, right: 80, left: 20, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
-                tickLine={{ stroke: 'var(--color-border)' }}
-                axisLine={{ stroke: 'var(--color-border)' }}
-                interval={viewMode === 'month' ? Math.max(0, Math.floor(days.length / 10) - 1) : 0}
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="var(--color-border-light)"
+                horizontal={false}
               />
-              <YAxis
+              <XAxis
+                type="number"
                 tickFormatter={(value: number) => formatDuration(value)}
                 tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
                 tickLine={{ stroke: 'var(--color-border)' }}
                 axisLine={{ stroke: 'var(--color-border)' }}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                formatter={(value: string) => {
-                  const book = books.find((b) => b.attachmentId === value);
-                  return book?.filename ?? value;
-                }}
-                wrapperStyle={{ fontSize: '0.8125rem' }}
+              <YAxis
+                type="category"
+                dataKey="displayName"
+                width={150}
+                tick={{ fill: 'var(--color-text)', fontSize: 13 }}
+                tickLine={false}
+                axisLine={{ stroke: 'var(--color-border)' }}
               />
-              {books.map((book) => (
-                <Bar
-                  key={book.attachmentId}
-                  dataKey={book.attachmentId}
-                  name={book.attachmentId}
-                  fill={book.color}
-                  stackId="reading"
-                  radius={[2, 2, 0, 0]}
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-primary-light)' }} />
+              <Bar dataKey="totalSeconds" radius={[0, 4, 4, 0]} barSize={30}>
+                {chartData.map((entry) => (
+                  <Cell key={entry.attachmentId} fill={entry.color} />
+                ))}
+                <LabelList
+                  dataKey="totalSeconds"
+                  content={<BarEndLabel />}
                 />
-              ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -146,24 +169,18 @@ export function SummaryPage() {
         <div className={styles.legend}>
           <h3 className={styles.legendTitle}>Books</h3>
           <ul className={styles.legendList}>
-            {books.map((book) => {
-              const bookTotal = days.reduce(
-                (sum, day) => sum + (day.books[book.attachmentId] || 0),
-                0,
-              );
-              return (
-                <li key={book.attachmentId} className={styles.legendItem}>
-                  <span
-                    className={styles.legendColor}
-                    style={{ backgroundColor: book.color }}
-                  />
-                  <span className={styles.legendName}>{book.filename}</span>
-                  <span className={styles.legendTime}>
-                    {formatDuration(bookTotal)}
-                  </span>
-                </li>
-              );
-            })}
+            {books.map((book) => (
+              <li key={book.attachmentId} className={styles.legendItem}>
+                <span
+                  className={styles.legendColor}
+                  style={{ backgroundColor: book.color }}
+                />
+                <span className={styles.legendName}>{book.displayName}</span>
+                <span className={styles.legendTime}>
+                  {formatDuration(book.roundedSeconds)}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
       )}
