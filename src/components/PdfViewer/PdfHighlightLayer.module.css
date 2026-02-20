@@ -11,7 +11,7 @@
   position: absolute;
   opacity: 0.35;
   cursor: pointer;
-  mix-blend-mode: multiply;
+  mix-blend-mode: var(--pdf-highlight-blend);
   border-radius: 2px;
   pointer-events: auto;
   transition: opacity 0.15s;

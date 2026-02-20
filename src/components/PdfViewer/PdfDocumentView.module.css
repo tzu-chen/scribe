@@ -2,7 +2,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: auto;
-  background: #e8e8e8;
+  background: var(--color-pdf-bg);
   padding: var(--spacing-md);
 }
 
@@ -13,5 +13,5 @@
 }
 
 .placeholder {
-  background: #f0f0f0;
+  background: var(--color-border-light);
 }
