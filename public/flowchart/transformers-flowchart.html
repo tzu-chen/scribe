@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Transformers Research Roadmap</title>
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$','$']] },
+  svg: { fontCache: 'global' },
+  startup: {
+    ready: () => {
+      MathJax.startup.defaultReady();
+      MathJax.startup.promise.then(() => {
+        setTimeout(drawAllArrows, 500);
+        window.addEventListener('resize', () => setTimeout(drawAllArrows, 200));
+      });
+    }
+  }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#faf8f4;font-family:'EB Garamond',Georgia,serif;color:#2a2a28;}
+  @media print{body{background:#fff;}.node{box-shadow:none!important;}}
+
+  #chart{position:relative;width:1560px;height:3050px;margin:0 auto;padding:30px 0 60px;}
+  #arrows{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+
+  .node{position:absolute;border-radius:6px;padding:12px 14px;z-index:1;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer;
+    transition:opacity 0.3s,transform 0.3s,box-shadow 0.3s;}
+  .node-title{font-size:0.9rem;font-weight:700;margin-bottom:2px;line-height:1.3;}
+  .node-div{height:1px;margin:5px 0 7px;}
+  .node-refs{font-size:0.74rem;line-height:1.55;}
+  .node-topics{font-size:0.71rem;font-style:italic;margin-top:5px;line-height:1.45;}
+  .node-feeds{font-size:0.68rem;margin-top:5px;color:#8a8880;line-height:1.4;}
+
+  .node.dimmed{opacity:0.2;transform:scale(0.98);}
+  .node.highlighted{box-shadow:0 2px 12px rgba(0,0,0,0.15);transform:scale(1.02);z-index:3;}
+  .node.selected{box-shadow:0 3px 16px rgba(0,0,0,0.22);transform:scale(1.03);z-index:4;}
+
+  .depth-badge{position:absolute;top:-8px;right:-8px;background:#4a4a40;color:#faf8f4;
+    font-family:'IBM Plex Mono',monospace;font-size:0.55rem;font-weight:600;
+    padding:2px 6px;border-radius:10px;z-index:5;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+  .node.highlighted .depth-badge,.node.selected .depth-badge{opacity:1;}
+
+  .badge{font-family:'IBM Plex Mono',monospace;font-size:0.52rem;font-weight:500;
+    padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;}
+  .badge.seminal{background:#e8d8c0;color:#6a4a20;}
+  .badge.optional{background:#ddd8e4;color:#5a4a6a;}
+  .badge.key{background:#c8e0d8;color:#2a5a48;}
+  .badge.frontier{background:#d0d8e8;color:#2a3a5a;}
+
+  /* === STAGE COLORS: warm peach → rose → lavender → blue → teal → green === */
+  .c0{background:#faf0e8;border:1.2px solid #d4b098;}
+  .c0 .node-title{color:#8a5030;}.c0 .node-div{background:#d4b098;}
+  .c0 .node-refs{color:#7a5a40;}.c0 .node-topics{color:#8a6a50;}
+
+  .c1{background:#f8eaee;border:1.2px solid #d4a0a8;}
+  .c1 .node-title{color:#7a2840;}.c1 .node-div{background:#d4a0a8;}
+  .c1 .node-refs{color:#7a4a54;}.c1 .node-topics{color:#8a5a64;}
+
+  .c2{background:#f2ecf4;border:1.2px solid #baa0c8;}
+  .c2 .node-title{color:#5a3070;}.c2 .node-div{background:#baa0c8;}
+  .c2 .node-refs{color:#6a4a7a;}.c2 .node-topics{color:#7a5a8a;}
+
+  .c3{background:#eaeff8;border:1.2px solid #94a8d0;}
+  .c3 .node-title{color:#2a3a6a;}.c3 .node-div{background:#94a8d0;}
+  .c3 .node-refs{color:#4a5a7a;}.c3 .node-topics{color:#5a6a8a;}
+
+  .c4{background:#eaf4f2;border:1px solid #88beb8;}
+  .c4 .node-title{color:#1a5a50;}.c4 .node-div{background:#88beb8;}
+  .c4 .node-refs{color:#3a6a60;}.c4 .node-topics{color:#4a7a70;}
+
+  .c5{background:#eef4ea;border:1px solid #98c090;}
+  .c5 .node-title{color:#2a5a20;}.c5 .node-div{background:#98c090;}
+  .c5 .node-refs{color:#4a6a40;}.c5 .node-topics{color:#5a7a50;}
+
+  .stage-lbl{position:absolute;font-size:0.66rem;letter-spacing:4px;text-transform:uppercase;font-weight:600;z-index:2;}
+  .chart-title{position:absolute;width:100%;text-align:center;top:6px;z-index:2;}
+  .chart-title h1{color:#2a2a28;font-size:1.4rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;}
+  .chart-title p{font-size:0.78rem;color:#8a8880;margin-top:2px;}
+
+  mjx-container{font-size:100%!important;}
+</style>
+</head>
+<body>
+<div id="chart">
+  <svg id="arrows"><defs>
+    <marker id="ah" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0.5,9 3.5,0 6.5" fill="#9a9a90"/></marker>
+    <marker id="ah-hi" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0.5,9 3.5,0 6.5" fill="#5a5a50"/></marker>
+    <marker id="ah-dim" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0.5,9 3.5,0 6.5" fill="#c0b8a8"/></marker>
+  </defs></svg>
+
+  <div class="chart-title">
+    <h1>Transformers — A Research Roadmap</h1>
+    <p>From sequence modelling foundations to frontier architectures</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 0 — PRE-TRANSFORMER FOUNDATIONS                        -->
+  <!-- ============================================================ -->
+  <div class="stage-lbl" style="left:50px;top:80px;color:#8a5030;">Stage 0 — Pre-Transformer Foundations</div>
+
+  <div class="node c0" id="emb" style="left:50px;top:115px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Word Embeddings</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Word2Vec (Mikolov et al., 2013), GloVe (Pennington et al., 2014)</div>
+    <div class="node-topics">Distributional semantics, skip-gram, CBOW, co-occurrence matrices</div>
+  </div>
+
+  <div class="node c0" id="rnn" style="left:370px;top:115px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">RNNs &amp; LSTMs</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Hochreiter &amp; Schmidhuber (1997), Cho et al. — GRU (2014)</div>
+    <div class="node-topics">Vanishing gradients, gating mechanisms, hidden state propagation</div>
+  </div>
+
+  <div class="node c0" id="seq2seq" style="left:690px;top:115px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Sequence-to-Sequence <span class="badge seminal">SEMINAL</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Sutskever et al. (2014), "Sequence to Sequence Learning with Neural Networks"</div>
+    <div class="node-topics">Encoder-decoder architecture, fixed-length bottleneck, teacher forcing</div>
+  </div>
+
+  <div class="node c0" id="attn" style="left:1030px;top:115px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Attention Mechanism <span class="badge seminal">SEMINAL</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Bahdanau et al. (2014), Luong et al. (2015)</div>
+    <div class="node-topics">Additive vs. multiplicative attention, alignment scores, context vectors</div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 1 — THE TRANSFORMER                                    -->
+  <!-- ============================================================ -->
+  <div class="stage-lbl" style="left:50px;top:320px;color:#7a2840;">Stage 1 — The Transformer</div>
+
+  <div class="node c1" id="transformer" style="left:350px;top:355px;width:310px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Attention Is All You Need <span class="badge seminal">SEMINAL</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Vaswani et al. (2017)</div>
+    <div class="node-topics">Multi-head self-attention, $QKV$ projections, $\text{softmax}(QK^T/\sqrt{d_k})V$, layer norm, residual connections</div>
+  </div>
+
+  <div class="node c1" id="posenc" style="left:750px;top:355px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Positional Encoding</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Vaswani et al. (2017) §3.5, Shaw et al. (2018) — relative PE</div>
+    <div class="node-topics">Sinusoidal embeddings, learned positions, relative position bias, RoPE (Su et al., 2021)</div>
+  </div>
+
+  <div class="node c1" id="layernorm" style="left:1100px;top:355px;width:260px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Layer Norm &amp; Residuals</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Ba et al. (2016), He et al. (2016)</div>
+    <div class="node-topics">Pre-norm vs. post-norm, training stability, skip connections</div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 2 — ENCODER & DECODER BREAKTHROUGHS                   -->
+  <!-- ============================================================ -->
+  <div class="stage-lbl" style="left:50px;top:570px;color:#5a3070;">Stage 2 — Encoder &amp; Decoder Breakthroughs</div>
+
+  <div class="node c2" id="gpt1" style="left:50px;top:610px;width:265px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">GPT-1 <span class="badge key">KEY</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Radford et al. (2018), "Improving Language Understanding by Generative Pre-Training"</div>
+    <div class="node-topics">Decoder-only, unsupervised pre-training + supervised fine-tuning, causal LM</div>
+  </div>
+
+  <div class="node c2" id="bert" style="left:370px;top:610px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">BERT <span class="badge seminal">SEMINAL</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Devlin et al. (2018), "Pre-training of Deep Bidirectional Transformers"</div>
+    <div class="node-topics">Masked language model, next sentence prediction, bidirectional encoder, fine-tuning paradigm</div>
+  </div>
+
+  <div class="node c2" id="xlnet" style="left:710px;top:610px;width:265px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">XLNet</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Yang et al. (2019)</div>
+    <div class="node-topics">Permutation LM, Transformer-XL integration, segment recurrence</div>
+  </div>
+
+  <div class="node c2" id="t5" style="left:1030px;top:610px;width:275px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">T5 — Text-to-Text <span class="badge key">KEY</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Raffel et al. (2019), "Exploring the Limits of Transfer Learning"</div>
+    <div class="node-topics">Unified text-to-text framework, encoder-decoder, C4 dataset, prefix task formatting</div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 3 — SCALING ERA                                        -->
+  <!-- ============================================================ -->
+  <div class="stage-lbl" style="left:50px;top:850px;color:#2a3a6a;">Stage 3 — Scaling &amp; Emergent Abilities</div>
+
+  <div class="node c3" id="gpt2" style="left:50px;top:890px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">GPT-2</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Radford et al. (2019), "Language Models are Unsupervised Multitask Learners"</div>
+    <div class="node-topics">1.5B params, zero-shot transfer, WebText, staged release ethics debate</div>
+  </div>
+
+  <div class="node c3" id="scaling" style="left:370px;top:890px;width:275px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Scaling Laws <span class="badge key">KEY</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Kaplan et al. (2020), Hoffmann et al. — Chinchilla (2022)</div>
+    <div class="node-topics">Power-law loss curves, compute-optimal training, Chinchilla scaling, data vs. params trade-off</div>
+  </div>
+
+  <div class="node c3" id="gpt3" style="left:710px;top:890px;width:275px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">GPT-3 <span class="badge seminal">SEMINAL</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Brown et al. (2020), "Language Models are Few-Shot Learners"</div>
+    <div class="node-topics">175B params, in-context learning, few-shot prompting, emergent abilities</div>
+  </div>
+
+  <div class="node c3" id="cot" style="left:1050px;top:890px;width:260px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Chain-of-Thought</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Wei et al. (2022), Kojima et al. — zero-shot CoT (2022)</div>
+    <div class="node-topics">Step-by-step reasoning, prompting strategies, emergent with scale</div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 4 — EFFICIENCY & ALIGNMENT                             -->
+  <!-- ============================================================ -->
+  <div class="stage-lbl" style="left:50px;top:1120px;color:#1a5a50;">Stage 4 — Efficiency &amp; Alignment</div>
+
+  <div class="node c4" id="sparse" style="left:50px;top:1160px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Sparse &amp; Linear Attention</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Child et al. — Sparse Transformer (2019), Katharopoulos et al. — Linear (2020), Kitaev et al. — Reformer (2020)</div>
+    <div class="node-topics">$O(n\sqrt{n})$ and $O(n)$ attention, locality-sensitive hashing, kernel methods</div>
+  </div>
+
+  <div class="node c4" id="flash" style="left:370px;top:1160px;width:260px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">FlashAttention <span class="badge key">KEY</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Dao et al. (2022), FlashAttention-2 (2023)</div>
+    <div class="node-topics">IO-aware algorithm, tiling, fused kernels, no approximation — exact attention at SRAM speed</div>
+  </div>
+
+  <div class="node c4" id="moe" style="left:690px;top:1160px;width:265px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Mixture of Experts</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Shazeer et al. (2017), Fedus et al. — Switch Transformer (2021), Jiang et al. — Mixtral (2024)</div>
+    <div class="node-topics">Conditional computation, top-k routing, load balancing, sparse MoE FFN layers</div>
+  </div>
+
+  <div class="node c4" id="lora" style="left:1010px;top:1160px;width:260px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">LoRA &amp; PEFT</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Hu et al. (2021), Dettmers et al. — QLoRA (2023)</div>
+    <div class="node-topics">Low-rank adaptation, $W + BA$ decomposition, parameter-efficient fine-tuning, quantized adapters</div>
+  </div>
+
+  <div class="node c4" id="rlhf" style="left:350px;top:1380px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">RLHF &amp; InstructGPT <span class="badge key">KEY</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Ouyang et al. (2022), Christiano et al. (2017), Bai et al. — Constitutional AI (2022)</div>
+    <div class="node-topics">Reward model from human preferences, PPO fine-tuning, alignment tax, DPO alternative</div>
+  </div>
+
+  <div class="node c4" id="kv" style="left:700px;top:1380px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">KV-Cache &amp; Long Context</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Pope et al. (2022), Ainslie et al. — GQA (2023), Chen et al. — extending context (2023)</div>
+    <div class="node-topics">Grouped-query attention, multi-query attention, RoPE scaling, sliding window, context extension to 128k+</div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 5 — FRONTIER: MULTIMODAL & BEYOND                     -->
+  <!-- ============================================================ -->
+  <div class="stage-lbl" style="left:50px;top:1610px;color:#2a5a20;">Stage 5 — Frontier: Multimodal &amp; Beyond</div>
+
+  <div class="node c5" id="vit" style="left:50px;top:1650px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Vision Transformer (ViT)</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Dosovitskiy et al. (2020), "An Image is Worth 16×16 Words"</div>
+    <div class="node-topics">Patch embeddings, cls token, pre-training at scale, DeiT distillation</div>
+  </div>
+
+  <div class="node c5" id="clip" style="left:370px;top:1650px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">CLIP &amp; Multimodal</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Radford et al. (2021), Li et al. — BLIP-2 (2023), Liu et al. — LLaVA (2023)</div>
+    <div class="node-topics">Contrastive image-text pretraining, zero-shot visual classification, vision-language models</div>
+  </div>
+
+  <div class="node c5" id="diff" style="left:700px;top:1650px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Diffusion Transformers (DiT)</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Peebles &amp; Xie (2023), Esser et al. — SD3 (2024)</div>
+    <div class="node-topics">Replacing U-Net with transformers for denoising, latent diffusion, rectified flow</div>
+  </div>
+
+  <div class="node c5" id="ssm" style="left:1030px;top:1650px;width:270px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">State Space Models <span class="badge frontier">FRONTIER</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">Gu et al. — S4 (2021), Gu &amp; Dao — Mamba (2023)</div>
+    <div class="node-topics">Linear-time sequence modeling, selective state spaces, hardware-aware scan, hybrid architectures (Jamba)</div>
+  </div>
+
+  <div class="node c5" id="reason" style="left:200px;top:1880px;width:290px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Test-Time Reasoning <span class="badge frontier">FRONTIER</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">OpenAI o1 (2024), DeepSeek-R1 (2025)</div>
+    <div class="node-topics">Extended chain-of-thought at inference, verification loops, reasoning traces, compute-scaling at test time</div>
+  </div>
+
+  <div class="node c5" id="mla" style="left:560px;top:1880px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Latent Attention (MLA) <span class="badge frontier">FRONTIER</span></div>
+    <div class="node-div"></div>
+    <div class="node-refs">DeepSeek-V2 (2024), DeepSeek-V3 (2024)</div>
+    <div class="node-topics">Low-rank KV compression, decoupled RoPE, KV-cache reduction, efficient inference</div>
+  </div>
+
+  <div class="node c5" id="openw" style="left:910px;top:1880px;width:280px;">
+    <div class="depth-badge"></div>
+    <div class="node-title">Open Weights Ecosystem</div>
+    <div class="node-div"></div>
+    <div class="node-refs">Touvron et al. — LLaMA (2023), Jiang et al. — Mistral (2023), Groeneveld et al. — OLMo (2024)</div>
+    <div class="node-topics">Reproducibility, open training data, community fine-tuning, model merging, democratized access</div>
+  </div>
+
+</div>
+
+<script>
+// ===== 1. DEPENDENCY GRAPH =====
+const prereqs = {
+  emb:         [],
+  rnn:         [],
+  seq2seq:     ['rnn','emb'],
+  attn:        ['seq2seq'],
+  transformer: ['attn','seq2seq'],
+  posenc:      ['transformer'],
+  layernorm:   ['transformer'],
+  gpt1:        ['transformer'],
+  bert:        ['transformer'],
+  xlnet:       ['bert','gpt1'],
+  t5:          ['bert','transformer'],
+  gpt2:        ['gpt1'],
+  scaling:     ['gpt2'],
+  gpt3:        ['gpt2','scaling'],
+  cot:         ['gpt3'],
+  sparse:      ['transformer'],
+  flash:       ['transformer'],
+  moe:         ['transformer','scaling'],
+  lora:        ['bert','gpt3'],
+  rlhf:        ['gpt3'],
+  kv:          ['transformer','flash','posenc'],
+  vit:         ['transformer'],
+  clip:        ['vit','bert'],
+  diff:        ['vit','transformer'],
+  ssm:         ['rnn','transformer'],
+  reason:      ['cot','rlhf'],
+  mla:         ['kv','moe'],
+  openw:       ['scaling','lora','rlhf'],
+};
+
+// ===== 2. HIGHLIGHT SYSTEM =====
+function getAncestors(nodeId) {
+  const depths = {}; depths[nodeId] = 0;
+  const queue = [nodeId];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    for (const p of (prereqs[cur]||[])) {
+      if (!(p in depths)) { depths[p] = depths[cur]+1; queue.push(p); }
+    }
+  }
+  return depths;
+}
+
+const allEdges = [];
+for (const [n,ps] of Object.entries(prereqs)) for (const p of ps) allEdges.push([p,n]);
+
+let selectedNode = null;
+
+function highlightChain(nodeId) {
+  if (selectedNode===nodeId){clearHighlight();return;}
+  selectedNode=nodeId;
+  const anc=getAncestors(nodeId), set=new Set(Object.keys(anc));
+  const activeEdges=new Set();
+  for(const[f,t]of allEdges)if(set.has(f)&&set.has(t))activeEdges.add(`${f}->${t}`);
+  document.querySelectorAll('.node').forEach(el=>{
+    const id=el.id,b=el.querySelector('.depth-badge');
+    if(id===nodeId){el.classList.remove('dimmed','highlighted');el.classList.add('selected');b.textContent='selected';}
+    else if(set.has(id)){el.classList.remove('dimmed','selected');el.classList.add('highlighted');const d=anc[id];b.textContent=d===1?'1 step':`${d} steps`;}
+    else{el.classList.remove('highlighted','selected');el.classList.add('dimmed');b.textContent='';}
+  });
+  document.querySelectorAll('#arrows path[data-from]').forEach(p=>{
+    const k=`${p.dataset.from}->${p.dataset.to}`;
+    if(activeEdges.has(k)){p.setAttribute('stroke','#5a5a50');p.setAttribute('stroke-width','2');p.setAttribute('stroke-opacity','1');p.setAttribute('marker-end','url(#ah-hi)');p.removeAttribute('stroke-dasharray');}
+    else{p.setAttribute('stroke-opacity','0.1');p.setAttribute('stroke-width','0.8');}
+  });
+}
+
+function clearHighlight(){
+  selectedNode=null;
+  document.querySelectorAll('.node').forEach(el=>{el.classList.remove('dimmed','highlighted','selected');el.querySelector('.depth-badge').textContent='';});
+  drawAllArrows();
+}
+
+document.addEventListener('click',e=>{
+  const n=e.target.closest('.node');
+  if(n&&n.id){e.stopPropagation();highlightChain(n.id);}else{clearHighlight();}
+});
+
+// ===== 3. ARROW DRAWING =====
+function ga(id,side){
+  const el=document.getElementById(id);if(!el)return{x:0,y:0};
+  const r=el.getBoundingClientRect(),c=document.getElementById('chart').getBoundingClientRect();
+  const x=r.left-c.left,y=r.top-c.top,w=r.width,h=r.height;
+  return{top:{x:x+w/2,y},bottom:{x:x+w/2,y:y+h},left:{x,y:y+h/2},right:{x:x+w,y:y+h/2},
+    b20:{x:x+w*.2,y:y+h},b30:{x:x+w*.3,y:y+h},b40:{x:x+w*.4,y:y+h},b50:{x:x+w*.5,y:y+h},
+    b60:{x:x+w*.6,y:y+h},b70:{x:x+w*.7,y:y+h},b80:{x:x+w*.8,y:y+h},
+    t20:{x:x+w*.2,y},t30:{x:x+w*.3,y},t40:{x:x+w*.4,y},t50:{x:x+w*.5,y},
+    t60:{x:x+w*.6,y},t70:{x:x+w*.7,y},t80:{x:x+w*.8,y},
+  }[side]||{x:x+w/2,y:y+h/2};
+}
+function cub(a,b,c1dx,c1dy,c2dx,c2dy){return`M${a.x} ${a.y} C${a.x+c1dx} ${a.y+c1dy},${b.x+c2dx} ${b.y+c2dy},${b.x} ${b.y}`;}
+function addP(svg,d,from,to,o={}){
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d',d);p.setAttribute('fill','none');
+  p.setAttribute('stroke',o.c||'#aaa89e');p.setAttribute('stroke-width',o.w||'1.1');
+  p.setAttribute('marker-end',`url(#${o.m||'ah'})`);
+  if(o.d)p.setAttribute('stroke-dasharray',o.d);
+  p.dataset.from=from;p.dataset.to=to;
+  svg.appendChild(p);
+}
+
+// ===== 4. DRAW ALL EDGES =====
+function drawAllArrows(){
+  const svg=document.getElementById('arrows');
+  const defs=svg.querySelector('defs');svg.innerHTML='';svg.appendChild(defs);
+  const ch=document.getElementById('chart');
+  svg.setAttribute('width',ch.scrollWidth);svg.setAttribute('height',ch.scrollHeight);
+
+  // --- Stage 0 → Stage 0 internal ---
+  addP(svg, cub(ga('emb','b70'), ga('seq2seq','t20'), 20,40, -30,-40), 'emb','seq2seq');
+  addP(svg, cub(ga('rnn','b60'), ga('seq2seq','t40'), 10,40, -10,-40), 'rnn','seq2seq');
+
+  // --- Stage 0 → Stage 0 ---
+  addP(svg, cub(ga('seq2seq','b60'), ga('attn','t40'), 20,50, -20,-50), 'seq2seq','attn');
+
+  // --- Stage 0 → Stage 1 (Transformer) ---
+  addP(svg, cub(ga('attn','b40'), ga('transformer','t70'), -20,70, 20,-70), 'attn','transformer');
+  addP(svg, cub(ga('seq2seq','b40'), ga('transformer','t30'), -30,80, -20,-70), 'seq2seq','transformer');
+
+  // --- Stage 1 internal ---
+  addP(svg, cub(ga('transformer','b70'), ga('posenc','t30'), 30,40, -30,-40), 'transformer','posenc');
+  addP(svg, cub(ga('transformer','b80'), ga('layernorm','t30'), 60,50, -40,-50), 'transformer','layernorm');
+
+  // --- Stage 1 → Stage 2 ---
+  addP(svg, cub(ga('transformer','b20'), ga('gpt1','t60'), -40,70, 20,-70), 'transformer','gpt1');
+  addP(svg, cub(ga('transformer','b40'), ga('bert','t40'), -10,70, -10,-70), 'transformer','bert');
+  addP(svg, cub(ga('transformer','b60'), ga('t5','t30'), 40,80, -40,-70), 'transformer','t5');
+
+  // --- Stage 2 internal ---
+  addP(svg, cub(ga('gpt1','b70'), ga('xlnet','t20'), 30,40, -30,-40), 'gpt1','xlnet');
+  addP(svg, cub(ga('bert','b70'), ga('xlnet','t40'), 20,40, -10,-40), 'bert','xlnet');
+  addP(svg, cub(ga('bert','b80'), ga('t5','t20'), 40,50, -40,-50), 'bert','t5');
+
+  // --- Stage 2 → Stage 3 ---
+  addP(svg, cub(ga('gpt1','b30'), ga('gpt2','t50'), -20,80, 10,-70), 'gpt1','gpt2');
+  addP(svg, cub(ga('gpt2','b60'), ga('scaling','t30'), 20,40, -20,-40), 'gpt2','scaling');
+  addP(svg, cub(ga('gpt2','b80'), ga('gpt3','t20'), 40,50, -40,-50), 'gpt2','gpt3');
+  addP(svg, cub(ga('scaling','b60'), ga('gpt3','t40'), 20,40, -20,-40), 'scaling','gpt3');
+  addP(svg, cub(ga('gpt3','b70'), ga('cot','t30'), 20,40, -20,-40), 'gpt3','cot');
+
+  // --- Transformer → Stage 4 (efficiency) ---
+  addP(svg, cub(ga('transformer','left'), ga('sparse','t50'), -120,200, 0,-60), 'transformer','sparse', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('transformer','b50'), ga('flash','t50'), 0,250, 0,-60), 'transformer','flash', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('transformer','right'), ga('moe','t30'), 100,250, -30,-60), 'transformer','moe', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('scaling','b40'), ga('moe','t60'), -20,60, 20,-50), 'scaling','moe');
+
+  // --- Stage 2/3 → Stage 4 (LoRA, RLHF, KV) ---
+  addP(svg, cub(ga('bert','b30'), ga('lora','t20'), -60,200, -30,-60), 'bert','lora', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('gpt3','b40'), ga('lora','t70'), 60,60, 40,-50), 'gpt3','lora', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('gpt3','b50'), ga('rlhf','t50'), -10,100, 0,-50), 'gpt3','rlhf');
+
+  // KV-cache edges
+  addP(svg, cub(ga('flash','b50'), ga('kv','t30'), 0,40, -20,-40), 'flash','kv');
+  addP(svg, cub(ga('posenc','b50'), ga('kv','t70'), 0,350, 40,-50), 'posenc','kv', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('transformer','b50'), ga('kv','t50'), 0,400, 0,-50), 'transformer','kv', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+
+  // --- Stage 1 → Stage 5 (ViT, SSM) ---
+  addP(svg, cub(ga('transformer','left'), ga('vit','t50'), -150,500, 0,-60), 'transformer','vit', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('rnn','b30'), ga('ssm','t30'), -80,900, -40,-60), 'rnn','ssm', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('transformer','right'), ga('ssm','t60'), 180,500, 40,-60), 'transformer','ssm', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+
+  // --- Stage 5 internal ---
+  addP(svg, cub(ga('vit','b60'), ga('clip','t30'), 20,40, -20,-40), 'vit','clip');
+  addP(svg, cub(ga('bert','b50'), ga('clip','t60'), 0,400, 20,-50), 'bert','clip', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('vit','b80'), ga('diff','t20'), 40,50, -40,-50), 'vit','diff');
+  addP(svg, cub(ga('transformer','right'), ga('diff','t60'), 200,600, 30,-50), 'transformer','diff', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+
+  // --- Stage 4 → Stage 5 row 2 ---
+  addP(svg, cub(ga('cot','b50'), ga('reason','t70'), 0,300, 30,-50), 'cot','reason');
+  addP(svg, cub(ga('rlhf','b40'), ga('reason','t30'), -20,100, -20,-50), 'rlhf','reason');
+
+  addP(svg, cub(ga('kv','b40'), ga('mla','t40'), -10,80, -10,-50), 'kv','mla');
+  addP(svg, cub(ga('moe','b50'), ga('mla','t70'), 0,120, 30,-50), 'moe','mla');
+
+  addP(svg, cub(ga('scaling','b80'), ga('openw','t30'), 80,300, -40,-50), 'scaling','openw', {c:'#c8c0b0',w:'0.85',d:'4,3',m:'ah-dim'});
+  addP(svg, cub(ga('lora','b50'), ga('openw','t50'), 0,120, 0,-50), 'lora','openw');
+  addP(svg, cub(ga('rlhf','b70'), ga('openw','t20'), 40,100, -60,-50), 'rlhf','openw');
+
+  if(selectedNode)highlightChain(selectedNode);
+}
+
+setTimeout(drawAllArrows,700);
+setTimeout(drawAllArrows,2200);
+</script>
+</body>
+</html>
