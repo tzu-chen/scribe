@@ -15,6 +15,17 @@
     </script>
   </head>
   <body>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+      <defs>
+        <filter id="pdf-dark-mode-filter" color-interpolation-filters="sRGB">
+          <!-- Maps white (#ffffff) -> #27394f and black (#000000) -> #dcdbe1 -->
+          <feColorMatrix type="matrix" values="-0.7098 0 0 0 0.8627
+                                                0 -0.6353 0 0 0.8588
+                                                0 0 -0.5725 0 0.8824
+                                                0 0 0 1 0"/>
+        </filter>
+      </defs>
+    </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

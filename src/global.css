@@ -81,7 +81,7 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --color-pdf-bg: #25262b;
-  --pdf-canvas-filter: invert(0.9) hue-rotate(180deg);
+  --pdf-canvas-filter: url(#pdf-dark-mode-filter);
   --pdf-highlight-blend: screen;
 }
 
