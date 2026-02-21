@@ -83,6 +83,13 @@ export function FlowchartsPage() {
       script.src = '/flowchart/flowchart-theme.js';
       doc.head.appendChild(script);
     }
+
+    if (!doc.getElementById('flowchart-integration-js')) {
+      const script = doc.createElement('script');
+      script.id = 'flowchart-integration-js';
+      script.src = '/flowchart/flowchart-integration.js';
+      doc.head.appendChild(script);
+    }
   }, []);
 
   /**
