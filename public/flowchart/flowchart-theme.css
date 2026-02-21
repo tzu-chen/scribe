@@ -1,0 +1,125 @@
+/*
+ * flowchart-theme.css
+ *
+ * Dark-mode overrides for all flowchart HTML files served from /flowchart/.
+ * Injected by FlowchartsPage.tsx at runtime — flowchart HTML files are NOT modified.
+ * Activated when <html data-theme="dark"> is set by the parent frame.
+ */
+
+html[data-theme="dark"] body {
+  background: #1a1b1e !important;
+  color: #e0ddd8 !important;
+}
+
+/* ── Stage 0: warm sand ── */
+html[data-theme="dark"] .c0 { background: #221e14 !important; border-color: #6b5c30 !important; }
+html[data-theme="dark"] .c0 .node-title  { color: #d4b86a !important; }
+html[data-theme="dark"] .c0 .node-div    { background: #6b5c30 !important; }
+html[data-theme="dark"] .c0 .node-refs   { color: #b89e60 !important; }
+html[data-theme="dark"] .c0 .node-topics { color: #9a8a5a !important; }
+
+/* ── Stage 1: warm peach ── */
+html[data-theme="dark"] .c1 { background: #221810 !important; border-color: #7a4820 !important; }
+html[data-theme="dark"] .c1 .node-title  { color: #e0905a !important; }
+html[data-theme="dark"] .c1 .node-div    { background: #7a4820 !important; }
+html[data-theme="dark"] .c1 .node-refs   { color: #c07848 !important; }
+html[data-theme="dark"] .c1 .node-topics { color: #a07858 !important; }
+
+/* ── Stage 2: rose ── */
+html[data-theme="dark"] .c2 { background: #221414 !important; border-color: #784040 !important; }
+html[data-theme="dark"] .c2 .node-title  { color: #e08080 !important; }
+html[data-theme="dark"] .c2 .node-div    { background: #784040 !important; }
+html[data-theme="dark"] .c2 .node-refs   { color: #b87070 !important; }
+html[data-theme="dark"] .c2 .node-topics { color: #9a7070 !important; }
+
+/* ── Stage 3: mauve ── */
+html[data-theme="dark"] .c3 { background: #1c1420 !important; border-color: #6a4080 !important; }
+html[data-theme="dark"] .c3 .node-title  { color: #c080e8 !important; }
+html[data-theme="dark"] .c3 .node-div    { background: #6a4080 !important; }
+html[data-theme="dark"] .c3 .node-refs   { color: #a068c8 !important; }
+html[data-theme="dark"] .c3 .node-topics { color: #8a6a98 !important; }
+
+/* ── Stage 4: slate blue ── */
+html[data-theme="dark"] .c4 { background: #121820 !important; border-color: #3a5880 !important; }
+html[data-theme="dark"] .c4 .node-title  { color: #7aaad8 !important; }
+html[data-theme="dark"] .c4 .node-div    { background: #3a5880 !important; }
+html[data-theme="dark"] .c4 .node-refs   { color: #5a88b8 !important; }
+html[data-theme="dark"] .c4 .node-topics { color: #4a7098 !important; }
+html[data-theme="dark"] .c4 .node-feeds  { color: #5a7888 !important; }
+
+/* ── Stage 5: deep teal ── */
+html[data-theme="dark"] .c5 { background: #0e1e1c !important; border-color: #2a6860 !important; }
+html[data-theme="dark"] .c5 .node-title  { color: #60c8b8 !important; }
+html[data-theme="dark"] .c5 .node-div    { background: #2a6860 !important; }
+html[data-theme="dark"] .c5 .node-refs   { color: #40a898 !important; }
+html[data-theme="dark"] .c5 .node-topics { color: #388878 !important; }
+html[data-theme="dark"] .c5 .node-feeds  { color: #2a6858 !important; }
+
+/* ── Depth badge ── */
+html[data-theme="dark"] .depth-badge {
+  background: #d0ccc0 !important;
+  color: #1a1a18 !important;
+}
+
+/* ── Action buttons ── */
+html[data-theme="dark"] .node-action-btn {
+  background: #2a2a28 !important;
+  border-color: #4a4844 !important;
+}
+html[data-theme="dark"] .node-action-btn:hover {
+  background: #3a3a38 !important;
+  border-color: #6a6866 !important;
+}
+html[data-theme="dark"] .node-action-btn svg      { stroke: #c0bdb8 !important; }
+html[data-theme="dark"] .node-action-btn:hover svg { stroke: #e0ddd8 !important; }
+
+/* ── Attachment count badge ── */
+html[data-theme="dark"] .attach-count { background: #5c7cfa !important; }
+
+/* ── Badges ── */
+html[data-theme="dark"] .badge.open,
+html[data-theme="dark"] .badge.qft3 {
+  background: #0a2420 !important;
+  border-color: #2a6860 !important;
+  color: #60c8b8 !important;
+}
+html[data-theme="dark"] .badge.moon {
+  background: #0c1c28 !important;
+  border-color: #305878 !important;
+  color: #70b0d8 !important;
+}
+html[data-theme="dark"] .badge.timing {
+  background: #101828 !important;
+  border-color: #385880 !important;
+  color: #7aaad8 !important;
+}
+html[data-theme="dark"] .badge.opt {
+  background: #141020 !important;
+  border-color: #504878 !important;
+  color: #b098e0 !important;
+}
+
+/* ── Chart title ── */
+html[data-theme="dark"] .chart-title h1  { color: #e0ddd8 !important; }
+html[data-theme="dark"] .chart-title .sub { color: #6a6a62 !important; }
+
+/* ── Timeline bar outer border ── */
+html[data-theme="dark"] .timeline-bar { border-color: #3a3830 !important; }
+
+/* ── SVG arrows ──
+ * SVG presentation attributes (stroke="...") have lower specificity than CSS
+ * author styles, so these rules override the hardcoded colors set by addP()
+ * and highlightChain() without modifying the flowchart JS.
+ *
+ * Selector strategy:
+ *   stroke-width="1.1"  → normal arrows   (addP default)
+ *   stroke-width="0.85" → dimmed arrows   (DIM object)
+ *   stroke-width="2"    → highlighted arrows (highlightChain)
+ */
+html[data-theme="dark"] #arrows path            { stroke: #4a4a42 !important; }
+html[data-theme="dark"] #arrows path[stroke-width="2"] { stroke: #c8c4b8 !important; }
+
+/* ── SVG arrowhead markers ── */
+html[data-theme="dark"] #arrows marker#ah     polygon { fill: #5a5a50 !important; }
+html[data-theme="dark"] #arrows marker#ah-hi  polygon { fill: #c8c4b8 !important; }
+html[data-theme="dark"] #arrows marker#ah-dim polygon { fill: #2a2a22 !important; }

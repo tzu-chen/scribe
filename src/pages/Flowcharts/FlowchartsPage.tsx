@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { BookPicker } from '../../components/BookPicker/BookPicker';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { AttachmentMeta } from '../../types/attachment';
 import styles from './FlowchartsPage.module.css';
 
@@ -36,6 +37,7 @@ export function FlowchartsPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [bookPickerSubject, setBookPickerSubject] = useState<string | null>(null);
 
+  const { theme } = useTheme();
   const activeFlowchart = searchParams.get('view');
 
   useEffect(() => {
@@ -57,6 +59,51 @@ export function FlowchartsPage() {
       console.error('Failed to send attachment counts:', err);
     }
   }, []);
+
+  /**
+   * Inject the shared theme CSS and JS files into the iframe document.
+   * These files live alongside the flowchart HTML files in /flowchart/ so
+   * they apply automatically to any flowchart without modifying the HTML.
+   */
+  const injectThemeAssets = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+
+    if (!doc.getElementById('flowchart-theme-css')) {
+      const link = doc.createElement('link');
+      link.id = 'flowchart-theme-css';
+      link.rel = 'stylesheet';
+      link.href = '/flowchart/flowchart-theme.css';
+      doc.head.appendChild(link);
+    }
+
+    if (!doc.getElementById('flowchart-theme-js')) {
+      const script = doc.createElement('script');
+      script.id = 'flowchart-theme-js';
+      script.src = '/flowchart/flowchart-theme.js';
+      doc.head.appendChild(script);
+    }
+  }, []);
+
+  /**
+   * Mirror the app's data-theme attribute onto the iframe's <html> element.
+   * Because the iframe is same-origin, we can set the attribute directly —
+   * no postMessage needed. The injected CSS and JS react to this attribute.
+   */
+  const applyThemeToIframe = useCallback(() => {
+    const htmlEl = iframeRef.current?.contentDocument?.documentElement;
+    if (!htmlEl) return;
+    if (theme === 'dark') {
+      htmlEl.setAttribute('data-theme', 'dark');
+    } else {
+      htmlEl.removeAttribute('data-theme');
+    }
+  }, [theme]);
+
+  /* Re-apply theme whenever the user toggles it while the iframe is visible. */
+  useEffect(() => {
+    applyThemeToIframe();
+  }, [applyThemeToIframe]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -194,7 +241,11 @@ export function FlowchartsPage() {
             src={`/flowchart/${flowchart.filename}`}
             className={styles.iframe}
             title={flowchart.name}
-            onLoad={sendAttachmentCounts}
+            onLoad={() => {
+              injectThemeAssets();
+              applyThemeToIframe();
+              void sendAttachmentCounts();
+            }}
           />
         </div>
 
