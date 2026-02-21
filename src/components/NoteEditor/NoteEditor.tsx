@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './NoteEditor.module.css';
 
 interface NoteEditorProps {
@@ -46,6 +47,7 @@ const previewOptions = {
 };
 
 export function NoteEditor({ value, onChange }: NoteEditorProps) {
+  const { theme } = useTheme();
   const handleChange = useCallback(
     (val?: string) => {
       onChange(val || '');
@@ -54,7 +56,7 @@ export function NoteEditor({ value, onChange }: NoteEditorProps) {
   );
 
   return (
-    <div className={styles.editor} data-color-mode="light">
+    <div className={styles.editor} data-color-mode={theme === 'dark' ? 'dark' : 'light'}>
       <MDEditor
         value={value}
         onChange={handleChange}

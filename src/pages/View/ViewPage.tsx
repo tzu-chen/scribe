@@ -4,6 +4,7 @@ import MDEditor from '@uiw/react-md-editor';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useNotes } from '../../hooks/useNotes';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './ViewPage.module.css';
 
 const previewOptions = {
@@ -32,6 +33,7 @@ export function ViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { notes, deleteNote } = useNotes();
+  const { theme } = useTheme();
   const note = notes.find(n => n.id === id);
 
   if (!note) {
@@ -98,7 +100,7 @@ export function ViewPage() {
           )}
         </header>
 
-        <div className={styles.content} data-color-mode="light">
+        <div className={styles.content} data-color-mode={theme === 'dark' ? 'dark' : 'light'}>
           <MDEditor.Markdown source={note.content} components={previewOptions.components} />
         </div>
       </article>
