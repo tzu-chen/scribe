@@ -18,7 +18,8 @@ interface Props {
 }
 
 export interface PdfDocumentViewHandle {
-  scrollToPage: (page: number, offsetTop?: number | null) => void;
+  scrollToPage: (page: number, offsetTop?: number | null, behavior?: ScrollBehavior) => void;
+  getScrollPosition: () => { page: number; offsetTop: number } | null;
 }
 
 const BUFFER = 2;
@@ -35,7 +36,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     });
 
     useImperativeHandle(ref, () => ({
-      scrollToPage(page: number, offsetTop?: number | null) {
+      scrollToPage(page: number, offsetTop?: number | null, behavior: ScrollBehavior = 'smooth') {
         const container = containerRef.current;
         if (!container) return;
         const pageEl = container.querySelector(`[data-page-wrapper="${page}"]`);
@@ -43,7 +44,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
 
         if (offsetTop == null) {
           // No sub-page offset – just scroll to the top of the page
-          pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          pageEl.scrollIntoView({ behavior, block: 'start' });
           return;
         }
 
@@ -56,7 +57,24 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
           pageRect.top - containerRect.top + container.scrollTop;
         const target = pageTopInContainer + offsetTop * scale;
 
-        container.scrollTo({ top: target, behavior: 'smooth' });
+        container.scrollTo({ top: target, behavior });
+      },
+      getScrollPosition() {
+        const container = containerRef.current;
+        if (!container) return null;
+        const containerRect = container.getBoundingClientRect();
+        const wrappers = container.querySelectorAll('[data-page-wrapper]');
+        for (const wrapper of wrappers) {
+          const rect = wrapper.getBoundingClientRect();
+          // First page whose bottom is at or below the container top is the current page
+          if (rect.bottom >= containerRect.top) {
+            const pageNum = Number((wrapper as HTMLElement).dataset.pageWrapper);
+            // How far we've scrolled into this page, converted to scale-1 units
+            const scrolledIntoPage = Math.max(0, containerRect.top - rect.top);
+            return { page: pageNum, offsetTop: scrolledIntoPage / scale };
+          }
+        }
+        return null;
       },
     }), [scale]);
 

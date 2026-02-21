@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
@@ -49,6 +49,8 @@ export function PdfViewerPage() {
   const docViewRef = useRef<PdfDocumentViewHandle>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
+  const prevEffectiveZoomRef = useRef<number>(0);
 
   // Track the document area width for fit-width calculation.
   // The body div is conditionally rendered (only when !loading && pdfDoc),
@@ -61,6 +63,7 @@ export function PdfViewerPage() {
     if (!el) return;
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
+        scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
         setContainerWidth(entry.contentRect.width);
       }
     });
@@ -165,19 +168,23 @@ export function PdfViewerPage() {
   }, [navigate, subject]);
 
   const handleZoomChange = useCallback((newZoom: number) => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(false);
     setZoom(newZoom);
   }, []);
 
   const handleFitWidthToggle = useCallback(() => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(prev => !prev);
   }, []);
 
   const handleTocToggle = useCallback(() => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setShowToc(prev => !prev);
   }, []);
 
   const handleRightPanelToggle = useCallback(() => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setShowRightPanel(prev => !prev);
   }, []);
 
@@ -246,6 +253,20 @@ export function PdfViewerPage() {
   // Compute fit-width scale using actual container width and PDF page width
   const availableWidth = containerWidth > 0 ? containerWidth - (showToc ? 280 : 0) - (showRightPanel ? 300 : 0) - 40 : 0;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / pageWidth) : zoom;
+
+  // When effectiveZoom changes, restore the scroll position that was saved before the change.
+  // useLayoutEffect fires after DOM mutations but before the browser paints, preventing a visible jump.
+  useLayoutEffect(() => {
+    if (prevEffectiveZoomRef.current === effectiveZoom) return;
+    prevEffectiveZoomRef.current = effectiveZoom;
+    // Don't interfere with the initial page scroll restoration
+    if (!initialScrollDone.current) return;
+    const pos = scrollPositionToRestoreRef.current;
+    scrollPositionToRestoreRef.current = null;
+    if (pos) {
+      docViewRef.current?.scrollToPage(pos.page, pos.offsetTop, 'instant');
+    }
+  }, [effectiveZoom]);
 
   const errorMessage = loadError || pdfError;
 
