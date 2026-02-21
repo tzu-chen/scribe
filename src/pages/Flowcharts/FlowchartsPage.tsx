@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
+import { questionStorage } from '../../services/questionStorage';
 import { BookPicker } from '../../components/BookPicker/BookPicker';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { AttachmentMeta } from '../../types/attachment';
@@ -16,6 +17,13 @@ interface FlowchartEntry {
 interface NodeSelection {
   nodeId: string;
   nodeTitle: string;
+}
+
+interface QuestionDialog {
+  nodeId: string;
+  nodeTitle: string;
+  flowchartId: string;
+  flowchartName: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -36,6 +44,8 @@ export function FlowchartsPage() {
   } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [bookPickerSubject, setBookPickerSubject] = useState<string | null>(null);
+  const [questionDialog, setQuestionDialog] = useState<QuestionDialog | null>(null);
+  const [questionText, setQuestionText] = useState('');
 
   const { theme } = useTheme();
   const activeFlowchart = searchParams.get('view');
@@ -58,6 +68,14 @@ export function FlowchartsPage() {
     } catch (err) {
       console.error('Failed to send attachment counts:', err);
     }
+  }, []);
+
+  const sendQuestionCounts = useCallback((flowchartId: string) => {
+    const counts = questionStorage.getCountsByNode(flowchartId);
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'question-counts', counts },
+      '*',
+    );
   }, []);
 
   /**
@@ -130,6 +148,9 @@ export function FlowchartsPage() {
           nodeTitle: string;
         };
 
+        const currentFlowchart = searchParams.get('view') ?? '';
+        const currentFlowchartEntry = flowcharts.find(f => f.id === currentFlowchart);
+
         switch (action) {
           case 'write-note':
             navigate(`/note/new?subject=${encodeURIComponent(nodeTitle)}`);
@@ -144,6 +165,15 @@ export function FlowchartsPage() {
             break;
           case 'view-notes':
             navigate(`/notes?subject=${encodeURIComponent(nodeTitle)}`);
+            break;
+          case 'add-question':
+            setQuestionDialog({
+              nodeId: data.nodeId as string,
+              nodeTitle,
+              flowchartId: currentFlowchart,
+              flowchartName: currentFlowchartEntry?.name ?? currentFlowchart,
+            });
+            setQuestionText('');
             break;
         }
       }
@@ -201,6 +231,28 @@ export function FlowchartsPage() {
     setAttachmentPanel(null);
   }, []);
 
+  const handleSaveQuestion = useCallback(() => {
+    if (!questionDialog || !questionText.trim()) return;
+    questionStorage.save({
+      id: crypto.randomUUID(),
+      text: questionText.trim(),
+      nodeId: questionDialog.nodeId,
+      nodeTitle: questionDialog.nodeTitle,
+      flowchartId: questionDialog.flowchartId,
+      flowchartName: questionDialog.flowchartName,
+      checked: false,
+      createdAt: new Date().toISOString(),
+    });
+    sendQuestionCounts(questionDialog.flowchartId);
+    setQuestionDialog(null);
+    setQuestionText('');
+  }, [questionDialog, questionText, sendQuestionCounts]);
+
+  const handleCancelQuestion = useCallback(() => {
+    setQuestionDialog(null);
+    setQuestionText('');
+  }, []);
+
   const selectFlowchart = (id: string) => {
     setSearchParams({ view: id });
     setSelectedNode(null);
@@ -252,6 +304,7 @@ export function FlowchartsPage() {
               injectThemeAssets();
               applyThemeToIframe();
               void sendAttachmentCounts();
+              sendQuestionCounts(flowchart.id);
             }}
           />
         </div>
@@ -261,6 +314,60 @@ export function FlowchartsPage() {
             onSelect={handleBookSelected}
             onCancel={handleBookPickerCancel}
           />
+        )}
+
+        {questionDialog && (
+          <div
+            className={styles.attachmentOverlay}
+            onClick={handleCancelQuestion}
+          >
+            <div
+              className={styles.attachmentPanel}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className={styles.attachmentHeader}>
+                <h3 className={styles.attachmentTitle}>
+                  Add question: {questionDialog.nodeTitle}
+                </h3>
+                <button
+                  className={styles.attachmentClose}
+                  onClick={handleCancelQuestion}
+                  aria-label="Close"
+                >
+                  &times;
+                </button>
+              </div>
+              <div className={styles.questionDialogBody}>
+                <textarea
+                  className={styles.questionTextarea}
+                  placeholder="Enter your question…"
+                  value={questionText}
+                  onChange={e => setQuestionText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      handleSaveQuestion();
+                    }
+                  }}
+                  autoFocus
+                />
+                <div className={styles.questionActions}>
+                  <button
+                    className={styles.questionCancel}
+                    onClick={handleCancelQuestion}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={styles.questionSave}
+                    onClick={handleSaveQuestion}
+                    disabled={!questionText.trim()}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {attachmentPanel && (

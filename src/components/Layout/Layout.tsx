@@ -11,6 +11,7 @@ export function Layout({ children }: LayoutProps) {
   const isHome = location.pathname === '/';
   const isNotes = location.pathname === '/notes';
   const isFlowcharts = location.pathname === '/flowcharts';
+  const isQuestions = location.pathname === '/questions';
   const isSummary = location.pathname === '/summary';
   const isPdfViewer = location.pathname.startsWith('/pdf/');
 
@@ -39,6 +40,12 @@ export function Layout({ children }: LayoutProps) {
               className={`${styles.navLink} ${isFlowcharts ? styles.navLinkActive : ''}`}
             >
               Flowcharts
+            </Link>
+            <Link
+              to="/questions"
+              className={`${styles.navLink} ${isQuestions ? styles.navLinkActive : ''}`}
+            >
+              Questions
             </Link>
             <Link
               to="/summary"

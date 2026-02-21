@@ -8,6 +8,7 @@ import { ViewPage } from './pages/View/ViewPage';
 import { FlowchartsPage } from './pages/Flowcharts/FlowchartsPage';
 import { PdfViewerPage } from './pages/PdfViewer/PdfViewerPage';
 import { SummaryPage } from './pages/Summary/SummaryPage';
+import { QuestionsPage } from './pages/Questions/QuestionsPage';
 import './global.css';
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
             <Route path="/" element={<LibraryPage />} />
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/flowcharts" element={<FlowchartsPage />} />
+            <Route path="/questions" element={<QuestionsPage />} />
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/pdf/:attachmentId" element={<PdfViewerPage />} />
             <Route path="/note/new" element={<EditorPage />} />

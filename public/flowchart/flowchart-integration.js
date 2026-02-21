@@ -34,7 +34,12 @@
     'font-family:"IBM Plex Mono",monospace;font-size:0.48rem;font-weight:700;' +
     'min-width:13px;height:13px;line-height:13px;text-align:center;border-radius:7px;' +
     'padding:0 3px;display:none;}' +
-    '.attach-count.has-files{display:block;}';
+    '.attach-count.has-files{display:block;}' +
+    '.question-count{position:absolute;top:-5px;right:-5px;background:#e67700;color:#fff;' +
+    'font-family:"IBM Plex Mono",monospace;font-size:0.48rem;font-weight:700;' +
+    'min-width:13px;height:13px;line-height:13px;text-align:center;border-radius:7px;' +
+    'padding:0 3px;display:none;}' +
+    '.question-count.has-questions{display:block;}';
   document.head.appendChild(css);
 
   /* ================================================================== *
@@ -101,10 +106,27 @@
         '<line x1="16" y1="17" x2="8" y2="17"/>' +
         '<polyline points="10 9 9 9 8 9"/></svg>';
 
+      /* Add question (question mark / help circle) */
+      var questionBtn = document.createElement('button');
+      questionBtn.className = 'node-action-btn';
+      questionBtn.setAttribute('data-action', 'add-question');
+      questionBtn.setAttribute('title', 'Add question');
+      questionBtn.innerHTML =
+        '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/>' +
+        '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>' +
+        '<line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+      var qBadge = document.createElement('span');
+      qBadge.className = 'question-count';
+      qBadge.setAttribute('data-node-id', nodeEl.id);
+      qBadge.textContent = '0';
+      questionBtn.appendChild(qBadge);
+
       actions.appendChild(writeBtn);
       actions.appendChild(attachBtn);
       actions.appendChild(viewBtn);
       actions.appendChild(notesBtn);
+      actions.appendChild(questionBtn);
       nodeEl.appendChild(actions);
     });
   }
@@ -175,16 +197,28 @@
    *  Receive attachment counts from parent                              *
    * ================================================================== */
   window.addEventListener('message', function (e) {
-    if (!e.data || e.data.type !== 'attachment-counts') return;
+    if (!e.data) return;
 
-    var counts = e.data.counts || {};
-    document.querySelectorAll('.attach-count').forEach(function (badge) {
-      var nodeId = badge.getAttribute('data-node-id');
-      var nodeEl = document.getElementById(nodeId);
-      if (!nodeEl) return;
-      var count = counts[getCleanTitle(nodeEl)] || 0;
-      badge.textContent = String(count);
-      badge.classList.toggle('has-files', count > 0);
-    });
+    if (e.data.type === 'attachment-counts') {
+      var counts = e.data.counts || {};
+      document.querySelectorAll('.attach-count').forEach(function (badge) {
+        var nodeId = badge.getAttribute('data-node-id');
+        var nodeEl = document.getElementById(nodeId);
+        if (!nodeEl) return;
+        var count = counts[getCleanTitle(nodeEl)] || 0;
+        badge.textContent = String(count);
+        badge.classList.toggle('has-files', count > 0);
+      });
+    }
+
+    if (e.data.type === 'question-counts') {
+      var qCounts = e.data.counts || {};
+      document.querySelectorAll('.question-count').forEach(function (badge) {
+        var nodeId = badge.getAttribute('data-node-id');
+        var count = qCounts[nodeId] || 0;
+        badge.textContent = String(count);
+        badge.classList.toggle('has-questions', count > 0);
+      });
+    }
   });
 })();
