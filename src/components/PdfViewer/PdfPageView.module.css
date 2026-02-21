@@ -8,5 +8,8 @@
 
 .canvas {
   display: block;
-  filter: var(--pdf-canvas-filter);
+}
+
+:global([data-theme="dark"]) .canvas {
+  filter: url(#pdf-dark-mode-filter);
 }
