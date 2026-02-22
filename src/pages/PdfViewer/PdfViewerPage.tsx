@@ -16,7 +16,7 @@ import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import styles from './PdfViewerPage.module.css';
 
-const EDITOR_PANEL_WIDTH = 450;
+const DEFAULT_EDITOR_WIDTH = 450;
 
 export function PdfViewerPage() {
   const { attachmentId } = useParams<{ attachmentId: string }>();
@@ -43,6 +43,7 @@ export function PdfViewerPage() {
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_WIDTH);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<{
@@ -268,7 +269,7 @@ export function PdfViewerPage() {
     ? containerWidth
       - (showToc ? 280 : 0)
       - (showRightPanel ? 300 : 0)
-      - (editingNoteId ? EDITOR_PANEL_WIDTH : 0)
+      - (editingNoteId ? editorPanelWidth : 0)
       - 40
     : 0;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / pageWidth) : zoom;
@@ -368,6 +369,8 @@ export function PdfViewerPage() {
             notes={notes}
             saveNote={saveNote}
             onClose={handleCloseEditor}
+            width={editorPanelWidth}
+            onWidthChange={setEditorPanelWidth}
           />
         )}
       </div>

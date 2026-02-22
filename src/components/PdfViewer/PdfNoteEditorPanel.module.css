@@ -1,12 +1,30 @@
 /* === Panel container === */
+/* Width is set via inline style (dynamic, user-resizable) */
 .panel {
-  width: 450px;
   flex-shrink: 0;
   background: var(--color-surface);
   border-left: 1px solid var(--color-border-light);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+}
+
+/* === Drag-to-resize handle === */
+.resizeHandle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.resizeHandle:hover,
+.resizeHandle:active {
+  background: var(--color-primary);
+  opacity: 0.35;
 }
 
 /* === Header === */
@@ -118,27 +136,18 @@
   font-weight: 400;
 }
 
-/* === Editor area (fills remaining height) === */
+/* === Editor area (fills remaining height, measured by ResizeObserver) === */
 .editorArea {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
-/* Override the fixed 500px height from NoteEditor's MDEditor prop */
+/* Remove border/radius from the MDEditor when embedded in the panel */
 .editorArea :global(.w-md-editor) {
-  height: 100% !important;
-  flex: 1;
   border-radius: 0 !important;
   border: none !important;
   box-shadow: none !important;
-}
-
-.editorArea :global(.w-md-editor-content) {
-  flex: 1;
-  min-height: 0;
 }
 
 /* === Error state === */
