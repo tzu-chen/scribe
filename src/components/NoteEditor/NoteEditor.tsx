@@ -8,6 +8,7 @@ import styles from './NoteEditor.module.css';
 interface NoteEditorProps {
   value: string;
   onChange: (value: string) => void;
+  height?: number;
 }
 
 function renderKatex(expression: string, displayMode: boolean): string {
@@ -46,7 +47,7 @@ const previewOptions = {
   },
 };
 
-export function NoteEditor({ value, onChange }: NoteEditorProps) {
+export function NoteEditor({ value, onChange, height = 500 }: NoteEditorProps) {
   const { theme } = useTheme();
   const handleChange = useCallback(
     (val?: string) => {
@@ -60,7 +61,7 @@ export function NoteEditor({ value, onChange }: NoteEditorProps) {
       <MDEditor
         value={value}
         onChange={handleChange}
-        height={500}
+        height={height}
         preview="live"
         previewOptions={previewOptions}
       />

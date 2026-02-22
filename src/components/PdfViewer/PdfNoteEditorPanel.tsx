@@ -9,22 +9,50 @@ interface Props {
   notes: Note[];
   saveNote: (note: Note) => void;
   onClose: () => void;
+  width: number;
+  onWidthChange: (width: number) => void;
 }
+
+const MIN_WIDTH = 280;
+const MAX_WIDTH = 900;
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
-export function PdfNoteEditorPanel({ noteId, notes, saveNote, onClose }: Props) {
+export function PdfNoteEditorPanel({
+  noteId,
+  notes,
+  saveNote,
+  onClose,
+  width,
+  onWidthChange,
+}: Props) {
   const note = useMemo(() => notes.find(n => n.id === noteId) ?? null, [notes, noteId]);
 
   const [title, setTitle] = useState(note?.title ?? '');
   const [content, setContent] = useState(note?.content ?? '');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [editorHeight, setEditorHeight] = useState(400);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const prevKeyRef = useRef('');
+  const editorAreaRef = useRef<HTMLDivElement>(null);
 
-  // Re-initialize local state when the edited note changes (different note opened)
+  // Measure the editor area height so NoteEditor gets a real pixel height
+  // instead of the fixed 500px default (which breaks the live preview layout).
+  useEffect(() => {
+    const el = editorAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setEditorHeight(Math.max(200, entry.contentRect.height));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Re-initialize local state when a different note is opened
   const prevNoteIdRef = useRef(noteId);
   useEffect(() => {
     if (prevNoteIdRef.current !== noteId && note) {
@@ -66,9 +94,40 @@ export function PdfNoteEditorPanel({ noteId, notes, saveNote, onClose }: Props) 
     debouncedSave({ ...note, title, content });
   }, [title, content, note, debouncedSave]);
 
+  // Drag-to-resize: dragging the left edge changes the panel width
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = width;
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        // Moving the cursor left increases width (panel is on the right)
+        const delta = startX - ev.clientX;
+        const newWidth = Math.min(Math.max(startWidth + delta, MIN_WIDTH), MAX_WIDTH);
+        onWidthChange(newWidth);
+      };
+
+      const handleMouseUp = () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    },
+    [width, onWidthChange],
+  );
+
   if (!note) {
     return (
-      <div className={styles.panel}>
+      <div className={styles.panel} style={{ width }}>
+        <div className={styles.resizeHandle} onMouseDown={handleDragStart} />
         <div className={styles.header}>
           <span className={styles.errorMsg}>Note not found.</span>
           <button className={styles.closeBtn} onClick={onClose} title="Close editor">
@@ -80,7 +139,8 @@ export function PdfNoteEditorPanel({ noteId, notes, saveNote, onClose }: Props) 
   }
 
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} style={{ width }}>
+      <div className={styles.resizeHandle} onMouseDown={handleDragStart} />
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <span
@@ -115,8 +175,8 @@ export function PdfNoteEditorPanel({ noteId, notes, saveNote, onClose }: Props) 
         />
       </div>
 
-      <div className={styles.editorArea}>
-        <NoteEditor value={content} onChange={setContent} />
+      <div ref={editorAreaRef} className={styles.editorArea}>
+        <NoteEditor value={content} onChange={setContent} height={editorHeight} />
       </div>
     </div>
   );
