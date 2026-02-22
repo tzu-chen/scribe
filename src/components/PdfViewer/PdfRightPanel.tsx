@@ -14,6 +14,7 @@ interface Props {
   subject: string;
   onScrollToPage: (page: number) => void;
   onNavigateToNote: (noteId: string) => void;
+  onEditNote: (noteId: string) => void;
 }
 
 export function PdfRightPanel({
@@ -23,6 +24,7 @@ export function PdfRightPanel({
   subject,
   onScrollToPage,
   onNavigateToNote,
+  onEditNote,
 }: Props) {
   const [activeTab, setActiveTab] = useState<RightPanelTab>('comments');
 
@@ -55,6 +57,7 @@ export function PdfRightPanel({
             notes={notes}
             subject={subject}
             onNavigateToNote={onNavigateToNote}
+            onEditNote={onEditNote}
           />
         )}
       </div>
