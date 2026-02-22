@@ -11,9 +11,12 @@ import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
 import { PdfDocumentView, type PdfDocumentViewHandle } from '../../components/PdfViewer/PdfDocumentView';
 import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionToolbar';
 import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
+import { PdfNoteEditorPanel } from '../../components/PdfViewer/PdfNoteEditorPanel';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import styles from './PdfViewerPage.module.css';
+
+const EDITOR_PANEL_WIDTH = 450;
 
 export function PdfViewerPage() {
   const { attachmentId } = useParams<{ attachmentId: string }>();
@@ -30,7 +33,7 @@ export function PdfViewerPage() {
 
   const { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
-  const { notes } = useNotes();
+  const { notes, saveNote } = useNotes();
 
   const savedPrefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
 
@@ -39,6 +42,7 @@ export function PdfViewerPage() {
   const [showToc, setShowToc] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<{
@@ -196,6 +200,15 @@ export function PdfViewerPage() {
     navigate(`/note/${noteId}`);
   }, [navigate]);
 
+  const handleEditNote = useCallback((noteId: string) => {
+    setEditingNoteId(noteId);
+    setShowRightPanel(false);
+  }, []);
+
+  const handleCloseEditor = useCallback(() => {
+    setEditingNoteId(null);
+  }, []);
+
   const handleTextSelected = useCallback((selection: TextSelection) => {
     setTextSelection(selection);
     setActiveHighlight(null);
@@ -251,7 +264,13 @@ export function PdfViewerPage() {
   }, []);
 
   // Compute fit-width scale using actual container width and PDF page width
-  const availableWidth = containerWidth > 0 ? containerWidth - (showToc ? 280 : 0) - (showRightPanel ? 300 : 0) - 40 : 0;
+  const availableWidth = containerWidth > 0
+    ? containerWidth
+      - (showToc ? 280 : 0)
+      - (showRightPanel ? 300 : 0)
+      - (editingNoteId ? EDITOR_PANEL_WIDTH : 0)
+      - 40
+    : 0;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / pageWidth) : zoom;
 
   // When effectiveZoom changes, restore the scroll position that was saved before the change.
@@ -340,6 +359,15 @@ export function PdfViewerPage() {
             subject={subject}
             onScrollToPage={handlePanelScrollToPage}
             onNavigateToNote={handleNavigateToNote}
+            onEditNote={handleEditNote}
+          />
+        )}
+        {editingNoteId && (
+          <PdfNoteEditorPanel
+            noteId={editingNoteId}
+            notes={notes}
+            saveNote={saveNote}
+            onClose={handleCloseEditor}
           />
         )}
       </div>
