@@ -172,6 +172,12 @@ export function PdfViewerPage() {
     }
   }, [navigate, subject]);
 
+  const handleOpenInNewTab = useCallback(() => {
+    if (!attachmentId) return;
+    const url = `/pdf/${attachmentId}${window.location.search}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [attachmentId]);
+
   const handleZoomChange = useCallback((newZoom: number) => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(false);
@@ -334,6 +340,7 @@ export function PdfViewerPage() {
         onRightPanelToggle={handleRightPanelToggle}
         onReturnToFlowchart={handleReturnToFlowchart}
         onCreateNote={handleCreateNote}
+        onOpenInNewTab={handleOpenInNewTab}
       />
       <div ref={bodyRef} className={styles.body}>
         {showToc && (

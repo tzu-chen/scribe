@@ -17,6 +17,7 @@ interface Props {
   onRightPanelToggle: () => void;
   onReturnToFlowchart: () => void;
   onCreateNote: () => void;
+  onOpenInNewTab: () => void;
 }
 
 export function PdfToolbar({
@@ -34,6 +35,7 @@ export function PdfToolbar({
   onRightPanelToggle,
   onReturnToFlowchart,
   onCreateNote,
+  onOpenInNewTab,
 }: Props) {
   const zoomOut = () => {
     const current = zoom;
@@ -100,6 +102,13 @@ export function PdfToolbar({
       </div>
 
       <div className={styles.right}>
+        <button
+          className={styles.newTabBtn}
+          onClick={onOpenInNewTab}
+          title="Open in new tab"
+        >
+          &#8599;
+        </button>
         <button
           className={`${styles.panelBtn} ${showRightPanel ? styles.panelBtnActive : ''}`}
           onClick={onRightPanelToggle}
