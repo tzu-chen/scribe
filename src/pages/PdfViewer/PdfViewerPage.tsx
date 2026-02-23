@@ -39,6 +39,7 @@ export function PdfViewerPage() {
 
   const [zoom, setZoom] = useState(savedPrefs?.zoom ?? 1.0);
   const [fitWidth, setFitWidth] = useState(savedPrefs?.fitWidth ?? false);
+  const [twoPageView, setTwoPageView] = useState(savedPrefs?.twoPageView ?? false);
   const [showToc, setShowToc] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
@@ -56,6 +57,8 @@ export function PdfViewerPage() {
   const [containerWidth, setContainerWidth] = useState(0);
   const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
   const prevEffectiveZoomRef = useRef<number>(0);
+  const prevTwoPageViewRef = useRef(twoPageView);
+  const currentPageRef = useRef(currentPage);
 
   // Track the document area width for fit-width calculation.
   // The body div is conditionally rendered (only when !loading && pdfDoc),
@@ -134,6 +137,7 @@ export function PdfViewerPage() {
         zoom,
         fitWidth,
         currentPage,
+        twoPageView,
       });
     }, 1000);
 
@@ -142,7 +146,7 @@ export function PdfViewerPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [attachmentId, zoom, fitWidth, currentPage]);
+  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView]);
 
   // Immediate save on tab close
   useEffect(() => {
@@ -153,12 +157,13 @@ export function PdfViewerPage() {
         zoom,
         fitWidth,
         currentPage,
+        twoPageView,
       });
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [attachmentId, zoom, fitWidth, currentPage]);
+  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView]);
 
   const handleReturnToFlowchart = useCallback(() => {
     navigate(`/flowcharts${flowchartId ? `?view=${flowchartId}` : ''}`);
@@ -187,6 +192,10 @@ export function PdfViewerPage() {
   const handleFitWidthToggle = useCallback(() => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(prev => !prev);
+  }, []);
+
+  const handleTwoPageViewToggle = useCallback(() => {
+    setTwoPageView(prev => !prev);
   }, []);
 
   const handleTocToggle = useCallback(() => {
@@ -270,6 +279,23 @@ export function PdfViewerPage() {
     docViewRef.current?.scrollToPage(page, destTop);
   }, []);
 
+  // Keep currentPageRef in sync for use in the two-page toggle effect
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
+  // When twoPageView toggles, restore scroll position to the current page so
+  // the user stays on the same content after the layout reflows.
+  useEffect(() => {
+    if (prevTwoPageViewRef.current === twoPageView) return;
+    prevTwoPageViewRef.current = twoPageView;
+    if (!initialScrollDone.current) return;
+    const page = currentPageRef.current;
+    requestAnimationFrame(() => {
+      docViewRef.current?.scrollToPage(page, null, 'instant');
+    });
+  }, [twoPageView]);
+
   // Compute fit-width scale using actual container width and PDF page width
   const availableWidth = containerWidth > 0
     ? containerWidth
@@ -278,7 +304,9 @@ export function PdfViewerPage() {
       - (editingNoteId ? editorPanelWidth : 0)
       - 40
     : 0;
-  const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / pageWidth) : zoom;
+  // In two-page view, two pages sit side by side with an 8px gap between them.
+  const fitWidthPageSpan = twoPageView ? pageWidth * 2 + 8 : pageWidth;
+  const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / fitWidthPageSpan) : zoom;
 
   // When effectiveZoom changes, restore the scroll position that was saved before the change.
   // useLayoutEffect fires after DOM mutations but before the browser paints, preventing a visible jump.
@@ -333,8 +361,10 @@ export function PdfViewerPage() {
         fitWidth={fitWidth}
         showToc={showToc}
         hasOutline={outline.length > 0}
+        twoPageView={twoPageView}
         onZoomChange={handleZoomChange}
         onFitWidthToggle={handleFitWidthToggle}
+        onTwoPageViewToggle={handleTwoPageViewToggle}
         onTocToggle={handleTocToggle}
         showRightPanel={showRightPanel}
         onRightPanelToggle={handleRightPanelToggle}
@@ -354,6 +384,7 @@ export function PdfViewerPage() {
           pageWidth={pageWidth}
           pageHeight={pageHeight}
           highlights={annotations.highlights}
+          twoPageView={twoPageView}
           onTextSelected={handleTextSelected}
           onSelectionCleared={handleSelectionCleared}
           onHighlightClick={handleHighlightClick}

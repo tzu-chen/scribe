@@ -98,6 +98,25 @@
   border-color: var(--color-primary);
 }
 
+.twoPageBtn {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
+}
+
+.twoPageBtn:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.twoPageBtnActive {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
 .divider {
   width: 1px;
   height: 20px;

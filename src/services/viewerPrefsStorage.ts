@@ -2,6 +2,7 @@ export interface ViewerPrefs {
   zoom: number;
   fitWidth: boolean;
   currentPage: number;
+  twoPageView?: boolean;
 }
 
 const STORAGE_KEY = 'scribe_viewer_prefs';

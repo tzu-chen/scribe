@@ -15,3 +15,10 @@
 .placeholder {
   background: var(--color-border-light);
 }
+
+.twoPageRow {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
