@@ -10,8 +10,10 @@ interface Props {
   fitWidth: boolean;
   showToc: boolean;
   hasOutline: boolean;
+  twoPageView: boolean;
   onZoomChange: (zoom: number) => void;
   onFitWidthToggle: () => void;
+  onTwoPageViewToggle: () => void;
   onTocToggle: () => void;
   showRightPanel: boolean;
   onRightPanelToggle: () => void;
@@ -28,8 +30,10 @@ export function PdfToolbar({
   fitWidth,
   showToc,
   hasOutline,
+  twoPageView,
   onZoomChange,
   onFitWidthToggle,
+  onTwoPageViewToggle,
   onTocToggle,
   showRightPanel,
   onRightPanelToggle,
@@ -82,6 +86,13 @@ export function PdfToolbar({
           title="Fit page width"
         >
           Fit Width
+        </button>
+        <button
+          className={`${styles.twoPageBtn} ${twoPageView ? styles.twoPageBtnActive : ''}`}
+          onClick={onTwoPageViewToggle}
+          title="Two-page view"
+        >
+          2-Page
         </button>
         <span className={styles.divider} />
         <span className={styles.pageInfo}>
