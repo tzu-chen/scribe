@@ -149,6 +149,24 @@
   border-color: var(--color-primary);
 }
 
+.newTabBtn {
+  font-size: 1rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
+}
+
+.newTabBtn:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
 .noteBtn {
   font-size: 0.85rem;
   padding: 6px 14px;

@@ -48,9 +48,13 @@ export function LibraryPage() {
   );
 
   const handleOpen = useCallback(
-    (book: AttachmentMeta) => {
+    (book: AttachmentMeta, openInNewTab = false) => {
       if (book.type === 'application/pdf') {
-        navigate(`/pdf/${book.id}`);
+        if (openInNewTab) {
+          window.open(`/pdf/${book.id}`, '_blank', 'noopener,noreferrer');
+        } else {
+          navigate(`/pdf/${book.id}`);
+        }
       } else {
         attachmentStorage.openFile(book.id);
       }
@@ -129,7 +133,10 @@ export function LibraryPage() {
             <article
               key={book.id}
               className={styles.card}
-              onClick={() => handleOpen(book)}
+              onClick={e => handleOpen(book, e.ctrlKey || e.metaKey)}
+              onAuxClick={e => {
+                if (e.button === 1) handleOpen(book, true);
+              }}
               role="button"
               tabIndex={0}
               onKeyDown={e => {
