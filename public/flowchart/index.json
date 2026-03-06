@@ -1,13 +1,13 @@
 {
   "flowcharts": [
     {
-      "id": "stochastic",
+      "id": "flowchart-interactive",
       "name": "From Analysis to Stochastic Frontiers",
       "filename": "flowchart-interactive.html",
       "description": "A study roadmap covering analysis, probability, PDEs, stochastic calculus, and research frontiers"
     },
     {
-      "id": "transformers",
+      "id": "transformers-flowchart",
       "name": "Transformers — A Research Roadmap",
       "filename": "transformers-flowchart.html",
       "description": "From sequence modelling foundations to frontier architectures"

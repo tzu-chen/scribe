@@ -14,6 +14,8 @@ export function Layout({ children }: LayoutProps) {
   const isQuestions = location.pathname === '/questions';
   const isSummary = location.pathname === '/summary';
   const isPdfViewer = location.pathname.startsWith('/pdf/');
+  const isFlowchartView = isFlowcharts && new URLSearchParams(location.search).has('view');
+  const useFullWidth = isPdfViewer || isFlowchartView;
 
   return (
     <div className={styles.layout}>
@@ -57,7 +59,7 @@ export function Layout({ children }: LayoutProps) {
           </nav>
         </div>
       </header>
-      <main className={isPdfViewer ? styles.mainFullWidth : styles.main}>{children}</main>
+      <main className={useFullWidth ? styles.mainFullWidth : styles.main}>{children}</main>
     </div>
   );
 }
