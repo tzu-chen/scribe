@@ -142,7 +142,7 @@
       var actionBtn = e.target.closest('.node-action-btn');
       if (!actionBtn) return;
 
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
 
       var nodeEl = actionBtn.closest('.node');
