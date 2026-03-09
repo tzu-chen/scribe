@@ -11,5 +11,5 @@
 }
 
 :global([data-theme="dark"]) .canvas {
-  filter: url(#pdf-dark-mode-filter);
+  filter: invert(0.9);
 }
