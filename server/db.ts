@@ -67,6 +67,14 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_comments_highlight ON comments(highlight_id);
   CREATE INDEX IF NOT EXISTS idx_comments_attachment ON comments(attachment_id);
+
+  CREATE TABLE IF NOT EXISTS reading_time (
+    attachment_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    date_cst TEXT NOT NULL,
+    total_seconds REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (attachment_id, date_cst)
+  );
 `);
 
 export { db, ATTACHMENTS_DIR };
