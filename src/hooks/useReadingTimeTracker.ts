@@ -27,9 +27,12 @@ export function useReadingTimeTracker(
 
     const nowDateCST = getCSTDateString();
     const dateToCredit = currentDateCSTRef.current;
-    readingTimeStorage.addSeconds(id, name, dateToCredit, accumulatedSecondsRef.current);
+    const seconds = accumulatedSecondsRef.current;
     accumulatedSecondsRef.current = 0;
     currentDateCSTRef.current = nowDateCST;
+
+    // Fire-and-forget: errors are non-critical for reading time tracking
+    readingTimeStorage.addSeconds(id, name, dateToCredit, seconds).catch(() => {});
   }, []);
 
   useEffect(() => {
