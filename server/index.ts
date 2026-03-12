@@ -14,6 +14,18 @@ const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 
 app.use(express.json({ limit: '50mb' }));
 
+// Allow cross-origin requests (for LAN access from different ports/devices)
+app.use((_req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (_req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 // --- API Routes ---
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
