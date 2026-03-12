@@ -1,143 +1,66 @@
-import { v4 as uuidv4 } from 'uuid';
-import type { Attachment, AttachmentMeta } from '../types/attachment';
-
-const DB_NAME = 'scribe_attachments';
-const DB_VERSION = 1;
-const STORE_NAME = 'attachments';
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('by_subject', 'subject', { unique: false });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function txStore(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectStore {
-  return db.transaction(STORE_NAME, mode).objectStore(STORE_NAME);
-}
-
-function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
+import type { AttachmentMeta } from '../types/attachment';
 
 export const attachmentStorage = {
   async getBySubject(subject: string): Promise<AttachmentMeta[]> {
-    const db = await openDB();
-    const store = txStore(db, 'readonly');
-    const index = store.index('by_subject');
-    const records: Attachment[] = await reqToPromise(index.getAll(subject));
-    db.close();
-    return records.map(({ data: _, ...meta }) => meta);
+    const res = await fetch(`/api/attachments/by-subject?subject=${encodeURIComponent(subject)}`);
+    return res.json();
   },
 
   async getCountsBySubject(): Promise<Record<string, number>> {
-    const db = await openDB();
-    const store = txStore(db, 'readonly');
-    const all: Attachment[] = await reqToPromise(store.getAll());
-    db.close();
-    const counts: Record<string, number> = {};
-    for (const rec of all) {
-      counts[rec.subject] = (counts[rec.subject] || 0) + 1;
-    }
-    return counts;
+    const res = await fetch('/api/attachments/counts-by-subject');
+    return res.json();
   },
 
   async add(subject: string, file: File): Promise<AttachmentMeta> {
-    const record: Attachment = {
-      id: uuidv4(),
-      subject,
-      filename: file.name,
-      type: file.type,
-      size: file.size,
-      data: file,
-      createdAt: new Date().toISOString(),
-    };
-    const db = await openDB();
-    const store = txStore(db, 'readwrite');
-    await reqToPromise(store.add(record));
-    db.close();
-    const { data: _, ...meta } = record;
-    return meta;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('subject', subject);
+    const res = await fetch('/api/attachments', {
+      method: 'POST',
+      body: formData,
+    });
+    return res.json();
   },
 
   async delete(id: string): Promise<void> {
-    const db = await openDB();
-    const store = txStore(db, 'readwrite');
-    await reqToPromise(store.delete(id));
-    db.close();
+    await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
   },
 
   async getBlob(id: string): Promise<Blob | null> {
-    const db = await openDB();
-    const store = txStore(db, 'readonly');
-    const record: Attachment | undefined = await reqToPromise(store.get(id));
-    db.close();
-    return record?.data ?? null;
+    const res = await fetch(`/api/attachments/${id}/blob`);
+    if (!res.ok) return null;
+    return res.blob();
   },
 
   async getAll(): Promise<AttachmentMeta[]> {
-    const db = await openDB();
-    const store = txStore(db, 'readonly');
-    const all: Attachment[] = await reqToPromise(store.getAll());
-    db.close();
-    return all
-      .map(({ data: _, ...meta }) => meta)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const res = await fetch('/api/attachments');
+    return res.json();
   },
 
   async addFromBlob(subject: string, filename: string, type: string, blob: Blob): Promise<AttachmentMeta> {
-    const record: Attachment = {
-      id: uuidv4(),
-      subject,
-      filename,
-      type,
-      size: blob.size,
-      data: blob,
-      createdAt: new Date().toISOString(),
-    };
-    const db = await openDB();
-    const store = txStore(db, 'readwrite');
-    await reqToPromise(store.add(record));
-    db.close();
-    const { data: _, ...meta } = record;
-    return meta;
+    const file = new File([blob], filename, { type });
+    return this.add(subject, file);
   },
 
   async updateSubject(id: string, subject: string): Promise<void> {
-    const db = await openDB();
-    const store = txStore(db, 'readwrite');
-    const record: Attachment | undefined = await reqToPromise(store.get(id));
-    if (record) {
-      record.subject = subject;
-      await reqToPromise(store.put(record));
-    }
-    db.close();
+    await fetch(`/api/attachments/${id}/subject`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject }),
+    });
   },
 
   async openFile(id: string): Promise<void> {
-    const db = await openDB();
-    const store = txStore(db, 'readonly');
-    const record: Attachment | undefined = await reqToPromise(store.get(id));
-    db.close();
-    if (!record) return;
-    const url = URL.createObjectURL(record.data);
+    const blob = await this.getBlob(id);
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.target = '_blank';
-    a.download = record.filename;
+    // Fetch metadata to get filename
+    const allMeta = await this.getAll();
+    const meta = allMeta.find(m => m.id === id);
+    a.download = meta?.filename ?? 'download';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

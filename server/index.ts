@@ -2,6 +2,9 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import notesRouter from './routes/notes.ts';
+import attachmentsRouter from './routes/attachments.ts';
+import annotationsRouter from './routes/annotations.ts';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
@@ -9,12 +12,16 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // --- API Routes ---
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use('/api/notes', notesRouter);
+app.use('/api/attachments', attachmentsRouter);
+app.use('/api/annotations', annotationsRouter);
 
 // --- Static Frontend (production) ---
 if (fs.existsSync(DIST_DIR)) {

@@ -24,9 +24,9 @@ export function useAutoSave(note: Note | null, delayMs = 1500) {
 
     clearTimers();
 
-    timeoutRef.current = setTimeout(() => {
+    timeoutRef.current = setTimeout(async () => {
       setSaveStatus('saving');
-      noteStorage.save({
+      await noteStorage.save({
         ...note,
         updatedAt: new Date().toISOString(),
       });

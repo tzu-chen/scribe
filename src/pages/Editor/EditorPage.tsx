@@ -32,27 +32,30 @@ export function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { notes, saveNote, deleteNote } = useNotes();
+  const { notes, saveNote, deleteNote, loading } = useNotes();
   const { allTags } = useTags(notes);
   const { allCategories } = useCategories(notes);
   const { allSubjects } = useSubjects(notes);
 
-  const [note, setNote] = useState<Note>(() => {
+  const [note, setNote] = useState<Note>(() => createNewNote({
+    subject: searchParams.get('subject') || undefined,
+  }));
+  const [initialized, setInitialized] = useState(false);
+
+  // Load existing note once notes are fetched
+  useEffect(() => {
+    if (loading || initialized) return;
     if (id) {
       const existing = notes.find(n => n.id === id);
-      if (existing) return existing;
+      if (existing) {
+        setNote(existing); // eslint-disable-line react-hooks/set-state-in-effect -- sync from async data fetch
+      } else if (notes.length > 0) {
+        // Notes loaded but this id doesn't exist — redirect
+        navigate('/note/new', { replace: true });
+      }
     }
-    return createNewNote({
-      subject: searchParams.get('subject') || undefined,
-    });
-  });
-
-  // Redirect if editing a non-existent note
-  useEffect(() => {
-    if (id && !notes.find(n => n.id === id) && note.createdAt !== note.updatedAt) {
-      navigate('/note/new', { replace: true });
-    }
-  }, [id, notes, note, navigate]);
+    setInitialized(true);
+  }, [id, notes, loading, initialized, navigate]);
 
   const tagsKey = note.tags.join(',');
   const autoSaveNote = useMemo(() => note, [note.title, note.content, tagsKey, note.category, note.subject]);
@@ -63,9 +66,9 @@ export function EditorPage() {
   }, []);
 
   const handleSave = useCallback(
-    (status: NoteStatus) => {
+    async (status: NoteStatus) => {
       const updated = { ...note, status, updatedAt: new Date().toISOString() };
-      saveNote(updated);
+      await saveNote(updated);
       setNote(updated);
       if (status === 'published') {
         navigate(`/note/${updated.id}`);
@@ -74,9 +77,9 @@ export function EditorPage() {
     [note, saveNote, navigate],
   );
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
-      deleteNote(note.id);
+      await deleteNote(note.id);
       navigate('/notes');
     }
   }, [note.id, deleteNote, navigate]);
