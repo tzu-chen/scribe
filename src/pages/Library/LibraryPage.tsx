@@ -23,13 +23,21 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadBooks = useCallback(async () => {
-    const all = await attachmentStorage.getAll();
-    setBooks(all);
-    setLoading(false);
+    try {
+      setError(null);
+      const all = await attachmentStorage.getAll();
+      setBooks(all);
+    } catch (err) {
+      console.error('Failed to load books:', err);
+      setError('Failed to load library. Make sure the server is running.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -81,6 +89,20 @@ export function LibraryPage() {
     return (
       <div className={styles.page}>
         <p className={styles.loading}>Loading library...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>Connection error</p>
+          <p className={styles.emptyText}>{error}</p>
+          <button className={styles.uploadButton} onClick={loadBooks}>
+            Retry
+          </button>
+        </div>
       </div>
     );
   }

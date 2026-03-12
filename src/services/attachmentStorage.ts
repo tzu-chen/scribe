@@ -3,11 +3,13 @@ import type { AttachmentMeta } from '../types/attachment';
 export const attachmentStorage = {
   async getBySubject(subject: string): Promise<AttachmentMeta[]> {
     const res = await fetch(`/api/attachments/by-subject?subject=${encodeURIComponent(subject)}`);
+    if (!res.ok) throw new Error(`Failed to fetch attachments by subject: ${res.status}`);
     return res.json();
   },
 
   async getCountsBySubject(): Promise<Record<string, number>> {
     const res = await fetch('/api/attachments/counts-by-subject');
+    if (!res.ok) throw new Error(`Failed to fetch attachment counts: ${res.status}`);
     return res.json();
   },
 
@@ -19,11 +21,13 @@ export const attachmentStorage = {
       method: 'POST',
       body: formData,
     });
+    if (!res.ok) throw new Error(`Failed to upload attachment: ${res.status}`);
     return res.json();
   },
 
   async delete(id: string): Promise<void> {
-    await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Failed to delete attachment: ${res.status}`);
   },
 
   async getBlob(id: string): Promise<Blob | null> {
@@ -34,6 +38,7 @@ export const attachmentStorage = {
 
   async getAll(): Promise<AttachmentMeta[]> {
     const res = await fetch('/api/attachments');
+    if (!res.ok) throw new Error(`Failed to fetch attachments: ${res.status}`);
     return res.json();
   },
 
@@ -43,11 +48,12 @@ export const attachmentStorage = {
   },
 
   async updateSubject(id: string, subject: string): Promise<void> {
-    await fetch(`/api/attachments/${id}/subject`, {
+    const res = await fetch(`/api/attachments/${id}/subject`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subject }),
     });
+    if (!res.ok) throw new Error(`Failed to update attachment subject: ${res.status}`);
   },
 
   async openFile(id: string): Promise<void> {
