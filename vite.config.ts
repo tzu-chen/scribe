@@ -6,6 +6,7 @@ import flowchartManifest from './vite-plugin-flowchart-manifest'
 export default defineConfig({
   plugins: [react(), flowchartManifest()],
   server: {
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
