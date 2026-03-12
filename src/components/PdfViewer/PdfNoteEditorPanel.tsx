@@ -7,7 +7,7 @@ import styles from './PdfNoteEditorPanel.module.css';
 interface Props {
   noteId: string;
   notes: Note[];
-  saveNote: (note: Note) => void;
+  saveNote: (note: Note) => void | Promise<void>;
   onClose: () => void;
   width: number;
   onWidthChange: (width: number) => void;

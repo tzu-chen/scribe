@@ -1,30 +1,26 @@
 import type { Note } from '../types/note';
 
-const STORAGE_KEY = 'scribe_notes';
-
 export const noteStorage = {
-  getAll(): Note[] {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+  async getAll(): Promise<Note[]> {
+    const res = await fetch('/api/notes');
+    return res.json();
   },
 
-  getById(id: string): Note | undefined {
-    return this.getAll().find(n => n.id === id);
+  async getById(id: string): Promise<Note | undefined> {
+    const res = await fetch(`/api/notes/${id}`);
+    if (!res.ok) return undefined;
+    return res.json();
   },
 
-  save(note: Note): void {
-    const notes = this.getAll();
-    const index = notes.findIndex(n => n.id === note.id);
-    if (index >= 0) {
-      notes[index] = note;
-    } else {
-      notes.push(note);
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  async save(note: Note): Promise<void> {
+    await fetch(`/api/notes/${note.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(note),
+    });
   },
 
-  delete(id: string): void {
-    const notes = this.getAll().filter(n => n.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  async delete(id: string): Promise<void> {
+    await fetch(`/api/notes/${id}`, { method: 'DELETE' });
   },
 };

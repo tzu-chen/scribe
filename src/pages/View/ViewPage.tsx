@@ -32,9 +32,13 @@ const previewOptions = {
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { notes, deleteNote } = useNotes();
+  const { notes, deleteNote, loading } = useNotes();
   const { theme } = useTheme();
   const note = notes.find(n => n.id === id);
+
+  if (loading) {
+    return <div className={styles.notFound}><p>Loading...</p></div>;
+  }
 
   if (!note) {
     return (
@@ -45,9 +49,9 @@ export function ViewPage() {
     );
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
-      deleteNote(note.id);
+      await deleteNote(note.id);
       navigate('/notes');
     }
   };
