@@ -15,6 +15,45 @@
   font-weight: 700;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-left: auto;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.viewToggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.viewToggleBtn:hover {
+  background: var(--color-bg);
+}
+
+.viewToggleActive {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.viewToggleActive:hover {
+  background: var(--color-primary-light);
+}
+
 .uploadButton {
   display: inline-flex;
   align-items: center;
@@ -44,6 +83,7 @@
   margin-bottom: var(--spacing-lg);
 }
 
+/* Card grid layout */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -118,6 +158,182 @@
   background: var(--color-bg);
 }
 
+/* Bulk toolbar */
+.bulkToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.bulkCount {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-right: auto;
+}
+
+.bulkDeleteBtn {
+  font-size: 0.8125rem;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: #fff;
+  background: var(--color-danger, #e53e3e);
+}
+
+.bulkDeleteBtn:hover {
+  opacity: 0.9;
+}
+
+.bulkDeselectBtn {
+  font-size: 0.8125rem;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.bulkDeselectBtn:hover {
+  background: var(--color-bg);
+}
+
+/* List layout */
+.listContainer {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.listTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.listHeaderRow {
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.listHeaderCell {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.listHeaderCell:hover {
+  color: var(--color-text);
+}
+
+.sortArrow {
+  font-size: 0.6875rem;
+}
+
+.listCheckboxCol {
+  width: 40px;
+  padding: var(--spacing-sm);
+  text-align: center;
+}
+
+.checkbox {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.listRow {
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background 0.1s;
+}
+
+.listRow:last-child {
+  border-bottom: none;
+}
+
+.listRow:hover {
+  background: var(--color-bg);
+}
+
+.listRowSelected {
+  background: var(--color-primary-light);
+}
+
+.listRowSelected:hover {
+  background: var(--color-primary-light);
+}
+
+.listNameCell {
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  max-width: 300px;
+}
+
+.listFileName {
+  font-weight: 500;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.listFileName:hover {
+  color: var(--color-primary);
+}
+
+.listCell {
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.listActionsCell {
+  padding: var(--spacing-sm) var(--spacing-md);
+  white-space: nowrap;
+}
+
+.listActionBtn {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.listActionBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.listDeleteBtn:hover {
+  color: var(--color-danger, #e53e3e);
+}
+
+.renameInput {
+  width: 100%;
+  padding: 2px 6px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+}
+
+/* Shared */
 .loading {
   color: var(--color-text-secondary);
 }
@@ -142,5 +358,9 @@
 @media (max-width: 640px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .listNameCell {
+    max-width: 150px;
   }
 }

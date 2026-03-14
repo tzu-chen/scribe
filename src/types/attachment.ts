@@ -6,6 +6,7 @@ export interface Attachment {
   size: number;
   data: Blob;
   createdAt: string;
+  lastOpenedAt?: string;
 }
 
 export interface AttachmentMeta {
@@ -15,4 +16,5 @@ export interface AttachmentMeta {
   type: string;
   size: number;
   createdAt: string;
+  lastOpenedAt?: string;
 }

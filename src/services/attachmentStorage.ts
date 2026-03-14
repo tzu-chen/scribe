@@ -56,6 +56,22 @@ export const attachmentStorage = {
     if (!res.ok) throw new Error(`Failed to update attachment subject: ${res.status}`);
   },
 
+  async rename(id: string, filename: string): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/filename`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename }),
+    });
+    if (!res.ok) throw new Error(`Failed to rename attachment: ${res.status}`);
+  },
+
+  async markOpened(id: string): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/last-opened`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw new Error(`Failed to mark attachment opened: ${res.status}`);
+  },
+
   async openFile(id: string): Promise<void> {
     const blob = await this.getBlob(id);
     if (!blob) return;
