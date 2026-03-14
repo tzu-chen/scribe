@@ -17,6 +17,7 @@ interface AttachmentRow {
   size: number;
   file_path: string;
   created_at: string;
+  last_opened_at: string | null;
 }
 
 function rowToMeta(row: AttachmentRow) {
@@ -27,6 +28,7 @@ function rowToMeta(row: AttachmentRow) {
     type: row.type,
     size: row.size,
     createdAt: row.created_at,
+    lastOpenedAt: row.last_opened_at ?? undefined,
   };
 }
 
@@ -111,6 +113,24 @@ router.get('/:id/blob', (req, res) => {
 router.patch('/:id/subject', (req, res) => {
   const { subject } = req.body;
   db.prepare('UPDATE attachments SET subject = ? WHERE id = ?').run(subject, req.params.id);
+  res.json({ ok: true });
+});
+
+// PATCH /api/attachments/:id/filename
+router.patch('/:id/filename', (req, res) => {
+  const { filename } = req.body;
+  if (!filename || typeof filename !== 'string') {
+    res.status(400).json({ error: 'filename is required' });
+    return;
+  }
+  db.prepare('UPDATE attachments SET filename = ? WHERE id = ?').run(filename.trim(), req.params.id);
+  res.json({ ok: true });
+});
+
+// PATCH /api/attachments/:id/last-opened
+router.patch('/:id/last-opened', (req, res) => {
+  const now = new Date().toISOString();
+  db.prepare('UPDATE attachments SET last_opened_at = ? WHERE id = ?').run(now, req.params.id);
   res.json({ ok: true });
 });
 

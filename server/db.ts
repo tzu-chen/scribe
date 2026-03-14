@@ -39,7 +39,8 @@ db.exec(`
     type TEXT NOT NULL,
     size INTEGER NOT NULL,
     file_path TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    last_opened_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_attachments_subject ON attachments(subject);
 
@@ -76,5 +77,11 @@ db.exec(`
     PRIMARY KEY (attachment_id, date_cst)
   );
 `);
+
+// Migration: add last_opened_at column if missing (for existing databases)
+const columns = db.prepare("PRAGMA table_info(attachments)").all() as Array<{ name: string }>;
+if (!columns.some(c => c.name === 'last_opened_at')) {
+  db.exec('ALTER TABLE attachments ADD COLUMN last_opened_at TEXT');
+}
 
 export { db, ATTACHMENTS_DIR };
