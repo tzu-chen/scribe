@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import type { AttachmentMeta } from '../../types/attachment';
 import styles from './BookPicker.module.css';
@@ -17,6 +17,7 @@ interface BookPickerProps {
 export function BookPicker({ onSelect, onCancel }: BookPickerProps) {
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
   const [loading, setLoading] = useState(true);
+  const overlayMouseDownRef = useRef(false);
 
   useEffect(() => {
     attachmentStorage.getAll().then(all => {
@@ -26,8 +27,19 @@ export function BookPicker({ onSelect, onCancel }: BookPickerProps) {
   }, []);
 
   return (
-    <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.panel} onClick={e => e.stopPropagation()}>
+    <div
+      className={styles.overlay}
+      onMouseDown={e => {
+        overlayMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={e => {
+        if (overlayMouseDownRef.current && e.target === e.currentTarget) {
+          onCancel();
+        }
+        overlayMouseDownRef.current = false;
+      }}
+    >
+      <div className={styles.panel}>
         <div className={styles.header}>
           <h3 className={styles.title}>Select a book from your library</h3>
           <button
