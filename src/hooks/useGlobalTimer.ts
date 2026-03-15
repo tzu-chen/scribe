@@ -3,7 +3,7 @@ import { globalTimerStorage } from '../services/globalTimerStorage';
 import { getCSTDateString } from '../services/readingTimeStorage';
 
 const FLUSH_INTERVAL_MS = 10_000;
-const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'scroll', 'mousedown', 'touchstart'];
+const ACTIVITY_EVENTS = ['keydown', 'scroll', 'mousedown'];
 
 interface GlobalTimerState {
   totalSeconds: number;
@@ -77,8 +77,6 @@ export function useGlobalTimer(): GlobalTimerState {
     const handleVisibility = () => {
       if (document.hidden) {
         flush();
-      } else {
-        lastTickRef.current = Date.now();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
