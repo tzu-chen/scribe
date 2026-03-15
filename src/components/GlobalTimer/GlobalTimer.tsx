@@ -11,11 +11,20 @@ function formatTime(totalSeconds: number): string {
 }
 
 export function GlobalTimer() {
-  const { totalSeconds, isRunning, toggle } = useGlobalTimer();
+  const { totalSeconds, isRunning, toggle, reset } = useGlobalTimer();
 
   return (
     <div className={styles.container}>
-      <span className={styles.time}>{formatTime(totalSeconds)}</span>
+      <span
+        className={styles.time}
+        onClick={reset}
+        title="Reset today's timer"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') reset(); }}
+      >
+        {formatTime(totalSeconds)}
+      </span>
       <button
         className={styles.toggleButton}
         onClick={toggle}
