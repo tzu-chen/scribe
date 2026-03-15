@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { GlobalTimer } from '../GlobalTimer/GlobalTimer';
 import { ThemeMenu } from '../ThemeMenu/ThemeMenu';
 import styles from './Layout.module.css';
 
@@ -55,6 +56,7 @@ export function Layout({ children }: LayoutProps) {
             >
               Summary
             </Link>
+            <GlobalTimer />
             <ThemeMenu />
           </nav>
         </div>
