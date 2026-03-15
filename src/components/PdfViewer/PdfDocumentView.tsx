@@ -40,25 +40,40 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       scrollToPage(page: number, offsetTop?: number | null, behavior: ScrollBehavior = 'smooth') {
         const container = containerRef.current;
         if (!container) return;
-        const pageEl = container.querySelector(`[data-page-wrapper="${page}"]`);
-        if (!pageEl) return;
 
-        if (offsetTop == null) {
-          // No sub-page offset – just scroll to the top of the page
-          pageEl.scrollIntoView({ behavior, block: 'start' });
-          return;
+        const doScroll = () => {
+          const pageEl = container.querySelector(`[data-page-wrapper="${page}"]`) as HTMLElement | null;
+          if (!pageEl) return;
+
+          const containerRect = container.getBoundingClientRect();
+          const pageRect = pageEl.getBoundingClientRect();
+          const pageTopInContainer =
+            pageRect.top - containerRect.top + container.scrollTop;
+
+          if (offsetTop == null) {
+            container.scrollTo({ top: pageTopInContainer, behavior });
+          } else {
+            // offsetTop is in viewport units at scale 1; multiply by current
+            // scale to get the pixel offset inside the rendered page.
+            const target = pageTopInContainer + offsetTop * scale;
+            container.scrollTo({ top: target, behavior });
+          }
+        };
+
+        doScroll();
+
+        // For instant scrolls, correct for layout shift caused by virtualization.
+        // The initial scroll triggers IntersectionObserver → visibleRange update →
+        // React re-render. Placeholder pages becoming real content (or vice versa)
+        // may shift positions. Double rAF waits for the observer callback, React
+        // re-render, and DOM commit before re-measuring.
+        if (behavior === 'instant') {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              doScroll();
+            });
+          });
         }
-
-        // Compute the precise scroll position within the container.
-        // offsetTop is in viewport units at scale 1; multiply by current
-        // scale to get the pixel offset inside the rendered page.
-        const containerRect = container.getBoundingClientRect();
-        const pageRect = (pageEl as HTMLElement).getBoundingClientRect();
-        const pageTopInContainer =
-          pageRect.top - containerRect.top + container.scrollTop;
-        const target = pageTopInContainer + offsetTop * scale;
-
-        container.scrollTo({ top: target, behavior });
       },
       getScrollPosition() {
         const container = containerRef.current;

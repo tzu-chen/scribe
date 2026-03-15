@@ -317,7 +317,7 @@ export function PdfViewerPage() {
   }, []);
 
   const handleTocNavigate = useCallback((page: number, destTop: number | null) => {
-    docViewRef.current?.scrollToPage(page, destTop);
+    docViewRef.current?.scrollToPage(page, destTop, 'instant');
   }, []);
 
   // Keep currentPageRef in sync for use in the two-page toggle effect
