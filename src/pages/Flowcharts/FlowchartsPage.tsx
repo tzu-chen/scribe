@@ -43,9 +43,9 @@ export function FlowchartsPage() {
     files: AttachmentMeta[];
   } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const actionInProgressRef = useRef(false);
   const searchParamsRef = useRef(searchParams);
   const flowchartsRef = useRef<FlowchartEntry[]>(flowcharts);
+  const overlayMouseDownRef = useRef(false);
   const [bookPickerSubject, setBookPickerSubject] = useState<string | null>(null);
   const [questionDialog, setQuestionDialog] = useState<QuestionDialog | null>(null);
   const [questionText, setQuestionText] = useState('');
@@ -143,19 +143,21 @@ export function FlowchartsPage() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      /* Only handle messages from our iframe. */
+      if (event.source !== iframeRef.current?.contentWindow) return;
+
       const data = event.data;
       if (!data?.type) return;
 
       if (data.type === 'node-selected') {
         setSelectedNode({ nodeId: data.nodeId, nodeTitle: data.nodeTitle });
-        if (!actionInProgressRef.current) {
-          setAttachmentPanel(null);
-        }
+        /* Close the attachment panel only if a *different* node was selected. */
+        setAttachmentPanel(prev =>
+          prev && prev.subject !== (data.nodeTitle as string) ? null : prev,
+        );
       } else if (data.type === 'node-deselected') {
         setSelectedNode(null);
-        if (!actionInProgressRef.current) {
-          setAttachmentPanel(null);
-        }
+        setAttachmentPanel(null);
       } else if (data.type === 'node-action') {
         const { action, nodeTitle } = data as {
           action: string;
@@ -174,12 +176,8 @@ export function FlowchartsPage() {
             setBookPickerSubject(nodeTitle);
             break;
           case 'view-attachments':
-            actionInProgressRef.current = true;
             attachmentStorage.getBySubject(nodeTitle).then(files => {
               setAttachmentPanel({ subject: nodeTitle, files });
-              setTimeout(() => {
-                actionInProgressRef.current = false;
-              }, 100);
             });
             break;
           case 'view-notes':
@@ -246,7 +244,27 @@ export function FlowchartsPage() {
     [attachmentPanel, sendAttachmentCounts],
   );
 
-  const closeAttachmentPanel = useCallback(() => {
+  const handleOverlayMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      /* Only register mousedowns directly on the overlay backdrop. */
+      overlayMouseDownRef.current = e.target === e.currentTarget;
+    },
+    [],
+  );
+
+  const closeAttachmentPanel = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      /* Only close if the user actually mouse-downed on the overlay too.
+         This prevents phantom clicks from closing the panel. */
+      if (overlayMouseDownRef.current && e.target === e.currentTarget) {
+        setAttachmentPanel(null);
+      }
+      overlayMouseDownRef.current = false;
+    },
+    [],
+  );
+
+  const closeAttachmentPanelButton = useCallback(() => {
     setAttachmentPanel(null);
   }, []);
 
@@ -338,12 +356,17 @@ export function FlowchartsPage() {
         {questionDialog && (
           <div
             className={styles.attachmentOverlay}
-            onClick={handleCancelQuestion}
+            onMouseDown={e => {
+              overlayMouseDownRef.current = e.target === e.currentTarget;
+            }}
+            onClick={e => {
+              if (overlayMouseDownRef.current && e.target === e.currentTarget) {
+                handleCancelQuestion();
+              }
+              overlayMouseDownRef.current = false;
+            }}
           >
-            <div
-              className={styles.attachmentPanel}
-              onClick={e => e.stopPropagation()}
-            >
+            <div className={styles.attachmentPanel}>
               <div className={styles.attachmentHeader}>
                 <h3 className={styles.attachmentTitle}>
                   Add question: {questionDialog.nodeTitle}
@@ -392,19 +415,17 @@ export function FlowchartsPage() {
         {attachmentPanel && (
           <div
             className={styles.attachmentOverlay}
+            onMouseDown={handleOverlayMouseDown}
             onClick={closeAttachmentPanel}
           >
-            <div
-              className={styles.attachmentPanel}
-              onClick={e => e.stopPropagation()}
-            >
+            <div className={styles.attachmentPanel}>
               <div className={styles.attachmentHeader}>
                 <h3 className={styles.attachmentTitle}>
                   Attachments: {attachmentPanel.subject}
                 </h3>
                 <button
                   className={styles.attachmentClose}
-                  onClick={closeAttachmentPanel}
+                  onClick={closeAttachmentPanelButton}
                   aria-label="Close"
                 >
                   &times;
