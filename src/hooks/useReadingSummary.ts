@@ -77,7 +77,9 @@ function computeSummary(entries: ReadingTimeEntry[], viewMode: ViewMode) {
   }
 
   const bookMap = new Map<string, BookInfo>();
-  for (const entry of entries) {
+  // Skip entries with empty filenames (caused by a previous bug)
+  const validEntries = entries.filter((e) => e.filename);
+  for (const entry of validEntries) {
     const day = dayMap.get(entry.dateCST);
     if (day) {
       day.books[entry.attachmentId] =
@@ -110,7 +112,7 @@ function computeSummary(entries: ReadingTimeEntry[], viewMode: ViewMode) {
   // Only show books with at least 30 minutes of reading time
   const filteredBooks = booksArray.filter((book) => book.roundedSeconds >= 1800);
 
-  const total = roundDown30Min(entries.reduce((sum, e) => sum + e.totalSeconds, 0));
+  const total = roundDown30Min(validEntries.reduce((sum, e) => sum + e.totalSeconds, 0));
 
   return { days: daysArray, books: filteredBooks, totalSeconds: total };
 }
@@ -123,6 +125,11 @@ export function useReadingSummary() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  const resetAll = useCallback(async () => {
+    await readingTimeStorage.deleteAll();
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     const todayCST = getCSTDateString();
@@ -150,5 +157,5 @@ export function useReadingSummary() {
     });
   }, [viewMode, refreshKey]);
 
-  return { viewMode, setViewMode, days, books, totalSeconds, refresh };
+  return { viewMode, setViewMode, days, books, totalSeconds, refresh, resetAll };
 }

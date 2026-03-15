@@ -23,7 +23,7 @@ export function useReadingTimeTracker(
   const flush = useCallback(() => {
     const id = attachmentIdRef.current;
     const name = filenameRef.current;
-    if (!id || accumulatedSecondsRef.current <= 0) return;
+    if (!id || !name || accumulatedSecondsRef.current <= 0) return;
 
     const nowDateCST = getCSTDateString();
     const dateToCredit = currentDateCSTRef.current;

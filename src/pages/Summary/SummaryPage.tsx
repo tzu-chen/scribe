@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useReadingSummary, type ViewMode } from '../../hooks/useReadingSummary';
 import styles from './SummaryPage.module.css';
 
@@ -13,8 +13,9 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export function SummaryPage() {
-  const { viewMode, setViewMode, days, books, totalSeconds, refresh } =
+  const { viewMode, setViewMode, days, books, totalSeconds, refresh, resetAll } =
     useReadingSummary();
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Refresh data when the page becomes visible (returning from reading)
   useEffect(() => {
@@ -52,6 +53,32 @@ export function SummaryPage() {
           Total reading time ({viewMode === 'week' ? 'this week' : 'this month'})
         </span>
         <span className={styles.totalValue}>{formatDuration(totalSeconds)}</span>
+        <div className={styles.resetArea}>
+          {showResetConfirm ? (
+            <>
+              <span className={styles.resetConfirmText}>Reset all tracked time?</span>
+              <button
+                className={styles.resetConfirmBtn}
+                onClick={() => { resetAll(); setShowResetConfirm(false); }}
+              >
+                Yes, reset
+              </button>
+              <button
+                className={styles.resetCancelBtn}
+                onClick={() => setShowResetConfirm(false)}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              className={styles.resetBtn}
+              onClick={() => setShowResetConfirm(true)}
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {viewMode === 'week' ? (

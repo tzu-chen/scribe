@@ -95,8 +95,8 @@ export function PdfViewerPage() {
         setBlob(b);
 
         // Get filename from metadata
-        const subjects = await attachmentStorage.getBySubject(subject);
-        const meta = subjects.find(f => f.id === attachmentId);
+        const allMeta = await attachmentStorage.getAll();
+        const meta = allMeta.find(f => f.id === attachmentId);
         if (meta) setFilename(meta.filename);
       } catch {
         if (!cancelled) setLoadError('Failed to load attachment.');

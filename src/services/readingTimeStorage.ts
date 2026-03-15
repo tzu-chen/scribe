@@ -34,4 +34,8 @@ export const readingTimeStorage = {
     const res = await fetch(`/api/reading-time?${params}`);
     return res.json() as Promise<ReadingTimeEntry[]>;
   },
+
+  async deleteAll(): Promise<void> {
+    await fetch('/api/reading-time', { method: 'DELETE' });
+  },
 };

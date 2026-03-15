@@ -66,4 +66,10 @@ router.post('/', (req, res) => {
   res.json(rowToEntry(row));
 });
 
+// DELETE /api/reading-time — clear all reading time data
+router.delete('/', (_req, res) => {
+  db.prepare('DELETE FROM reading_time').run();
+  res.json({ ok: true });
+});
+
 export default router;

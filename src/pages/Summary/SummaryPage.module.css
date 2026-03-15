@@ -73,6 +73,54 @@
   color: var(--color-text);
 }
 
+.resetArea {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.resetBtn {
+  font-size: 0.8125rem;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.resetBtn:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.resetConfirmText {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.resetConfirmBtn {
+  font-size: 0.8125rem;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background: var(--color-danger);
+  color: #fff;
+  cursor: pointer;
+}
+
+.resetCancelBtn {
+  font-size: 0.8125rem;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
 .chartContainer {
   background: var(--color-surface);
   border: 1px solid var(--color-border-light);
