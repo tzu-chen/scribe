@@ -285,8 +285,9 @@ export function PdfViewerPage() {
   }, []);
 
   const handleTocNavigate = useCallback((page: number, destTop: number | null) => {
+    startTimer();
     docViewRef.current?.scrollToPage(page, destTop);
-  }, []);
+  }, [startTimer]);
 
   // Keep currentPageRef in sync for use in the two-page toggle effect
   useEffect(() => {
@@ -397,7 +398,7 @@ export function PdfViewerPage() {
           onTextSelected={handleTextSelected}
           onSelectionCleared={handleSelectionCleared}
           onHighlightClick={handleHighlightClick}
-          onPageChange={setCurrentPage}
+          onPageChange={(page: number) => { startTimer(); setCurrentPage(page); }}
         />
         {showRightPanel && (
           <PdfRightPanel
