@@ -56,8 +56,9 @@ export function Layout({ children }: LayoutProps) {
             >
               Summary
             </Link>
-            <GlobalTimer />
+            <div className={styles.navSpacer} />
             <ThemeMenu />
+            <GlobalTimer />
           </nav>
         </div>
       </header>
