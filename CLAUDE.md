@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Scribe is a browser-based study tool built with React 19, TypeScript, and Vite. It is a **fully client-side, offline-first application** — all data is stored in the browser (localStorage and IndexedDB) with no backend or API calls. The app helps users manage:
+Scribe is a study tool built with React 19, TypeScript, and Vite on the frontend, backed by an **Express + SQLite** server. The app helps users manage:
 
 - A **Library** of uploaded PDF and other files
 - **Notes** written in Markdown with LaTeX support
@@ -10,16 +10,35 @@ Scribe is a browser-based study tool built with React 19, TypeScript, and Vite. 
 - **Questions** linked to flowchart nodes
 - A **Reading Summary** with time-tracking heatmaps
 
+### Architecture History
+
+The project was originally a **fully client-side, offline-first application** using localStorage and IndexedDB for all data storage. In March 2025, it was migrated to a **client-server architecture** with:
+- An Express.js backend serving a REST API
+- SQLite (via `better-sqlite3`) for persistent storage
+- File uploads stored on the server filesystem
+
+**A few features still use client-side storage** (see [Data Storage](#data-storage) below).
+
 ---
 
 ## Development Commands
 
 ```bash
-npm run dev      # Start Vite dev server (HMR)
-npm run build    # TypeScript check + Vite production build
-npm run lint     # ESLint
-npm run preview  # Preview the production build locally
+npm run dev          # Start both client (Vite) and server (Express) concurrently
+npm run dev:client   # Start Vite dev server only (HMR)
+npm run dev:server   # Start Express server only (tsx watch, auto-reload)
+npm run build        # TypeScript check + Vite production build
+npm run lint         # ESLint
+npm run preview      # Preview the production build locally (client only)
+npm run start        # Start Express server in production (serves built client from dist/)
 ```
+
+In development, `npm run dev` runs both processes via `concurrently`:
+- **Vite dev server** — serves the React app with HMR
+- **Express server** — runs on port 3001 (configurable via `PORT` env var)
+- Vite proxies `/api/*` requests to the Express server (configured in `vite.config.ts`)
+
+In production, the Express server serves the built React app from `dist/` and handles all API requests on a single port.
 
 There are **no tests** in this project currently.
 
@@ -28,6 +47,8 @@ There are **no tests** in this project currently.
 ## Architecture
 
 ### Tech Stack
+
+#### Frontend (React SPA)
 
 | Tool | Version | Purpose |
 |---|---|---|
@@ -42,28 +63,53 @@ There are **no tests** in this project currently.
 | date-fns | 4.x | Date utilities |
 | uuid | 13.x | UUID generation |
 
+#### Backend (Express + SQLite)
+
+| Tool | Version | Purpose |
+|---|---|---|
+| Express | 5.x | HTTP server and REST API |
+| better-sqlite3 | 12.x | SQLite database |
+| multer | 2.x | File upload handling (multipart) |
+| tsx | 4.x | TypeScript execution for server |
+| concurrently | 9.x | Run client + server in parallel |
+
 ### Directory Structure
 
 ```
+server/
+  index.ts                   # Express app setup, CORS, static file serving
+  db.ts                      # SQLite schema init + migrations
+  routes/
+    notes.ts                 # CRUD for notes
+    attachments.ts           # Upload, download, list, delete attachments
+    annotations.ts           # PDF highlights and comments
+    readingTime.ts           # Per-attachment reading time tracking
+    globalTimer.ts           # Global daily timer
+
+data/                        # Created at runtime, git-ignored
+  scribe.db                  # SQLite database file
+  attachments/               # Uploaded file blobs stored on disk
+
 src/
-  App.tsx                  # Root: router + ThemeProvider + Layout
-  main.tsx                 # React entry point
-  global.css               # CSS custom properties (design tokens), reset
-  types/                   # TypeScript interfaces (no logic)
-    note.ts                # Note, NoteStatus
-    attachment.ts          # Attachment, AttachmentMeta
-    annotation.ts          # PdfHighlight, PdfComment, HighlightRect
-    question.ts            # Question
-    readingTime.ts         # ReadingTimeEntry, ReadingTimeMap
-  services/                # Storage layer (pure functions / objects, no React)
-    noteStorage.ts         # localStorage (key: scribe_notes)
-    attachmentStorage.ts   # IndexedDB (scribe_attachments)
-    annotationStorage.ts   # IndexedDB (scribe_annotations)
-    questionStorage.ts     # localStorage (key: scribe_questions)
-    readingTimeStorage.ts  # localStorage (key: scribe_reading_time)
-    themeStorage.ts        # localStorage (key: scribe_theme)
-    viewerPrefsStorage.ts  # localStorage (key: scribe_viewer_prefs)
-  hooks/                   # Custom React hooks (wrap services + React state)
+  App.tsx                    # Root: router + ThemeProvider + Layout
+  main.tsx                   # React entry point
+  global.css                 # CSS custom properties (design tokens), reset
+  types/                     # TypeScript interfaces (no logic)
+    note.ts                  # Note, NoteStatus
+    attachment.ts            # Attachment, AttachmentMeta
+    annotation.ts            # PdfHighlight, PdfComment, HighlightRect
+    question.ts              # Question
+    readingTime.ts           # ReadingTimeEntry, ReadingTimeMap
+  services/                  # Data access layer (calls REST API or localStorage)
+    noteStorage.ts           # REST API → /api/notes
+    attachmentStorage.ts     # REST API → /api/attachments
+    annotationStorage.ts     # REST API → /api/annotations
+    readingTimeStorage.ts    # REST API → /api/reading-time
+    globalTimerStorage.ts    # REST API → /api/global-timer
+    questionStorage.ts       # localStorage (key: scribe_questions) — not yet migrated
+    themeStorage.ts          # localStorage (key: scribe_theme)
+    viewerPrefsStorage.ts    # localStorage (key: scribe_viewer_prefs)
+  hooks/                     # Custom React hooks (wrap services + React state)
     useNotes.ts
     useAutoSave.ts
     useCategories.ts
@@ -73,29 +119,30 @@ src/
     usePdfAnnotations.ts
     useReadingTimeTracker.ts
     useReadingSummary.ts
+    useGlobalTimer.ts
   contexts/
-    ThemeContext.tsx        # Theme ('default' | 'dark'), reads/writes themeStorage
-  components/              # Reusable UI components
-    Layout/                # App shell: header nav + main content area
-    NoteEditor/            # @uiw/react-md-editor wrapper with KaTeX support
-    NoteCard/              # Note list item
-    NoteToolbar/           # Save/publish/delete toolbar
-    TagInput/              # Tag chip input
-    TagFilter/             # Tag filter chips
-    CategorySelect/        # Category autocomplete input
-    SearchBar/             # Search input
-    ThemeMenu/             # Light/dark toggle
-    BookPicker/            # Modal for picking an existing attachment
-    PdfViewer/             # All PDF viewer sub-components (see below)
-  pages/                   # Route-level components
-    Library/LibraryPage.tsx        # / — upload and browse attachments
-    Notes/NotesPage.tsx            # /notes — list/filter/search notes
-    Editor/EditorPage.tsx          # /note/new, /note/:id/edit
-    View/ViewPage.tsx              # /note/:id (read-only)
-    Flowcharts/FlowchartsPage.tsx  # /flowcharts — flowchart picker + iframe viewer
-    PdfViewer/PdfViewerPage.tsx    # /pdf/:attachmentId
-    Questions/QuestionsPage.tsx    # /questions — review node questions
-    Summary/SummaryPage.tsx        # /summary — reading time heatmap
+    ThemeContext.tsx          # Theme ('default' | 'dark'), reads/writes themeStorage
+  components/                # Reusable UI components
+    Layout/                  # App shell: header nav + main content area
+    NoteEditor/              # @uiw/react-md-editor wrapper with KaTeX support
+    NoteCard/                # Note list item
+    NoteToolbar/             # Save/publish/delete toolbar
+    TagInput/                # Tag chip input
+    TagFilter/               # Tag filter chips
+    CategorySelect/          # Category autocomplete input
+    SearchBar/               # Search input
+    ThemeMenu/               # Light/dark toggle
+    BookPicker/              # Modal for picking an existing attachment
+    PdfViewer/               # All PDF viewer sub-components (see below)
+  pages/                     # Route-level components
+    Library/LibraryPage.tsx          # / — upload and browse attachments
+    Notes/NotesPage.tsx              # /notes — list/filter/search notes
+    Editor/EditorPage.tsx            # /note/new, /note/:id/edit
+    View/ViewPage.tsx                # /note/:id (read-only)
+    Flowcharts/FlowchartsPage.tsx    # /flowcharts — flowchart picker + iframe viewer
+    PdfViewer/PdfViewerPage.tsx      # /pdf/:attachmentId
+    Questions/QuestionsPage.tsx      # /questions — review node questions
+    Summary/SummaryPage.tsx          # /summary — reading time heatmap
 public/
   flowchart/
     flowchart-integration.js  # Injected into flowchart iframes at runtime
@@ -104,35 +151,94 @@ public/
     index.json                 # Flowchart manifest (loaded by FlowchartsPage)
 ```
 
+### TypeScript Configuration
+
+The project uses **TypeScript project references** with three configs:
+- `tsconfig.app.json` — React app (ES2022, JSX)
+- `tsconfig.server.json` — Node.js server (ES2023)
+- `tsconfig.node.json` — Vite/build tooling
+- `tsconfig.json` — References all three
+
 ---
 
 ## Data Storage
 
-All data is stored **client-side only**. No data leaves the browser.
+Data is split between the **server** (SQLite + filesystem) and **client** (localStorage).
 
-### localStorage keys
+### Server-side (SQLite database at `data/scribe.db`)
+
+| Table | Key | Description |
+|---|---|---|
+| `notes` | `id` (TEXT) | Note content, tags (JSON), status, category, subject |
+| `attachments` | `id` (TEXT) | File metadata; actual blobs stored at `data/attachments/` |
+| `highlights` | `id` (TEXT) | PDF highlight rects (JSON), selected text, color; FK → attachments |
+| `comments` | `id` (TEXT) | Annotation comments; FK → highlights, FK → attachments |
+| `reading_time` | `(attachment_id, date_cst)` | Per-attachment daily reading seconds |
+| `global_timer` | `date_cst` | Global daily reading seconds |
+
+SQLite features enabled: WAL mode, foreign key constraints, CASCADE deletes.
+
+### Client-side (localStorage) — not yet migrated to server
 
 | Key | Type | Contents |
 |---|---|---|
-| `scribe_notes` | JSON array | `Note[]` |
 | `scribe_questions` | JSON array | `Question[]` |
-| `scribe_reading_time` | JSON object | `ReadingTimeMap` (keyed `attachmentId::dateCST`) |
 | `scribe_theme` | string | `'default'` or `'dark'` |
 | `scribe_viewer_prefs` | JSON object | `Record<attachmentId, ViewerPrefs>` |
 
-### IndexedDB databases
+### File Storage
 
-| Database | Store(s) | Key | Indexes |
-|---|---|---|---|
-| `scribe_attachments` (v1) | `attachments` | `id` | `by_subject` |
-| `scribe_annotations` (v1) | `highlights`, `comments` | `id` | `by_attachment`, `by_highlight` |
-
-- Attachment binary data (`Blob`) is stored directly in IndexedDB — no server upload.
-- `AttachmentMeta` (metadata without the `data` blob) is the type used for listing.
+Uploaded files (PDFs, etc.) are stored on the server filesystem at `data/attachments/`. The `attachments` table stores metadata and a `file_path` pointing to the file on disk. Files are served via `GET /api/attachments/:id/blob`.
 
 ---
 
-## Routing
+## API Endpoints
+
+All endpoints are prefixed with `/api/`.
+
+### Notes
+- `GET /api/notes` — list all notes
+- `GET /api/notes/:id` — get a single note
+- `PUT /api/notes/:id` — upsert (create or update) a note
+- `DELETE /api/notes/:id` — delete a note
+
+### Attachments
+- `GET /api/attachments` — list all attachments
+- `GET /api/attachments/by-subject?subject=X` — filter by subject
+- `GET /api/attachments/counts-by-subject` — aggregate attachment counts per subject
+- `POST /api/attachments` — upload a file (multipart form data via multer)
+- `GET /api/attachments/:id/blob` — download the file blob
+- `PATCH /api/attachments/:id/subject` — update subject
+- `PATCH /api/attachments/:id/filename` — rename file
+- `PATCH /api/attachments/:id/last-opened` — mark as recently opened
+- `DELETE /api/attachments/:id` — delete attachment (cascades to DB rows + filesystem)
+
+### Annotations
+- `GET /api/annotations/highlights?attachmentId=X` — list highlights for an attachment
+- `POST /api/annotations/highlights` — create a highlight
+- `DELETE /api/annotations/highlights/:id` — delete a highlight
+- `GET /api/annotations/comments?highlightId=X` or `?attachmentId=X` — list comments
+- `POST /api/annotations/comments` — create a comment
+- `PATCH /api/annotations/comments/:id` — update comment text
+- `DELETE /api/annotations/comments/:id` — delete a comment
+- `DELETE /api/annotations/comments?highlightId=X` — batch delete comments by highlight
+
+### Reading Time
+- `GET /api/reading-time` — all entries (optional `?start=DATE&end=DATE` filter)
+- `POST /api/reading-time` — accumulate seconds for attachment + date
+- `DELETE /api/reading-time` — clear all reading time data
+
+### Global Timer
+- `GET /api/global-timer?date=YYYY-MM-DD` — get total seconds for a date
+- `POST /api/global-timer` — accumulate seconds for a date
+- `DELETE /api/global-timer?date=YYYY-MM-DD` — reset (or all if no date param)
+
+### Health
+- `GET /api/health` — returns `{ status: 'ok', timestamp: ... }`
+
+---
+
+## Routing (Client-side)
 
 | Path | Component | Description |
 |---|---|---|
@@ -174,9 +280,19 @@ All data is stored **client-side only**. No data leaves the browser.
 ### Service Layer Pattern
 
 - Services are plain objects (not classes) exported as `const serviceName = { ... }`.
-- Services are synchronous for localStorage and async/Promise-based for IndexedDB.
+- **Server-backed services** (notes, attachments, annotations, reading time, global timer) are async and use `fetch()` to call the REST API.
+- **Client-only services** (questions, theme, viewer prefs) use localStorage and may be synchronous.
 - Services do **not** use React hooks.
 - Hooks wrap services and expose React state + callbacks.
+
+### Server / Database Conventions
+
+- Server routes live in `server/routes/` — one file per resource.
+- Database schema and initialization are in `server/db.ts`.
+- The `db` object and `ATTACHMENTS_DIR` path are exported from `server/db.ts` for use in routes.
+- JSON columns (e.g., `tags`, `rects`) are stored as TEXT and parsed/serialized in the route handlers.
+- File uploads use `multer` with in-memory storage; blobs are written to `data/attachments/` by the route handler.
+- CORS is enabled (allows `*` origin) for LAN access from different devices/ports.
 
 ### Auto-save
 
@@ -187,7 +303,7 @@ All data is stored **client-side only**. No data leaves the browser.
 `useReadingTimeTracker` tracks active reading time per attachment per CST calendar date:
 - Accumulates seconds via a 1 s tick interval (capped at 2 s per tick to handle tab switches).
 - Detects idleness after 60 s of no user activity (`mousemove`, `keydown`, `scroll`, etc.) and pauses accumulation.
-- Flushes to `readingTimeStorage` every 30 s and on page unload / tab hide.
+- Flushes to the server (`POST /api/reading-time`) every 30 s and on page unload / tab hide.
 - Dates are recorded in **CST (UTC-6, fixed offset)** — the code does not adjust for CDT.
 
 ### Flowchart Integration
@@ -264,8 +380,22 @@ Run: `npm run lint`
 2. Add a `<Route>` in `src/App.tsx`.
 3. Add a `<Link>` in `src/components/Layout/Layout.tsx` if it belongs in the nav.
 
+## Adding a New API Endpoint
+
+1. Create or edit a route file in `server/routes/`.
+2. Register the router in `server/index.ts` with `app.use('/api/...', router)`.
+3. If new tables are needed, add `CREATE TABLE IF NOT EXISTS` statements in `server/db.ts`.
+
 ## Adding a New Storage Key
 
+For **server-backed storage** (recommended for shared/important data):
 1. Add the type to `src/types/`.
-2. Create `src/services/newStorage.ts` following the existing service pattern.
+2. Add a database table in `server/db.ts`.
+3. Create route handlers in `server/routes/`.
+4. Create `src/services/newStorage.ts` that calls the REST API via `fetch()`.
+5. Create a hook in `src/hooks/` if React components need to consume it.
+
+For **client-only storage** (appropriate for UI preferences):
+1. Add the type to `src/types/`.
+2. Create `src/services/newStorage.ts` using localStorage.
 3. Create a hook in `src/hooks/` if React components need to consume it.
