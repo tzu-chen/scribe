@@ -118,7 +118,14 @@ export function usePdfDocument(blob: Blob | null) {
   const docRef = useRef<PDFDocumentProxy | null>(null);
 
   useEffect(() => {
-    if (!blob) return;
+    if (!blob) {
+      setPdfDoc(null);
+      setNumPages(0);
+      setOutline([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);

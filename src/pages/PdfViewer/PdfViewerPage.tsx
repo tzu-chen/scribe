@@ -75,6 +75,26 @@ export function PdfViewerPage() {
     offsetTop: savedPrefs?.scrollOffsetTop ?? 0,
   });
 
+  // Reset all viewer state when switching attachments
+  useEffect(() => {
+    const prefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
+    setZoom(prefs?.zoom ?? 1.0);
+    setFitWidth(prefs?.fitWidth ?? false);
+    setTwoPageView(prefs?.twoPageView ?? false);
+    setCurrentPage(prefs?.currentPage ?? 1);
+    setShowToc(false);
+    setShowRightPanel(false);
+    setEditingNoteId(null);
+    setTextSelection(null);
+    setActiveHighlight(null);
+    scrolledForAttachmentRef.current = null;
+    lastScrollPosRef.current = {
+      page: prefs?.currentPage ?? 1,
+      offsetTop: prefs?.scrollOffsetTop ?? 0,
+    };
+    prevEffectiveZoomRef.current = 0;
+  }, [attachmentId]);
+
   // Track the document area width for fit-width calculation.
   // The body div is conditionally rendered (only when !loading && pdfDoc),
   // so we depend on both pdfDoc and loading to re-run the effect once the
@@ -97,6 +117,8 @@ export function PdfViewerPage() {
   // Load the attachment blob
   useEffect(() => {
     if (!attachmentId) return;
+    setBlob(null);
+    setLoadError(null);
     let cancelled = false;
 
     const load = async () => {
@@ -122,25 +144,26 @@ export function PdfViewerPage() {
     return () => { cancelled = true; };
   }, [attachmentId, subject]);
 
-  // Scroll to saved page once the PDF is loaded
-  const initialScrollDone = useRef(false);
+  // Scroll to saved page once the PDF is loaded.
+  // Tracks which attachment we already scrolled for to avoid repeating.
+  const scrolledForAttachmentRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pdfDoc || initialScrollDone.current) return;
-    const hasPosition = savedPrefs && (savedPrefs.currentPage > 1 || (savedPrefs.scrollOffsetTop && savedPrefs.scrollOffsetTop > 0));
+    if (!pdfDoc || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
+    // Read prefs directly to avoid stale closure
+    const prefs = viewerPrefsStorage.get(attachmentId);
+    const hasPosition = prefs && (prefs.currentPage > 1 || (prefs.scrollOffsetTop && prefs.scrollOffsetTop > 0));
     if (hasPosition) {
       requestAnimationFrame(() => {
         docViewRef.current?.scrollToPage(
-          savedPrefs.currentPage,
-          savedPrefs.scrollOffsetTop ?? null,
+          prefs.currentPage,
+          prefs.scrollOffsetTop ?? null,
           'instant',
         );
-        initialScrollDone.current = true;
       });
-    } else {
-      initialScrollDone.current = true;
     }
-  }, [pdfDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+    scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
+  }, [pdfDoc, attachmentId]);
 
   // Wrap onPageChange to also capture the precise scroll offset into a ref
   const handlePageChange = useCallback((page: number) => {
@@ -167,7 +190,7 @@ export function PdfViewerPage() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    if (!attachmentId || !initialScrollDone.current) return;
+    if (!attachmentId || !scrolledForAttachmentRef.current) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -330,7 +353,7 @@ export function PdfViewerPage() {
   useEffect(() => {
     if (prevTwoPageViewRef.current === twoPageView) return;
     prevTwoPageViewRef.current = twoPageView;
-    if (!initialScrollDone.current) return;
+    if (!scrolledForAttachmentRef.current) return;
     const page = currentPageRef.current;
     requestAnimationFrame(() => {
       docViewRef.current?.scrollToPage(page, null, 'instant');
@@ -355,7 +378,7 @@ export function PdfViewerPage() {
     if (prevEffectiveZoomRef.current === effectiveZoom) return;
     prevEffectiveZoomRef.current = effectiveZoom;
     // Don't interfere with the initial page scroll restoration
-    if (!initialScrollDone.current) return;
+    if (!scrolledForAttachmentRef.current) return;
     const pos = scrollPositionToRestoreRef.current;
     scrollPositionToRestoreRef.current = null;
     if (pos) {
