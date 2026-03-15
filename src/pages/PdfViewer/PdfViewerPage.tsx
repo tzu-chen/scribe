@@ -112,15 +112,32 @@ export function PdfViewerPage() {
 
   useEffect(() => {
     if (!pdfDoc || initialScrollDone.current) return;
-    if (savedPrefs && savedPrefs.currentPage > 1) {
+    const hasPosition = savedPrefs && (savedPrefs.currentPage > 1 || (savedPrefs.scrollOffsetTop && savedPrefs.scrollOffsetTop > 0));
+    if (hasPosition) {
       requestAnimationFrame(() => {
-        docViewRef.current?.scrollToPage(savedPrefs.currentPage);
+        docViewRef.current?.scrollToPage(
+          savedPrefs.currentPage,
+          savedPrefs.scrollOffsetTop ?? null,
+          'instant',
+        );
         initialScrollDone.current = true;
       });
     } else {
       initialScrollDone.current = true;
     }
   }, [pdfDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper to build current prefs including precise scroll offset
+  const buildPrefs = useCallback(() => {
+    const pos = docViewRef.current?.getScrollPosition();
+    return {
+      zoom,
+      fitWidth,
+      currentPage: pos?.page ?? currentPage,
+      twoPageView,
+      scrollOffsetTop: pos?.offsetTop ?? 0,
+    };
+  }, [zoom, fitWidth, currentPage, twoPageView]);
 
   // Debounced save of viewer preferences
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -133,12 +150,7 @@ export function PdfViewerPage() {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      viewerPrefsStorage.save(attachmentId, {
-        zoom,
-        fitWidth,
-        currentPage,
-        twoPageView,
-      });
+      viewerPrefsStorage.save(attachmentId, buildPrefs());
     }, 1000);
 
     return () => {
@@ -146,24 +158,23 @@ export function PdfViewerPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView]);
+  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView, buildPrefs]);
 
-  // Immediate save on tab close
+  // Immediate save on tab close / navigation away
   useEffect(() => {
     if (!attachmentId) return;
 
     const handleBeforeUnload = () => {
-      viewerPrefsStorage.save(attachmentId, {
-        zoom,
-        fitWidth,
-        currentPage,
-        twoPageView,
-      });
+      viewerPrefsStorage.save(attachmentId, buildPrefs());
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView]);
+    return () => {
+      // Save prefs when component unmounts (navigating away from PDF view)
+      viewerPrefsStorage.save(attachmentId, buildPrefs());
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [attachmentId, buildPrefs]);
 
   const handleReturnToFlowchart = useCallback(() => {
     navigate(`/flowcharts${flowchartId ? `?view=${flowchartId}` : ''}`);

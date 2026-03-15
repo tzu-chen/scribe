@@ -3,6 +3,7 @@ export interface ViewerPrefs {
   fitWidth: boolean;
   currentPage: number;
   twoPageView?: boolean;
+  scrollOffsetTop?: number;
 }
 
 const STORAGE_KEY = 'scribe_viewer_prefs';
