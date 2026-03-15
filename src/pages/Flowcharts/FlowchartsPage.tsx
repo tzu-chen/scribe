@@ -43,12 +43,23 @@ export function FlowchartsPage() {
     files: AttachmentMeta[];
   } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const actionInProgressRef = useRef(false);
+  const searchParamsRef = useRef(searchParams);
+  const flowchartsRef = useRef<FlowchartEntry[]>(flowcharts);
   const [bookPickerSubject, setBookPickerSubject] = useState<string | null>(null);
   const [questionDialog, setQuestionDialog] = useState<QuestionDialog | null>(null);
   const [questionText, setQuestionText] = useState('');
 
   const { theme } = useTheme();
   const activeFlowchart = searchParams.get('view');
+
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+  }, [searchParams]);
+
+  useEffect(() => {
+    flowchartsRef.current = flowcharts;
+  }, [flowcharts]);
 
   useEffect(() => {
     fetch('/flowchart/index.json')
@@ -137,10 +148,14 @@ export function FlowchartsPage() {
 
       if (data.type === 'node-selected') {
         setSelectedNode({ nodeId: data.nodeId, nodeTitle: data.nodeTitle });
-        setAttachmentPanel(null);
+        if (!actionInProgressRef.current) {
+          setAttachmentPanel(null);
+        }
       } else if (data.type === 'node-deselected') {
         setSelectedNode(null);
-        setAttachmentPanel(null);
+        if (!actionInProgressRef.current) {
+          setAttachmentPanel(null);
+        }
       } else if (data.type === 'node-action') {
         const { action, nodeTitle } = data as {
           action: string;
@@ -148,8 +163,8 @@ export function FlowchartsPage() {
           nodeTitle: string;
         };
 
-        const currentFlowchart = searchParams.get('view') ?? '';
-        const currentFlowchartEntry = flowcharts.find(f => f.id === currentFlowchart);
+        const currentFlowchart = searchParamsRef.current.get('view') ?? '';
+        const currentFlowchartEntry = flowchartsRef.current.find(f => f.id === currentFlowchart);
 
         switch (action) {
           case 'write-note':
@@ -159,8 +174,12 @@ export function FlowchartsPage() {
             setBookPickerSubject(nodeTitle);
             break;
           case 'view-attachments':
+            actionInProgressRef.current = true;
             attachmentStorage.getBySubject(nodeTitle).then(files => {
               setAttachmentPanel({ subject: nodeTitle, files });
+              setTimeout(() => {
+                actionInProgressRef.current = false;
+              }, 100);
             });
             break;
           case 'view-notes':
