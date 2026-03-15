@@ -1,73 +1,91 @@
-# React + TypeScript + Vite
+# Scribe
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-based study tool for managing PDFs, notes, flowcharts, and reading time — built with React 19 + TypeScript on the frontend and Express + SQLite on the backend.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Library** — Upload and browse PDF files and other documents
+- **Notes** — Write notes in Markdown with LaTeX math support
+- **Flowcharts** — Interactive flowcharts with node-linked actions (notes, attachments, questions)
+- **Questions** — Create and review questions linked to flowchart nodes
+- **Reading Summary** — Track reading time with daily heatmaps and charts
 
-## React Compiler
+## Architecture
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+Scribe uses a **client-server architecture**:
 
-## Expanding the ESLint configuration
+- **Frontend**: React 19 SPA built with Vite, using CSS Modules for styling and React Router for navigation
+- **Backend**: Express 5 REST API with SQLite (via `better-sqlite3`) for persistent storage
+- **File storage**: Uploaded files stored on the server filesystem (`data/attachments/`)
+- **Client-only storage**: Theme preference, viewer preferences, and questions use localStorage
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+In development, Vite proxies `/api/*` requests to the Express server. In production, Express serves both the API and the built React app.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Prerequisites
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js (v18+)
+- npm
+
+### Install & Run
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+This starts both the Vite dev server (with HMR) and the Express API server concurrently. The app will be available at `http://localhost:5173`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Production
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
+npm run start
 ```
+
+The Express server serves the built app from `dist/` and handles API requests on port 3001 (configurable via `PORT` env var).
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start client + server concurrently (development) |
+| `npm run dev:client` | Start Vite dev server only |
+| `npm run dev:server` | Start Express server only (with auto-reload) |
+| `npm run build` | TypeScript check + Vite production build |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview the production build (client only) |
+| `npm run start` | Start production server |
+
+## Tech Stack
+
+**Frontend**: React 19, TypeScript, Vite, React Router, CSS Modules, pdfjs-dist, KaTeX, Recharts
+
+**Backend**: Express 5, better-sqlite3, multer
+
+## Project Structure
+
+```
+server/           # Express API server
+  index.ts        # App setup, CORS, static serving
+  db.ts           # SQLite schema and initialization
+  routes/         # API route handlers (notes, attachments, annotations, etc.)
+
+src/              # React frontend
+  pages/          # Route-level page components
+  components/     # Reusable UI components
+  services/       # Data access (REST API calls + localStorage)
+  hooks/          # Custom React hooks
+  contexts/       # React contexts (theme)
+  types/          # TypeScript interfaces
+
+data/             # Runtime data (git-ignored)
+  scribe.db       # SQLite database
+  attachments/    # Uploaded files
+
+public/
+  flowchart/      # Static flowchart HTML files + integration scripts
+```
+
+See [CLAUDE.md](./CLAUDE.md) for detailed architecture documentation, conventions, and API endpoint reference.
