@@ -59,6 +59,12 @@ export function PdfViewerPage() {
   const prevEffectiveZoomRef = useRef<number>(0);
   const prevTwoPageViewRef = useRef(twoPageView);
   const currentPageRef = useRef(currentPage);
+  // Cached scroll position, updated on page changes — used as fallback when
+  // docViewRef is unavailable (e.g. during unmount).
+  const lastScrollPosRef = useRef<{ page: number; offsetTop: number }>({
+    page: savedPrefs?.currentPage ?? 1,
+    offsetTop: savedPrefs?.scrollOffsetTop ?? 0,
+  });
 
   // Track the document area width for fit-width calculation.
   // The body div is conditionally rendered (only when !loading && pdfDoc),
@@ -127,15 +133,24 @@ export function PdfViewerPage() {
     }
   }, [pdfDoc]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Wrap onPageChange to also capture the precise scroll offset into a ref
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+    const pos = docViewRef.current?.getScrollPosition();
+    if (pos) lastScrollPosRef.current = pos;
+  }, []);
+
   // Helper to build current prefs including precise scroll offset
   const buildPrefs = useCallback(() => {
-    const pos = docViewRef.current?.getScrollPosition();
+    // Try live DOM first; fall back to cached position (needed during unmount
+    // when React has already cleared the imperative handle ref).
+    const pos = docViewRef.current?.getScrollPosition() ?? lastScrollPosRef.current;
     return {
       zoom,
       fitWidth,
-      currentPage: pos?.page ?? currentPage,
+      currentPage: pos.page,
       twoPageView,
-      scrollOffsetTop: pos?.offsetTop ?? 0,
+      scrollOffsetTop: pos.offsetTop,
     };
   }, [zoom, fitWidth, currentPage, twoPageView]);
 
@@ -160,7 +175,17 @@ export function PdfViewerPage() {
     };
   }, [attachmentId, zoom, fitWidth, currentPage, twoPageView, buildPrefs]);
 
-  // Immediate save on tab close / navigation away
+  // Save prefs on component unmount (navigating away from PDF view).
+  // useLayoutEffect cleanup runs synchronously before React clears refs,
+  // so docViewRef.current is still available for getScrollPosition().
+  useLayoutEffect(() => {
+    if (!attachmentId) return;
+    return () => {
+      viewerPrefsStorage.save(attachmentId, buildPrefs());
+    };
+  }, [attachmentId, buildPrefs]);
+
+  // Immediate save on tab close
   useEffect(() => {
     if (!attachmentId) return;
 
@@ -169,11 +194,7 @@ export function PdfViewerPage() {
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      // Save prefs when component unmounts (navigating away from PDF view)
-      viewerPrefsStorage.save(attachmentId, buildPrefs());
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [attachmentId, buildPrefs]);
 
   const handleReturnToFlowchart = useCallback(() => {
@@ -399,7 +420,7 @@ export function PdfViewerPage() {
           onTextSelected={handleTextSelected}
           onSelectionCleared={handleSelectionCleared}
           onHighlightClick={handleHighlightClick}
-          onPageChange={setCurrentPage}
+          onPageChange={handlePageChange}
         />
         {showRightPanel && (
           <PdfRightPanel
