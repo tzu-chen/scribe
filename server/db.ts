@@ -76,6 +76,11 @@ db.exec(`
     total_seconds REAL NOT NULL DEFAULT 0,
     PRIMARY KEY (attachment_id, date_cst)
   );
+
+  CREATE TABLE IF NOT EXISTS global_timer (
+    date_cst TEXT PRIMARY KEY,
+    total_seconds REAL NOT NULL DEFAULT 0
+  );
 `);
 
 // Migration: add last_opened_at column if missing (for existing databases)

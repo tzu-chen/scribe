@@ -1,30 +1,20 @@
-import { getCSTDateString } from './readingTimeStorage';
-
-const STORAGE_KEY = 'scribe_global_timer';
-
 interface GlobalTimerData {
   dateCST: string;
   totalSeconds: number;
 }
 
 export const globalTimerStorage = {
-  load(): GlobalTimerData {
-    const today = getCSTDateString();
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const data = JSON.parse(raw) as GlobalTimerData;
-        if (data.dateCST === today) {
-          return data;
-        }
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return { dateCST: today, totalSeconds: 0 };
+  async load(dateCST: string): Promise<GlobalTimerData> {
+    const params = new URLSearchParams({ date: dateCST });
+    const res = await fetch(`/api/global-timer?${params}`);
+    return res.json() as Promise<GlobalTimerData>;
   },
 
-  save(dateCST: string, totalSeconds: number): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ dateCST, totalSeconds }));
+  async addSeconds(dateCST: string, seconds: number): Promise<void> {
+    await fetch('/api/global-timer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateCST, seconds }),
+    });
   },
 };

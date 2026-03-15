@@ -12,25 +12,30 @@ interface GlobalTimerState {
 }
 
 export function useGlobalTimer(): GlobalTimerState {
-  const [totalSeconds, setTotalSeconds] = useState(() => {
-    const data = globalTimerStorage.load();
-    return data.totalSeconds;
-  });
+  const [totalSeconds, setTotalSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
 
-  const totalSecondsRef = useRef(totalSeconds);
   const lastTickRef = useRef(0);
   const currentDateRef = useRef<string>('');
+  const lastFlushedSecondsRef = useRef(0);
+  const totalSecondsRef = useRef(0);
 
-  // Sync totalSecondsRef in effects that update it, not during render
+  // Load initial value from server
   useEffect(() => {
-    currentDateRef.current = getCSTDateString();
+    const today = getCSTDateString();
+    currentDateRef.current = today;
+    globalTimerStorage.load(today).then((data) => {
+      setTotalSeconds(data.totalSeconds);
+      totalSecondsRef.current = data.totalSeconds;
+      lastFlushedSecondsRef.current = data.totalSeconds;
+    }).catch(() => {});
   }, []);
 
   const flush = useCallback(() => {
-    if (currentDateRef.current) {
-      globalTimerStorage.save(currentDateRef.current, totalSecondsRef.current);
-    }
+    const delta = totalSecondsRef.current - lastFlushedSecondsRef.current;
+    if (delta <= 0 || !currentDateRef.current) return;
+    lastFlushedSecondsRef.current = totalSecondsRef.current;
+    globalTimerStorage.addSeconds(currentDateRef.current, delta).catch(() => {});
   }, []);
 
   const toggle = useCallback(() => {
@@ -51,8 +56,10 @@ export function useGlobalTimer(): GlobalTimerState {
       // Check for date rollover
       const today = getCSTDateString();
       if (today !== currentDateRef.current) {
+        flush();
         currentDateRef.current = today;
         totalSecondsRef.current = 0;
+        lastFlushedSecondsRef.current = 0;
         setTotalSeconds(0);
         return;
       }
@@ -65,7 +72,7 @@ export function useGlobalTimer(): GlobalTimerState {
     }, 1000);
 
     return () => clearInterval(tickInterval);
-  }, [isRunning]);
+  }, [isRunning, flush]);
 
   // Flush interval + unload/visibility handlers
   useEffect(() => {
