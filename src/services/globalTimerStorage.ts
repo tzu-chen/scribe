@@ -17,4 +17,9 @@ export const globalTimerStorage = {
       body: JSON.stringify({ dateCST, seconds }),
     });
   },
+
+  async resetDate(dateCST: string): Promise<void> {
+    const params = new URLSearchParams({ date: dateCST });
+    await fetch(`/api/global-timer?${params}`, { method: 'DELETE' });
+  },
 };

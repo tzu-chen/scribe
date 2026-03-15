@@ -9,6 +9,7 @@ interface GlobalTimerState {
   totalSeconds: number;
   isRunning: boolean;
   toggle: () => void;
+  reset: () => void;
 }
 
 export function useGlobalTimer(): GlobalTimerState {
@@ -41,6 +42,17 @@ export function useGlobalTimer(): GlobalTimerState {
   const toggle = useCallback(() => {
     setIsRunning((prev) => !prev);
   }, []);
+
+  const reset = useCallback(() => {
+    // Flush any pending delta first, then delete the date on the server
+    flush();
+    if (currentDateRef.current) {
+      globalTimerStorage.resetDate(currentDateRef.current).catch(() => {});
+    }
+    setTotalSeconds(0);
+    totalSecondsRef.current = 0;
+    lastFlushedSecondsRef.current = 0;
+  }, [flush]);
 
   // Tick interval — restarts when isRunning changes
   useEffect(() => {
@@ -114,5 +126,5 @@ export function useGlobalTimer(): GlobalTimerState {
     };
   }, [isRunning]);
 
-  return { totalSeconds: Math.floor(totalSeconds), isRunning, toggle };
+  return { totalSeconds: Math.floor(totalSeconds), isRunning, toggle, reset };
 }

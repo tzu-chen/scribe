@@ -10,6 +10,11 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-text-secondary);
   letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.time:hover {
+  color: var(--color-text);
 }
 
 .toggleButton {

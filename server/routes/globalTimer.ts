@@ -56,9 +56,14 @@ router.post('/', (req, res) => {
   res.json(rowToEntry(row));
 });
 
-// DELETE /api/global-timer — clear all
-router.delete('/', (_req, res) => {
-  db.prepare('DELETE FROM global_timer').run();
+// DELETE /api/global-timer?date=YYYY-MM-DD — clear specific date, or all if no date
+router.delete('/', (req, res) => {
+  const { date } = req.query;
+  if (date && typeof date === 'string') {
+    db.prepare('DELETE FROM global_timer WHERE date_cst = ?').run(date);
+  } else {
+    db.prepare('DELETE FROM global_timer').run();
+  }
   res.json({ ok: true });
 });
 
