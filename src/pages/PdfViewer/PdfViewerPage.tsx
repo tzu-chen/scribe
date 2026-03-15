@@ -14,6 +14,7 @@ import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover'
 import { PdfNoteEditorPanel } from '../../components/PdfViewer/PdfNoteEditorPanel';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
+import { useGlobalTimer } from '../../hooks/useGlobalTimer';
 import styles from './PdfViewerPage.module.css';
 
 const DEFAULT_EDITOR_WIDTH = 450;
@@ -30,6 +31,14 @@ export function PdfViewerPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useReadingTimeTracker(attachmentId, filename);
+
+  const { start: startTimer, pause: pauseTimer } = useGlobalTimer();
+
+  // Start global timer when entering PDF view, pause when leaving
+  useEffect(() => {
+    startTimer();
+    return () => pauseTimer();
+  }, [startTimer, pauseTimer]);
 
   const { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
