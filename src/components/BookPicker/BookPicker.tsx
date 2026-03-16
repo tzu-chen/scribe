@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import type { AttachmentMeta } from '../../types/attachment';
+import { CloseIcon } from '../Icons/Icons';
 import styles from './BookPicker.module.css';
 
 function formatFileSize(bytes: number): string {
@@ -47,7 +48,7 @@ export function BookPicker({ onSelect, onCancel }: BookPickerProps) {
             onClick={onCancel}
             aria-label="Close"
           >
-            &times;
+            <CloseIcon size={18} />
           </button>
         </div>
         {loading ? (

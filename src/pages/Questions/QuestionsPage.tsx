@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { questionStorage } from '../../services/questionStorage';
 import type { Question } from '../../types/question';
+import { CloseIcon } from '../../components/Icons/Icons';
 import styles from './QuestionsPage.module.css';
 
 export function QuestionsPage() {
@@ -97,7 +98,7 @@ export function QuestionsPage() {
                               aria-label="Delete question"
                               title="Delete"
                             >
-                              &times;
+                              <CloseIcon size={14} />
                             </button>
                           </li>
                         ))}

@@ -11,6 +11,9 @@
 }
 
 .backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.875rem;
   color: var(--color-text-secondary);
   text-decoration: none;

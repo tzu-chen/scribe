@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { CloseIcon } from '../Icons/Icons';
 import styles from './TagInput.module.css';
 
 interface TagInputProps {
@@ -63,7 +64,7 @@ export function TagInput({ tags, onChange, suggestions = [] }: TagInputProps) {
               }}
               aria-label={`Remove tag ${tag}`}
             >
-              x
+              <CloseIcon size={10} />
             </button>
           </span>
         ))}

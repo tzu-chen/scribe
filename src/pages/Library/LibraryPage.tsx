@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import type { AttachmentMeta } from '../../types/attachment';
+import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import styles from './LibraryPage.module.css';
 
 type ViewMode = 'card' | 'list';
@@ -229,7 +230,7 @@ export function LibraryPage() {
 
   const sortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
-    return <span className={styles.sortArrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>;
+    return <span className={styles.sortArrow}>{sortDir === 'asc' ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}</span>;
   };
 
   return (

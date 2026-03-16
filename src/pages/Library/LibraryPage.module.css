@@ -238,7 +238,10 @@
 }
 
 .sortArrow {
-  font-size: 0.6875rem;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  vertical-align: middle;
 }
 
 .listCheckboxCol {
