@@ -123,6 +123,9 @@ export function PdfViewerPage() {
         }
         setBlob(b);
 
+        // Mark as recently opened so Library "last opened" stays current
+        attachmentStorage.markOpened(attachmentId).catch(() => {});
+
         // Get filename from metadata
         const allMeta = await attachmentStorage.getAll();
         const meta = allMeta.find(f => f.id === attachmentId);
