@@ -267,6 +267,10 @@ export function PdfViewerPage() {
     docViewRef.current?.scrollToPage(page);
   }, []);
 
+  const handleToolbarPageJump = useCallback((page: number) => {
+    docViewRef.current?.scrollToPage(page, null, 'instant');
+  }, []);
+
   const handleNavigateToNote = useCallback((noteId: string) => {
     navigate(`/note/${noteId}`);
   }, [navigate]);
@@ -412,7 +416,7 @@ export function PdfViewerPage() {
         filename={filename}
         currentPage={currentPage}
         numPages={numPages}
-        onPageJump={handlePanelScrollToPage}
+        onPageJump={handleToolbarPageJump}
         zoom={effectiveZoom}
         fitWidth={fitWidth}
         showToc={showToc}
