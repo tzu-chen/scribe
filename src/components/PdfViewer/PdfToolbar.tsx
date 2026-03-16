@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { ArrowLeftIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from '../Icons/Icons';
 import styles from './PdfToolbar.module.css';
 
 const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -86,7 +87,7 @@ export function PdfToolbar({
     <div className={styles.toolbar}>
       <div className={styles.left}>
         <button className={styles.backBtn} onClick={onReturnToFlowchart}>
-          &larr; Flowchart
+          <ArrowLeftIcon size={14} /> Flowchart
         </button>
         <span className={styles.filename} title={filename}>
           {filename}
@@ -95,11 +96,11 @@ export function PdfToolbar({
 
       <div className={styles.center}>
         <button className={styles.zoomBtn} onClick={zoomOut} title="Zoom out">
-          &minus;
+          <MinusIcon size={16} />
         </button>
         <span className={styles.zoomLevel}>{Math.round(zoom * 100)}%</span>
         <button className={styles.zoomBtn} onClick={zoomIn} title="Zoom in">
-          +
+          <PlusIcon size={16} />
         </button>
         <button
           className={`${styles.fitBtn} ${fitWidth ? styles.fitBtnActive : ''}`}
@@ -122,7 +123,7 @@ export function PdfToolbar({
           disabled={currentPage <= 1}
           title="Previous page"
         >
-          &lsaquo;
+          <ChevronLeftIcon size={18} />
         </button>
         {editingPage ? (
           <span className={styles.pageInfo}>
@@ -156,7 +157,7 @@ export function PdfToolbar({
           disabled={currentPage >= numPages}
           title="Next page"
         >
-          &rsaquo;
+          <ChevronRightIcon size={18} />
         </button>
         {hasOutline && (
           <>
@@ -178,7 +179,7 @@ export function PdfToolbar({
           onClick={onOpenInNewTab}
           title="Open in new tab"
         >
-          &#8599;
+          <ExternalLinkIcon size={16} />
         </button>
         <button
           className={`${styles.panelBtn} ${showRightPanel ? styles.panelBtnActive : ''}`}

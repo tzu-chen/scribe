@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { Note } from '../../types/note';
 import { NoteEditor } from '../NoteEditor/NoteEditor';
+import { CloseIcon, ExternalLinkIcon } from '../Icons/Icons';
 import styles from './PdfNoteEditorPanel.module.css';
 
 interface Props {
@@ -131,7 +132,7 @@ export function PdfNoteEditorPanel({
         <div className={styles.header}>
           <span className={styles.errorMsg}>Note not found.</span>
           <button className={styles.closeBtn} onClick={onClose} title="Close editor">
-            ✕
+            <CloseIcon size={16} />
           </button>
         </div>
       </div>
@@ -156,10 +157,10 @@ export function PdfNoteEditorPanel({
         </div>
         <div className={styles.headerRight}>
           <Link to={`/note/${noteId}/edit`} className={styles.fullEditorLink}>
-            Open full editor ↗
+            Open full editor <ExternalLinkIcon size={12} />
           </Link>
           <button className={styles.closeBtn} onClick={onClose} title="Close editor">
-            ✕
+            <CloseIcon size={16} />
           </button>
         </div>
       </div>

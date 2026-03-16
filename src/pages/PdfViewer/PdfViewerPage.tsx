@@ -5,6 +5,7 @@ import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useNotes } from '../../hooks/useNotes';
+import { ArrowLeftIcon } from '../../components/Icons/Icons';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
 import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
 import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
@@ -389,7 +390,7 @@ export function PdfViewerPage() {
         <div className={styles.errorContainer}>
           <p className={styles.error}>{errorMessage}</p>
           <button className={styles.backBtn} onClick={handleReturnToFlowchart}>
-            &larr; Return to Flowchart
+            <ArrowLeftIcon size={14} /> Return to Flowchart
           </button>
         </div>
       </div>

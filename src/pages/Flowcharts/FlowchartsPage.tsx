@@ -5,6 +5,7 @@ import { questionStorage } from '../../services/questionStorage';
 import { BookPicker } from '../../components/BookPicker/BookPicker';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { AttachmentMeta } from '../../types/attachment';
+import { CloseIcon, ArrowLeftIcon } from '../../components/Icons/Icons';
 import styles from './FlowchartsPage.module.css';
 
 interface FlowchartEntry {
@@ -327,7 +328,7 @@ export function FlowchartsPage() {
       <div className={styles.viewPage}>
         <div className={styles.viewHeader}>
           <button className={styles.backButton} onClick={goBack}>
-            &larr; All Flowcharts
+            <ArrowLeftIcon size={14} /> All Flowcharts
           </button>
           <h2 className={styles.viewTitle}>{flowchart.name}</h2>
         </div>
@@ -376,7 +377,7 @@ export function FlowchartsPage() {
                   onClick={handleCancelQuestion}
                   aria-label="Close"
                 >
-                  &times;
+                  <CloseIcon size={18} />
                 </button>
               </div>
               <div className={styles.questionDialogBody}>
@@ -428,7 +429,7 @@ export function FlowchartsPage() {
                   onClick={closeAttachmentPanelButton}
                   aria-label="Close"
                 >
-                  &times;
+                  <CloseIcon size={18} />
                 </button>
               </div>
               {attachmentPanel.files.length === 0 ? (
@@ -454,7 +455,7 @@ export function FlowchartsPage() {
                         onClick={() => handleDeleteAttachment(file.id)}
                         title="Remove attachment"
                       >
-                        &times;
+                        <CloseIcon size={14} />
                       </button>
                     </li>
                   ))}

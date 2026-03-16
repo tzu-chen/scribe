@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { PdfHighlight, PdfComment } from '../../types/annotation';
+import { CloseIcon } from '../Icons/Icons';
 import styles from './PdfCommentPopover.module.css';
 
 interface Props {
@@ -77,7 +78,7 @@ export function PdfCommentPopover({
           &ldquo;{highlight.selectedText.slice(0, 80)}
           {highlight.selectedText.length > 80 ? '...' : ''}&rdquo;
         </span>
-        <button className={styles.closeBtn} onClick={onClose}>&times;</button>
+        <button className={styles.closeBtn} onClick={onClose}><CloseIcon size={16} /></button>
       </div>
 
       {comments.length > 0 && (
@@ -117,7 +118,7 @@ export function PdfCommentPopover({
                       onClick={() => onDeleteComment(c.id, highlight.id)}
                       title="Delete"
                     >
-                      &times;
+                      <CloseIcon size={14} />
                     </button>
                   </div>
                 </div>

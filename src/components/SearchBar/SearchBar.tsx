@@ -1,3 +1,4 @@
+import { CloseIcon } from '../Icons/Icons';
 import styles from './SearchBar.module.css';
 
 interface SearchBarProps {
@@ -32,7 +33,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search notes...' }: 
       />
       {value && (
         <button className={styles.clear} onClick={() => onChange('')} aria-label="Clear search">
-          x
+          <CloseIcon size={12} />
         </button>
       )}
     </div>

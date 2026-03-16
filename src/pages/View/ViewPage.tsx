@@ -5,6 +5,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { useNotes } from '../../hooks/useNotes';
 import { useTheme } from '../../contexts/ThemeContext';
+import { ArrowLeftIcon } from '../../components/Icons/Icons';
 import styles from './ViewPage.module.css';
 
 const previewOptions = {
@@ -60,7 +61,7 @@ export function ViewPage() {
     <div className={styles.page}>
       <div className={styles.actions}>
         <Link to="/notes" className={styles.backLink}>
-          &larr; Notes
+          <ArrowLeftIcon size={14} /> Notes
         </Link>
         <div className={styles.actionButtons}>
           <Link to={`/note/${note.id}/edit`} className={styles.editButton}>
