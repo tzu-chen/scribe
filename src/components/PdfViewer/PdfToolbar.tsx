@@ -116,6 +116,14 @@ export function PdfToolbar({
           2-Page
         </button>
         <span className={styles.divider} />
+        <button
+          className={styles.pageNavBtn}
+          onClick={() => onPageJump(currentPage - 1)}
+          disabled={currentPage <= 1}
+          title="Previous page"
+        >
+          &lsaquo;
+        </button>
         {editingPage ? (
           <span className={styles.pageInfo}>
             <input
@@ -142,6 +150,14 @@ export function PdfToolbar({
             {currentPage} / {numPages}
           </span>
         )}
+        <button
+          className={styles.pageNavBtn}
+          onClick={() => onPageJump(currentPage + 1)}
+          disabled={currentPage >= numPages}
+          title="Next page"
+        >
+          &rsaquo;
+        </button>
         {hasOutline && (
           <>
             <span className={styles.divider} />
