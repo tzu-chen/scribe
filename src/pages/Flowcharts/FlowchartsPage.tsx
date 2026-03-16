@@ -158,7 +158,6 @@ export function FlowchartsPage() {
         );
       } else if (data.type === 'node-deselected') {
         setSelectedNode(null);
-        setAttachmentPanel(null);
       } else if (data.type === 'node-action') {
         const { action, nodeTitle } = data as {
           action: string;
