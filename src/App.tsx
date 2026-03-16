@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { GlobalTimerProvider } from './contexts/GlobalTimerContext';
 import { Layout } from './components/Layout/Layout';
 import { LibraryPage } from './pages/Library/LibraryPage';
 import { NotesPage } from './pages/Notes/NotesPage';
@@ -15,23 +14,21 @@ import './global.css';
 export default function App() {
   return (
     <ThemeProvider>
-      <GlobalTimerProvider>
-        <BrowserRouter>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<LibraryPage />} />
-              <Route path="/notes" element={<NotesPage />} />
-              <Route path="/flowcharts" element={<FlowchartsPage />} />
-              <Route path="/questions" element={<QuestionsPage />} />
-              <Route path="/summary" element={<SummaryPage />} />
-              <Route path="/pdf/:attachmentId" element={<PdfViewerPage />} />
-              <Route path="/note/new" element={<EditorPage />} />
-              <Route path="/note/:id/edit" element={<EditorPage />} />
-              <Route path="/note/:id" element={<ViewPage />} />
-            </Routes>
-          </Layout>
-        </BrowserRouter>
-      </GlobalTimerProvider>
+      <BrowserRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/notes" element={<NotesPage />} />
+            <Route path="/flowcharts" element={<FlowchartsPage />} />
+            <Route path="/questions" element={<QuestionsPage />} />
+            <Route path="/summary" element={<SummaryPage />} />
+            <Route path="/pdf/:attachmentId" element={<PdfViewerPage />} />
+            <Route path="/note/new" element={<EditorPage />} />
+            <Route path="/note/:id/edit" element={<EditorPage />} />
+            <Route path="/note/:id" element={<ViewPage />} />
+          </Routes>
+        </Layout>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }
