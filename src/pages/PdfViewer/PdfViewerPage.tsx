@@ -412,6 +412,7 @@ export function PdfViewerPage() {
         filename={filename}
         currentPage={currentPage}
         numPages={numPages}
+        onPageJump={handlePanelScrollToPage}
         zoom={effectiveZoom}
         fitWidth={fitWidth}
         showToc={showToc}

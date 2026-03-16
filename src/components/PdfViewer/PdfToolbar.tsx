@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import styles from './PdfToolbar.module.css';
 
 const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -6,6 +7,7 @@ interface Props {
   filename: string;
   currentPage: number;
   numPages: number;
+  onPageJump: (page: number) => void;
   zoom: number;
   fitWidth: boolean;
   showToc: boolean;
@@ -26,6 +28,7 @@ export function PdfToolbar({
   filename,
   currentPage,
   numPages,
+  onPageJump,
   zoom,
   fitWidth,
   showToc,
@@ -41,6 +44,24 @@ export function PdfToolbar({
   onCreateNote,
   onOpenInNewTab,
 }: Props) {
+  const [editingPage, setEditingPage] = useState(false);
+  const [pageInput, setPageInput] = useState('');
+  const pageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingPage) {
+      pageInputRef.current?.select();
+    }
+  }, [editingPage]);
+
+  const commitPageJump = () => {
+    const page = parseInt(pageInput, 10);
+    if (!isNaN(page) && page >= 1 && page <= numPages) {
+      onPageJump(page);
+    }
+    setEditingPage(false);
+  };
+
   const zoomOut = () => {
     const current = zoom;
     for (let i = ZOOM_STEPS.length - 1; i >= 0; i--) {
@@ -95,9 +116,32 @@ export function PdfToolbar({
           2-Page
         </button>
         <span className={styles.divider} />
-        <span className={styles.pageInfo}>
-          {currentPage} / {numPages}
-        </span>
+        {editingPage ? (
+          <span className={styles.pageInfo}>
+            <input
+              ref={pageInputRef}
+              className={styles.pageInput}
+              type="text"
+              inputMode="numeric"
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitPageJump();
+                if (e.key === 'Escape') setEditingPage(false);
+              }}
+              onBlur={commitPageJump}
+            />
+            <span>/ {numPages}</span>
+          </span>
+        ) : (
+          <span
+            className={`${styles.pageInfo} ${styles.pageInfoClickable}`}
+            onClick={() => { setPageInput(String(currentPage)); setEditingPage(true); }}
+            title="Click to jump to a page"
+          >
+            {currentPage} / {numPages}
+          </span>
+        )}
         {hasOutline && (
           <>
             <span className={styles.divider} />
