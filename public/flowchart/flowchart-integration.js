@@ -194,6 +194,31 @@
   };
 
   /* ================================================================== *
+   *  Prevent drawAllArrows from toggling off the selected node          *
+   *                                                                     *
+   *  drawAllArrows() ends with `if(selectedNode) highlightChain(…)`.    *
+   *  After our wrapping above, that call goes through the wrapper and   *
+   *  triggers toggle-off (original highlightChain treats a call with    *
+   *  the already-selected id as "deselect"). We fix this by            *
+   *  temporarily clearing selectedNode so the re-highlight call inside  *
+   *  drawAllArrows becomes a no-op, then re-applying the highlight     *
+   *  directly via origHighlight (which skips the toggle check because   *
+   *  selectedNode is null).                                             *
+   * ================================================================== */
+  if (typeof window.drawAllArrows === 'function') {
+    var origDraw = window.drawAllArrows;
+    window.drawAllArrows = function () {
+      var saved = window.selectedNode;
+      window.selectedNode = null;
+      origDraw();
+      if (saved) {
+        window.selectedNode = null;
+        origHighlight(saved);
+      }
+    };
+  }
+
+  /* ================================================================== *
    *  Receive attachment counts from parent                              *
    * ================================================================== */
   window.addEventListener('message', function (e) {
