@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="59.145653mm"
+   height="59.145653mm"
+   viewBox="0 0 59.145653 59.145653"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <g
+     id="layer1"
+     transform="translate(-5.129102,-69.80139)">
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.466;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 34.547493,70.164569 c 0,31.535691 0,31.535691 0,31.535691"
+       id="path12" />
+    <circle
+       style="opacity:0.999;fill:#ffffff;fill-opacity:0;stroke:#000000;stroke-width:0.765;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+       id="circle12"
+       cx="34.701931"
+       cy="99.374222"
+       r="29.190329" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.862;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 34.916281,70.338827 c 0,0 2.038069,26.606215 13.169046,32.684363 -0.156773,0 -0.156773,0 -0.156773,0"
+       id="path18" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.862;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 48.622704,102.91364 c 0,0 -3.560196,4.86561 -4.54054,13.19866 -0.980341,8.33306 -1.135134,11.5768 -1.135134,11.5768"
+       id="path22" />
+    <circle
+       style="opacity:0.999;fill:#ffffff;fill-opacity:0;stroke:#000000;stroke-width:0.466;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+       id="path23"
+       cx="34.592247"
+       cy="102.2478"
+       r="0.84637702" />
+    <text
+       xml:space="preserve"
+       style="font-weight:500;font-size:9.87778px;line-height:1.25;font-family:QTFraktur;-inkscape-font-specification:'QTFraktur Medium';stroke-width:0.264583"
+       x="25.259712"
+       y="109.50917"
+       id="text31"><tspan
+         id="tspan31"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:9.87778px;font-family:QTLinoscroll;-inkscape-font-specification:QTLinoscroll;stroke-width:0.264583"
+         x="25.259712"
+         y="109.50917">scribe</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.862;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 34.179686,70.338827 c 0,0 -2.038069,26.606215 -13.169046,32.684363 0.156773,0 0.156773,0 0.156773,0"
+       id="path60" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.862;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 20.473263,102.91364 c 0,0 3.560196,4.86561 4.54054,13.19866 0.980341,8.33306 1.135134,11.5768 1.135134,11.5768"
+       id="path61" />
+  </g>
+</svg>
