@@ -1,19 +1,23 @@
-export type ThemeName = 'default' | 'dark';
+import { COLOR_SCHEMES, DEFAULT_SCHEME_ID } from '../colorSchemes';
 
 const STORAGE_KEY = 'scribe_theme';
 
-const VALID_THEMES: ThemeName[] = ['default', 'dark'];
+/** Map old stored values to new scheme IDs for backward compatibility. */
+const LEGACY_MAP: Record<string, string> = {
+  default: 'default-light',
+  dark: 'default-dark',
+};
 
 export const themeStorage = {
-  get(): ThemeName {
+  get(): string {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw && VALID_THEMES.includes(raw as ThemeName)) {
-      return raw as ThemeName;
-    }
-    return 'default';
+    if (!raw) return DEFAULT_SCHEME_ID;
+    const mapped = LEGACY_MAP[raw] ?? raw;
+    if (COLOR_SCHEMES.some(s => s.id === mapped)) return mapped;
+    return DEFAULT_SCHEME_ID;
   },
 
-  save(theme: ThemeName): void {
-    localStorage.setItem(STORAGE_KEY, theme);
+  save(schemeId: string): void {
+    localStorage.setItem(STORAGE_KEY, schemeId);
   },
 };

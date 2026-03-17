@@ -34,7 +34,7 @@ export function ViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { notes, deleteNote, loading } = useNotes();
-  const { theme } = useTheme();
+  const { scheme } = useTheme();
   const note = notes.find(n => n.id === id);
 
   if (loading) {
@@ -105,7 +105,7 @@ export function ViewPage() {
           )}
         </header>
 
-        <div className={styles.content} data-color-mode={theme === 'dark' ? 'dark' : 'light'}>
+        <div className={styles.content} data-color-mode={scheme.type === 'dark' ? 'dark' : 'light'}>
           <MDEditor.Markdown source={note.content} components={previewOptions.components} />
         </div>
       </article>
