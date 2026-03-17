@@ -44,27 +44,58 @@ export function ThemeMenu() {
                 <CloseIcon size={18} />
               </button>
             </div>
-            <div className={styles.grid}>
-              {COLOR_SCHEMES.map(scheme => (
-                <button
-                  key={scheme.id}
-                  className={`${styles.card} ${scheme.id === schemeId ? styles.cardActive : ''}`}
-                  onClick={() => {
-                    setScheme(scheme.id);
-                    setOpen(false);
-                  }}
-                >
-                  <span className={styles.cardName}>{scheme.name}</span>
-                  <span className={styles.cardType}>{scheme.type}</span>
-                  <div className={styles.swatches}>
-                    <span className={styles.swatch} style={{ background: scheme.colors['color-bg'] }} />
-                    <span className={styles.swatch} style={{ background: scheme.colors['color-surface'] }} />
-                    <span className={styles.swatch} style={{ background: scheme.colors['color-primary'] }} />
-                    <span className={styles.swatch} style={{ background: scheme.colors['color-text'] }} />
-                    <span className={styles.swatch} style={{ background: scheme.colors['color-danger'] }} />
-                  </div>
-                </button>
-              ))}
+            <div className={styles.body}>
+              <div className={styles.grid}>
+                {COLOR_SCHEMES.map(scheme => (
+                  <button
+                    key={scheme.id}
+                    className={`${styles.card} ${scheme.id === schemeId ? styles.cardActive : ''}`}
+                    onClick={() => {
+                      setScheme(scheme.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <div className={styles.preview}>
+                      <div
+                        className={styles.swatchBg}
+                        style={{ background: scheme.colors['color-bg'] }}
+                      >
+                        <div
+                          className={styles.swatchBar}
+                          style={{
+                            background: scheme.colors['color-surface'],
+                            borderBottom: `2px solid ${scheme.colors['color-border']}`,
+                          }}
+                        />
+                        <div className={styles.swatchBody}>
+                          <div
+                            className={styles.swatchCard}
+                            style={{
+                              background: scheme.colors['color-surface'],
+                              border: `1px solid ${scheme.colors['color-border']}`,
+                            }}
+                          >
+                            <div
+                              className={styles.swatchText}
+                              style={{ background: scheme.colors['color-text'] }}
+                            />
+                            <div
+                              className={`${styles.swatchText} ${styles.swatchTextShort}`}
+                              style={{ background: scheme.colors['color-text-secondary'] }}
+                            />
+                          </div>
+                          <div
+                            className={styles.swatchAccent}
+                            style={{ background: scheme.colors['color-primary'] }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <span className={styles.cardName}>{scheme.name}</span>
+                    <span className={styles.cardType}>{scheme.type}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
