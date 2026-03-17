@@ -50,6 +50,14 @@ const BOOK_COLORS = [
   '#b45309',
 ];
 
+function hashStringToIndex(str: string, mod: number): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return ((hash % mod) + mod) % mod;
+}
+
 function computeSummary(entries: ReadingTimeEntry[], viewMode: ViewMode) {
   const todayCST = getCSTDateString();
   const todayDate = new Date(todayCST + 'T12:00:00');
@@ -90,7 +98,7 @@ function computeSummary(entries: ReadingTimeEntry[], viewMode: ViewMode) {
         attachmentId: entry.attachmentId,
         filename: entry.filename,
         displayName: stripPdfExtension(entry.filename),
-        color: BOOK_COLORS[bookMap.size % BOOK_COLORS.length],
+        color: BOOK_COLORS[hashStringToIndex(entry.attachmentId, BOOK_COLORS.length)],
         totalSeconds: 0,
         roundedSeconds: 0,
       });
