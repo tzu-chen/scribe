@@ -27,6 +27,14 @@
   color: var(--color-text);
   text-decoration: none;
   letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.logoIcon {
+  height: 1.5rem;
+  width: auto;
 }
 
 .logo:hover {
