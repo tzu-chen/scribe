@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeMenu } from '../ThemeMenu/ThemeMenu';
+import scribeLogo from '../../scribe.svg';
 import styles from './Layout.module.css';
 
 interface LayoutProps {
@@ -22,7 +23,7 @@ export function Layout({ children }: LayoutProps) {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link to="/" className={styles.logo}>
-            Scribe
+            <img src={scribeLogo} alt="Scribe" className={styles.logoIcon} />
           </Link>
           <nav className={styles.nav}>
             <Link
