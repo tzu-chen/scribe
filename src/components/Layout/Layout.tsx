@@ -24,7 +24,6 @@ export function Layout({ children }: LayoutProps) {
         <div className={styles.headerInner}>
           <Link to="/" className={styles.logo}>
             <img src={scribeLogo} alt="Scribe" className={styles.logoIcon} />
-            Scribe
           </Link>
           <nav className={styles.nav}>
             <Link

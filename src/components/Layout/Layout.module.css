@@ -22,14 +22,9 @@
 }
 
 .logo {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-text);
-  text-decoration: none;
-  letter-spacing: -0.02em;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  text-decoration: none;
 }
 
 .logoIcon {
@@ -38,8 +33,7 @@
 }
 
 .logo:hover {
-  text-decoration: none;
-  color: var(--color-primary);
+  opacity: 0.8;
 }
 
 .nav {
