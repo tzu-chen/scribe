@@ -1,31 +1,32 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { themeStorage, type ThemeName } from '../services/themeStorage';
+import { createContext, useContext, useState, useLayoutEffect, useCallback, useMemo } from 'react';
+import { themeStorage } from '../services/themeStorage';
+import { getSchemeById, applyColorScheme } from '../colorSchemes';
+import type { ColorScheme } from '../colorSchemes';
 
 interface ThemeContextValue {
-  theme: ThemeName;
-  setTheme: (theme: ThemeName) => void;
+  schemeId: string;
+  scheme: ColorScheme;
+  setScheme: (id: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeName>(() => themeStorage.get());
+  const [schemeId, setSchemeId] = useState<string>(() => themeStorage.get());
 
-  const setTheme = useCallback((newTheme: ThemeName) => {
-    setThemeState(newTheme);
-    themeStorage.save(newTheme);
+  const scheme = useMemo(() => getSchemeById(schemeId), [schemeId]);
+
+  const setScheme = useCallback((id: string) => {
+    setSchemeId(id);
+    themeStorage.save(id);
   }, []);
 
-  useEffect(() => {
-    if (theme === 'default') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  }, [theme]);
+  useLayoutEffect(() => {
+    applyColorScheme(scheme);
+  }, [scheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ schemeId, scheme, setScheme }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -1,47 +1,74 @@
+import { useState, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { COLOR_SCHEMES } from '../../colorSchemes';
+import { CloseIcon, PaletteIcon } from '../Icons/Icons';
 import styles from './ThemeMenu.module.css';
 
 export function ThemeMenu() {
-  const { theme, setTheme } = useTheme();
-  const isDark = theme === 'dark';
+  const { schemeId, setScheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const overlayMouseDownRef = useRef(false);
 
   return (
-    <button
-      className={styles.trigger}
-      onClick={() => setTheme(isDark ? 'default' : 'dark')}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {isDark ? (
-        // Sun icon — click to go light
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <>
+      <button
+        className={styles.trigger}
+        onClick={() => setOpen(true)}
+        aria-label="Change theme"
+        title="Change theme"
+      >
+        <PaletteIcon size={18} />
+      </button>
+
+      {open && (
+        <div
+          className={styles.overlay}
+          onMouseDown={e => {
+            overlayMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={e => {
+            if (overlayMouseDownRef.current && e.target === e.currentTarget) {
+              setOpen(false);
+            }
+            overlayMouseDownRef.current = false;
+          }}
         >
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-        </svg>
-      ) : (
-        // Moon icon — click to go dark
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
+          <div className={styles.panel}>
+            <div className={styles.header}>
+              <h3 className={styles.title}>Theme</h3>
+              <button
+                className={styles.close}
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+            <div className={styles.grid}>
+              {COLOR_SCHEMES.map(scheme => (
+                <button
+                  key={scheme.id}
+                  className={`${styles.card} ${scheme.id === schemeId ? styles.cardActive : ''}`}
+                  onClick={() => {
+                    setScheme(scheme.id);
+                    setOpen(false);
+                  }}
+                >
+                  <span className={styles.cardName}>{scheme.name}</span>
+                  <span className={styles.cardType}>{scheme.type}</span>
+                  <div className={styles.swatches}>
+                    <span className={styles.swatch} style={{ background: scheme.colors['color-bg'] }} />
+                    <span className={styles.swatch} style={{ background: scheme.colors['color-surface'] }} />
+                    <span className={styles.swatch} style={{ background: scheme.colors['color-primary'] }} />
+                    <span className={styles.swatch} style={{ background: scheme.colors['color-text'] }} />
+                    <span className={styles.swatch} style={{ background: scheme.colors['color-danger'] }} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
-    </button>
+    </>
   );
 }

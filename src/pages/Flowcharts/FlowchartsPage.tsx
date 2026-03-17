@@ -51,7 +51,7 @@ export function FlowchartsPage() {
   const [questionDialog, setQuestionDialog] = useState<QuestionDialog | null>(null);
   const [questionText, setQuestionText] = useState('');
 
-  const { theme } = useTheme();
+  const { scheme } = useTheme();
   const activeFlowchart = searchParams.get('view');
 
   useEffect(() => {
@@ -130,12 +130,12 @@ export function FlowchartsPage() {
   const applyThemeToIframe = useCallback(() => {
     const htmlEl = iframeRef.current?.contentDocument?.documentElement;
     if (!htmlEl) return;
-    if (theme === 'dark') {
+    if (scheme.type === 'dark') {
       htmlEl.setAttribute('data-theme', 'dark');
     } else {
       htmlEl.removeAttribute('data-theme');
     }
-  }, [theme]);
+  }, [scheme]);
 
   /* Re-apply theme whenever the user toggles it while the iframe is visible. */
   useEffect(() => {

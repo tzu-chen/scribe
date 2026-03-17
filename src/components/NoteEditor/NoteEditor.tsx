@@ -48,7 +48,7 @@ const previewOptions = {
 };
 
 export function NoteEditor({ value, onChange, height = 500 }: NoteEditorProps) {
-  const { theme } = useTheme();
+  const { scheme } = useTheme();
   const handleChange = useCallback(
     (val?: string) => {
       onChange(val || '');
@@ -57,7 +57,7 @@ export function NoteEditor({ value, onChange, height = 500 }: NoteEditorProps) {
   );
 
   return (
-    <div className={styles.editor} data-color-mode={theme === 'dark' ? 'dark' : 'light'}>
+    <div className={styles.editor} data-color-mode={scheme.type === 'dark' ? 'dark' : 'light'}>
       <MDEditor
         value={value}
         onChange={handleChange}
