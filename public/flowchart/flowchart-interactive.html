@@ -433,7 +433,7 @@ function highlightChain(nodeId) {
   });
   document.querySelectorAll('#arrows path[data-from]').forEach(p=>{
     const k=`${p.dataset.from}->${p.dataset.to}`;
-    if(activeEdges.has(k)){p.setAttribute('stroke','#5a5a50');p.setAttribute('stroke-width','2');p.setAttribute('stroke-opacity','1');p.setAttribute('marker-end','url(#ah-hi)');p.removeAttribute('stroke-dasharray');}
+    if(activeEdges.has(k)){p.setAttribute('stroke','#5a5a50');p.setAttribute('stroke-width','2');p.setAttribute('stroke-opacity','1');p.setAttribute('marker-end','url(#ah-hi)');}
     else{p.setAttribute('stroke-opacity','0.08');p.setAttribute('stroke-width','0.8');}
   });
 }
