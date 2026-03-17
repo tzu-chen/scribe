@@ -53,7 +53,7 @@ export function Layout({ children }: LayoutProps) {
               to="/summary"
               className={`${styles.navLink} ${isSummary ? styles.navLinkActive : ''}`}
             >
-              Summary
+              Time
             </Link>
             <div className={styles.navSpacer} />
             <ThemeMenu />

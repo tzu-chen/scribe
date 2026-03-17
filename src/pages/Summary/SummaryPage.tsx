@@ -31,7 +31,7 @@ export function SummaryPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Reading Summary</h1>
+        <h1 className={styles.title}>Time</h1>
         <div className={styles.viewToggle}>
           <button
             className={`${styles.toggleBtn} ${viewMode === 'week' ? styles.toggleBtnActive : ''}`}
