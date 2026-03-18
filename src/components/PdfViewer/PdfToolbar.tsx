@@ -119,7 +119,7 @@ export function PdfToolbar({
         <span className={styles.divider} />
         <button
           className={styles.pageNavBtn}
-          onClick={() => onPageJump(currentPage - 1)}
+          onClick={() => onPageJump(twoPageView ? (currentPage <= 2 ? 1 : currentPage - 2) : currentPage - 1)}
           disabled={currentPage <= 1}
           title="Previous page"
         >
@@ -153,8 +153,8 @@ export function PdfToolbar({
         )}
         <button
           className={styles.pageNavBtn}
-          onClick={() => onPageJump(currentPage + 1)}
-          disabled={currentPage >= numPages}
+          onClick={() => onPageJump(twoPageView ? (currentPage === 1 ? 2 : currentPage + 2) : currentPage + 1)}
+          disabled={twoPageView ? (currentPage === 1 ? numPages < 2 : currentPage + 2 > numPages) : currentPage >= numPages}
           title="Next page"
         >
           <ChevronRightIcon size={18} />
