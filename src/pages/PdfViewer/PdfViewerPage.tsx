@@ -32,7 +32,7 @@ export function PdfViewerPage() {
 
   useReadingTimeTracker(attachmentId, filename);
 
-  const { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error: pdfError } = usePdfDocument(blob);
+  const { pdfDoc, numPages, pageWidth, pageHeight, pageDimensions, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
   const { notes, saveNote } = useNotes();
 
@@ -447,6 +447,7 @@ export function PdfViewerPage() {
           scale={effectiveZoom}
           pageWidth={pageWidth}
           pageHeight={pageHeight}
+          pageDimensions={pageDimensions}
           highlights={annotations.highlights}
           twoPageView={twoPageView}
           onTextSelected={handleTextSelected}
