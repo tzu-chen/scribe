@@ -2,9 +2,8 @@
 
 Cross-app integration spec for Scribe. This documents the endpoints and data shapes that sibling apps (Navigate, Monolith, Granary) may call or reference.
 
-**Base URL:** `http://localhost:3001/api`  
-**Port:** 3001 (server), 5173 (Vite dev)  
-**Note:** Scribe and Navigate share port 3001 by default — run one at a time, or override `PORT` env var.
+**Base URL:** `http://localhost:3003/api`  
+**Port:** 3003 (server), 5173 (Vite dev)  
 
 ---
 
