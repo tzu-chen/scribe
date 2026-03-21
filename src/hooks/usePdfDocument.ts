@@ -112,6 +112,7 @@ export function usePdfDocument(blob: Blob | null) {
   const [numPages, setNumPages] = useState(0);
   const [pageWidth, setPageWidth] = useState(612);
   const [pageHeight, setPageHeight] = useState(792);
+  const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }[]>([]);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [loading, setLoading] = useState(!!blob);
   const [error, setError] = useState<string | null>(null);
@@ -141,12 +142,20 @@ export function usePdfDocument(blob: Blob | null) {
         setPdfDoc(doc);
         setNumPages(doc.numPages);
 
-        // Get actual first page width for fit-width calculation
-        const firstPage = await doc.getPage(1);
+        // Measure all pages' dimensions at scale 1 for accurate placeholders.
+        // getViewport is pure math on the page mediaBox — fast even for 1000+ pages.
+        const dims: { width: number; height: number }[] = [];
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i);
+          const vp = page.getViewport({ scale: 1 });
+          dims.push({ width: vp.width, height: vp.height });
+        }
         if (!cancelled) {
-          const vp = firstPage.getViewport({ scale: 1 });
-          setPageWidth(vp.width);
-          setPageHeight(vp.height);
+          setPageDimensions(dims);
+          if (dims.length > 0) {
+            setPageWidth(dims[0].width);
+            setPageHeight(dims[0].height);
+          }
         }
 
         const rawOutline = await doc.getOutline();
@@ -170,5 +179,5 @@ export function usePdfDocument(blob: Blob | null) {
     };
   }, [blob]);
 
-  return { pdfDoc, numPages, pageWidth, pageHeight, outline, loading, error };
+  return { pdfDoc, numPages, pageWidth, pageHeight, pageDimensions, outline, loading, error };
 }

@@ -16,6 +16,8 @@ interface Props {
   pdfDoc: PDFDocumentProxy;
   pageNumber: number;
   scale: number;
+  expectedWidth: number;
+  expectedHeight: number;
   highlights: PdfHighlight[];
   onTextSelected: (selection: TextSelection) => void;
   onSelectionCleared: () => void;
@@ -26,6 +28,8 @@ export function PdfPageView({
   pdfDoc,
   pageNumber,
   scale,
+  expectedWidth,
+  expectedHeight,
   highlights,
   onTextSelected,
   onSelectionCleared,
@@ -36,7 +40,10 @@ export function PdfPageView({
   const containerRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const textLayerInstanceRef = useRef<TextLayer | null>(null);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
+    width: Math.floor(expectedWidth * scale),
+    height: Math.floor(expectedHeight * scale),
+  });
   const dimensionsRef = useRef(dimensions);
   useEffect(() => {
     dimensionsRef.current = dimensions;
@@ -181,6 +188,10 @@ export function PdfPageView({
     <div
       ref={containerRef}
       className={styles.page}
+      style={{
+        width: Math.floor(expectedWidth * scale),
+        height: Math.floor(expectedHeight * scale),
+      }}
       onMouseUp={handleMouseUp}
     >
       <canvas ref={canvasRef} className={styles.canvas} />

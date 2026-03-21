@@ -10,6 +10,7 @@ interface Props {
   scale: number;
   pageWidth: number;
   pageHeight: number;
+  pageDimensions: { width: number; height: number }[];
   highlights: PdfHighlight[];
   twoPageView: boolean;
   onTextSelected: (selection: TextSelection) => void;
@@ -27,7 +28,7 @@ const BUFFER = 2;
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, highlights, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -137,12 +138,25 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       [visibleRange],
     );
 
-    const renderPageContent = (pageNum: number) =>
-      isPageVisible(pageNum) ? (
+    const getPageDims = useCallback(
+      (pageNum: number) => {
+        if (pageDimensions.length >= pageNum) {
+          return pageDimensions[pageNum - 1];
+        }
+        return { width: pageWidth, height: pageHeight };
+      },
+      [pageDimensions, pageWidth, pageHeight],
+    );
+
+    const renderPageContent = (pageNum: number) => {
+      const dims = getPageDims(pageNum);
+      return isPageVisible(pageNum) ? (
         <PdfPageView
           pdfDoc={pdfDoc}
           pageNumber={pageNum}
           scale={scale}
+          expectedWidth={dims.width}
+          expectedHeight={dims.height}
           highlights={highlights}
           onTextSelected={onTextSelected}
           onSelectionCleared={onSelectionCleared}
@@ -152,11 +166,12 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
         <div
           className={styles.placeholder}
           style={{
-            width: Math.floor(pageWidth * scale),
-            height: Math.floor(pageHeight * scale),
+            width: Math.floor(dims.width * scale),
+            height: Math.floor(dims.height * scale),
           }}
         />
       );
+    };
 
     let pages: ReactNode[];
 
