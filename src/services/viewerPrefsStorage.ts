@@ -34,5 +34,39 @@ export const viewerPrefsStorage = {
     }
     map[attachmentId] = prefs;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+
+    // Fire-and-forget save to server for cross-device sync
+    this.saveToServer(attachmentId, prefs).catch(() => {});
+  },
+
+  async fetchFromServer(attachmentId: string): Promise<ViewerPrefs | null> {
+    try {
+      const res = await fetch(`/api/viewer-prefs/${encodeURIComponent(attachmentId)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        zoom: data.zoom,
+        fitWidth: data.fitWidth,
+        currentPage: data.currentPage,
+        twoPageView: data.twoPageView ?? false,
+        scrollOffsetTop: data.scrollOffsetTop ?? 0,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async saveToServer(attachmentId: string, prefs: ViewerPrefs): Promise<void> {
+    await fetch(`/api/viewer-prefs/${encodeURIComponent(attachmentId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        zoom: prefs.zoom,
+        fitWidth: prefs.fitWidth,
+        currentPage: prefs.currentPage,
+        twoPageView: prefs.twoPageView ?? false,
+        scrollOffsetTop: prefs.scrollOffsetTop ?? 0,
+      }),
+    });
   },
 };
