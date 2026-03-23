@@ -23,6 +23,7 @@ interface Props {
   onReturnToFlowchart: () => void;
   onCreateNote: () => void;
   onOpenInNewTab: () => void;
+  immersiveMode?: boolean;
 }
 
 export function PdfToolbar({
@@ -44,6 +45,7 @@ export function PdfToolbar({
   onReturnToFlowchart,
   onCreateNote,
   onOpenInNewTab,
+  immersiveMode,
 }: Props) {
   const [editingPage, setEditingPage] = useState(false);
   const [pageInput, setPageInput] = useState('');
@@ -82,6 +84,8 @@ export function PdfToolbar({
       }
     }
   };
+
+  if (immersiveMode) return null;
 
   return (
     <div className={styles.toolbar}>

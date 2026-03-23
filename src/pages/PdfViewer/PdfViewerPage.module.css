@@ -52,3 +52,48 @@
   color: var(--color-primary);
   background: var(--color-primary-light);
 }
+
+/* Immersive mode — full viewport height when header is hidden */
+.immersive {
+  height: 100vh;
+}
+
+/* Hover zone in upper-right corner that reveals the immersive toggle */
+.immersiveZone {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 60px;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 10px;
+  pointer-events: auto;
+}
+
+.immersiveToggle {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.immersiveZone:hover .immersiveToggle {
+  opacity: 1;
+}
+
+.immersiveToggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
