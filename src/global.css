@@ -91,6 +91,11 @@ input {
   font-size: inherit;
 }
 
+/* Immersive mode — hide the app header when reading PDFs */
+[data-immersive="true"] header {
+  display: none !important;
+}
+
 /* Utility classes */
 .visually-hidden {
   position: absolute;

@@ -5,7 +5,7 @@ import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useNotes } from '../../hooks/useNotes';
-import { ArrowLeftIcon } from '../../components/Icons/Icons';
+import { ArrowLeftIcon, ExpandIcon, CollapseIcon } from '../../components/Icons/Icons';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
 import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
 import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
@@ -46,6 +46,7 @@ export function PdfViewerPage() {
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_WIDTH);
+  const [immersiveMode, setImmersiveMode] = useState(false);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<{
@@ -86,6 +87,28 @@ export function PdfViewerPage() {
     };
     prevEffectiveZoomRef.current = 0;
   }, [attachmentId]);
+
+  // Sync immersive mode with document attribute (hides Layout header via global CSS)
+  useEffect(() => {
+    if (immersiveMode) {
+      document.documentElement.setAttribute('data-immersive', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-immersive');
+    }
+    return () => {
+      document.documentElement.removeAttribute('data-immersive');
+    };
+  }, [immersiveMode]);
+
+  // Escape key exits immersive mode
+  useEffect(() => {
+    if (!immersiveMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setImmersiveMode(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [immersiveMode]);
 
   // Track the document area width for fit-width calculation.
   // The body div is conditionally rendered (only when !loading && pdfDoc),
@@ -223,6 +246,11 @@ export function PdfViewerPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [attachmentId, buildPrefs]);
+
+  const handleImmersiveToggle = useCallback(() => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+    setImmersiveMode(prev => !prev);
+  }, []);
 
   const handleReturnToFlowchart = useCallback(() => {
     navigate(`/flowcharts${flowchartId ? `?view=${flowchartId}` : ''}`);
@@ -415,7 +443,7 @@ export function PdfViewerPage() {
     : null;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${immersiveMode ? styles.immersive : ''}`}>
       <PdfToolbar
         filename={filename}
         currentPage={currentPage}
@@ -435,6 +463,7 @@ export function PdfViewerPage() {
         onReturnToFlowchart={handleReturnToFlowchart}
         onCreateNote={handleCreateNote}
         onOpenInNewTab={handleOpenInNewTab}
+        immersiveMode={immersiveMode}
       />
       <div ref={bodyRef} className={styles.body}>
         {showToc && (
@@ -501,6 +530,16 @@ export function PdfViewerPage() {
           onClose={handleClosePopover}
         />
       )}
+
+      <div className={styles.immersiveZone}>
+        <button
+          className={styles.immersiveToggle}
+          onClick={handleImmersiveToggle}
+          title={immersiveMode ? 'Exit immersive mode (Esc)' : 'Enter immersive mode'}
+        >
+          {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
+        </button>
+      </div>
     </div>
   );
 }
