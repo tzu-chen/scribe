@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
-import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
+import { viewerPrefsStorage, type ViewerPrefs } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useNotes } from '../../hooks/useNotes';
@@ -129,7 +129,7 @@ export function PdfViewerPage() {
     return () => ro.disconnect();
   }, [pdfDoc, loading]);
 
-  // Load the attachment blob
+  // Load the attachment blob and sync server-side viewer prefs
   useEffect(() => {
     if (!attachmentId) return;
     setBlob(null);
@@ -138,12 +138,37 @@ export function PdfViewerPage() {
 
     const load = async () => {
       try {
-        const b = await attachmentStorage.getBlob(attachmentId);
+        const [b, serverPrefs] = await Promise.all([
+          attachmentStorage.getBlob(attachmentId),
+          viewerPrefsStorage.fetchFromServer(attachmentId),
+        ]);
         if (cancelled) return;
         if (!b) {
           setLoadError('Attachment not found.');
           return;
         }
+
+        // If server has prefs (cross-device sync), update localStorage and state
+        if (serverPrefs) {
+          viewerPrefsStorage.get(attachmentId); // ensure localStorage is read
+          // Write server prefs to localStorage cache (skip the server save
+          // since data already came from the server)
+          const raw = localStorage.getItem('scribe_viewer_prefs');
+          let map: Record<string, ViewerPrefs> = {};
+          if (raw) { try { map = JSON.parse(raw); } catch { /* start fresh */ } }
+          map[attachmentId] = serverPrefs;
+          localStorage.setItem('scribe_viewer_prefs', JSON.stringify(map));
+
+          setZoom(serverPrefs.zoom ?? 1.0);
+          setFitWidth(serverPrefs.fitWidth ?? false);
+          setTwoPageView(serverPrefs.twoPageView ?? false);
+          setCurrentPage(serverPrefs.currentPage ?? 1);
+          lastScrollPosRef.current = {
+            page: serverPrefs.currentPage ?? 1,
+            offsetTop: serverPrefs.scrollOffsetTop ?? 0,
+          };
+        }
+
         setBlob(b);
 
         // Mark as recently opened so Library "last opened" stays current
@@ -167,7 +192,7 @@ export function PdfViewerPage() {
   const scrolledForAttachmentRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pdfDoc || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
+    if (!pdfDoc || loading || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
     // Read prefs directly to avoid stale closure
     const prefs = viewerPrefsStorage.get(attachmentId);
     const hasPosition = prefs && (prefs.currentPage > 1 || (prefs.scrollOffsetTop && prefs.scrollOffsetTop > 0));
@@ -181,7 +206,7 @@ export function PdfViewerPage() {
       });
     }
     scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
-  }, [pdfDoc, attachmentId]);
+  }, [pdfDoc, loading, attachmentId]);
 
   // Wrap onPageChange to also capture the precise scroll offset into a ref
   const handlePageChange = useCallback((page: number) => {
@@ -235,7 +260,7 @@ export function PdfViewerPage() {
     };
   }, [attachmentId, buildPrefs]);
 
-  // Immediate save on tab close
+  // Immediate save on tab close or tab hide (mobile may not fire beforeunload)
   useEffect(() => {
     if (!attachmentId) return;
 
@@ -243,8 +268,18 @@ export function PdfViewerPage() {
       viewerPrefsStorage.save(attachmentId, buildPrefs());
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        viewerPrefsStorage.save(attachmentId, buildPrefs());
+      }
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [attachmentId, buildPrefs]);
 
   const handleImmersiveToggle = useCallback(() => {

@@ -77,6 +77,16 @@ db.exec(`
     PRIMARY KEY (attachment_id, date_cst)
   );
 
+  CREATE TABLE IF NOT EXISTS viewer_prefs (
+    attachment_id TEXT PRIMARY KEY,
+    zoom REAL NOT NULL DEFAULT 1.0,
+    fit_width INTEGER NOT NULL DEFAULT 0,
+    current_page INTEGER NOT NULL DEFAULT 1,
+    two_page_view INTEGER NOT NULL DEFAULT 0,
+    scroll_offset_top REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
+
 `);
 
 // Migration: add last_opened_at column if missing (for existing databases)
