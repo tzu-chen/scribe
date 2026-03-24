@@ -607,8 +607,8 @@ export function PdfViewerPage() {
         <PdfCropOverlay
           pdfDoc={pdfDoc}
           pageNumber={currentPage}
-          pageWidth={pageWidth}
-          pageHeight={pageHeight}
+          pageWidth={pageDimensions[currentPage - 1]?.width ?? pageWidth}
+          pageHeight={pageDimensions[currentPage - 1]?.height ?? pageHeight}
           currentCrop={crop}
           onApply={handleCropApply}
           onReset={handleCropReset}
