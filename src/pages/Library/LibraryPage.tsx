@@ -43,7 +43,7 @@ export function LibraryPage() {
     const saved = localStorage.getItem(VIEW_MODE_KEY);
     return saved === 'list' ? 'list' : 'card';
   });
-  const [sortField, setSortField] = useState<SortField>('uploaded');
+  const [sortField, setSortField] = useState<SortField>('lastOpened');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
