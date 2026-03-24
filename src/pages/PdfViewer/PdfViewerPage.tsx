@@ -605,6 +605,8 @@ export function PdfViewerPage() {
 
       {cropMode && (
         <PdfCropOverlay
+          pdfDoc={pdfDoc}
+          pageNumber={currentPage}
           pageWidth={pageWidth}
           pageHeight={pageHeight}
           currentCrop={crop}

@@ -1,9 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { CropBox } from '../../types/crop';
 import { hasCrop } from '../../types/crop';
 import styles from './PdfCropOverlay.module.css';
 
 interface Props {
+  pdfDoc: PDFDocumentProxy;
+  pageNumber: number;
   pageWidth: number;
   pageHeight: number;
   currentCrop: CropBox;
@@ -14,9 +17,11 @@ interface Props {
 
 type DragEdge = 'top' | 'right' | 'bottom' | 'left' | null;
 
-const MAX_CROP = 0.45; // Each edge can crop at most 45%
+const MAX_CROP = 0.45;
 
 export function PdfCropOverlay({
+  pdfDoc,
+  pageNumber,
   pageWidth,
   pageHeight,
   currentCrop,
@@ -27,11 +32,13 @@ export function PdfCropOverlay({
   const [crop, setCrop] = useState<CropBox>({ ...currentCrop });
   const [dragging, setDragging] = useState<DragEdge>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
 
-  // Calculate preview size to fit within viewport
+  // Calculate preview size — use most of the viewport
   const aspect = pageWidth / pageHeight;
-  const maxW = Math.min(500, window.innerWidth * 0.7);
-  const maxH = window.innerHeight * 0.6;
+  const maxW = Math.min(800, window.innerWidth * 0.85);
+  const maxH = window.innerHeight * 0.75;
   let previewW: number;
   let previewH: number;
   if (maxW / aspect <= maxH) {
@@ -41,6 +48,44 @@ export function PdfCropOverlay({
     previewH = maxH;
     previewW = maxH * aspect;
   }
+
+  // Render the actual PDF page to the canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let cancelled = false;
+
+    const renderPage = async () => {
+      const page = await pdfDoc.getPage(pageNumber);
+      if (cancelled) return;
+
+      const scale = previewW / pageWidth;
+      const dpr = window.devicePixelRatio || 1;
+      const viewport = page.getViewport({ scale });
+      const renderViewport = page.getViewport({ scale: scale * dpr });
+
+      canvas.width = Math.floor(renderViewport.width);
+      canvas.height = Math.floor(renderViewport.height);
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+      renderTaskRef.current?.cancel();
+      const renderTask = page.render({ canvas, viewport: renderViewport });
+      renderTaskRef.current = renderTask;
+
+      try {
+        await renderTask.promise;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'RenderingCancelledException') return;
+      }
+    };
+
+    renderPage();
+    return () => {
+      cancelled = true;
+      renderTaskRef.current?.cancel();
+    };
+  }, [pdfDoc, pageNumber, pageWidth, previewW]);
 
   const handlePointerDown = useCallback((edge: DragEdge) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -55,17 +100,13 @@ export function PdfCropOverlay({
     setCrop(prev => {
       const next = { ...prev };
       if (dragging === 'top') {
-        const frac = Math.max(0, Math.min(MAX_CROP, (e.clientY - rect.top) / rect.height));
-        next.top = frac;
+        next.top = Math.max(0, Math.min(MAX_CROP, (e.clientY - rect.top) / rect.height));
       } else if (dragging === 'bottom') {
-        const frac = Math.max(0, Math.min(MAX_CROP, (rect.bottom - e.clientY) / rect.height));
-        next.bottom = frac;
+        next.bottom = Math.max(0, Math.min(MAX_CROP, (rect.bottom - e.clientY) / rect.height));
       } else if (dragging === 'left') {
-        const frac = Math.max(0, Math.min(MAX_CROP, (e.clientX - rect.left) / rect.width));
-        next.left = frac;
+        next.left = Math.max(0, Math.min(MAX_CROP, (e.clientX - rect.left) / rect.width));
       } else if (dragging === 'right') {
-        const frac = Math.max(0, Math.min(MAX_CROP, (rect.right - e.clientX) / rect.width));
-        next.right = frac;
+        next.right = Math.max(0, Math.min(MAX_CROP, (rect.right - e.clientX) / rect.width));
       }
       return next;
     });
@@ -75,7 +116,6 @@ export function PdfCropOverlay({
     setDragging(null);
   }, []);
 
-  // Escape key cancels
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
@@ -84,7 +124,6 @@ export function PdfCropOverlay({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
-  // Crop area in pixels within the preview
   const cropTopPx = crop.top * previewH;
   const cropBottomPx = crop.bottom * previewH;
   const cropLeftPx = crop.left * previewW;
@@ -107,24 +146,19 @@ export function PdfCropOverlay({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Dim regions */}
+          {/* Actual PDF page rendered to canvas */}
+          <canvas ref={canvasRef} className={styles.pageCanvas} />
+
+          {/* Dim regions over cropped-away areas */}
           <div className={styles.dimTop} style={{ height: cropTopPx }} />
           <div className={styles.dimBottom} style={{ height: cropBottomPx }} />
           <div
             className={styles.dimLeft}
-            style={{
-              top: cropTopPx,
-              width: cropLeftPx,
-              height: cropAreaHeight,
-            }}
+            style={{ top: cropTopPx, width: cropLeftPx, height: cropAreaHeight }}
           />
           <div
             className={styles.dimRight}
-            style={{
-              top: cropTopPx,
-              width: cropRightPx,
-              height: cropAreaHeight,
-            }}
+            style={{ top: cropTopPx, width: cropRightPx, height: cropAreaHeight }}
           />
 
           {/* Crop area outline */}
@@ -138,7 +172,7 @@ export function PdfCropOverlay({
             }}
           />
 
-          {/* Draggable edge handles — positioned on the crop area edges */}
+          {/* Draggable edge handles */}
           <div
             className={`${styles.handle} ${styles.handleTop}`}
             style={{ top: cropAreaTop - 6 }}
