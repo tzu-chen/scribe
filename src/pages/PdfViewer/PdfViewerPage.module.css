@@ -1,5 +1,4 @@
 .page {
-  position: relative;
   display: flex;
   flex-direction: column;
   height: calc(100vh - var(--header-height));
@@ -7,6 +6,7 @@
 }
 
 .body {
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;

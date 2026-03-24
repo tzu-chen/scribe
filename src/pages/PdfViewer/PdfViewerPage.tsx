@@ -540,6 +540,15 @@ export function PdfViewerPage() {
             onWidthChange={setEditorPanelWidth}
           />
         )}
+        <div className={styles.immersiveZone}>
+          <button
+            className={styles.immersiveToggle}
+            onClick={handleImmersiveToggle}
+            title={immersiveMode ? 'Exit immersive mode (Esc)' : 'Enter immersive mode'}
+          >
+            {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
+          </button>
+        </div>
       </div>
 
       {textSelection && (
@@ -565,16 +574,6 @@ export function PdfViewerPage() {
           onClose={handleClosePopover}
         />
       )}
-
-      <div className={styles.immersiveZone}>
-        <button
-          className={styles.immersiveToggle}
-          onClick={handleImmersiveToggle}
-          title={immersiveMode ? 'Exit immersive mode (Esc)' : 'Enter immersive mode'}
-        >
-          {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
-        </button>
-      </div>
     </div>
   );
 }
