@@ -5,6 +5,8 @@ import { viewerPrefsStorage, type ViewerPrefs } from '../../services/viewerPrefs
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useNotes } from '../../hooks/useNotes';
+import type { CropBox } from '../../types/crop';
+import { NO_CROP, hasCrop } from '../../types/crop';
 import { ArrowLeftIcon, ExpandIcon, CollapseIcon } from '../../components/Icons/Icons';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
 import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
@@ -12,6 +14,7 @@ import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
 import { PdfDocumentView, type PdfDocumentViewHandle } from '../../components/PdfViewer/PdfDocumentView';
 import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionToolbar';
 import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
+import { PdfCropOverlay } from '../../components/PdfViewer/PdfCropOverlay';
 import { PdfNoteEditorPanel } from '../../components/PdfViewer/PdfNoteEditorPanel';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
@@ -47,6 +50,13 @@ export function PdfViewerPage() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_WIDTH);
   const [immersiveMode, setImmersiveMode] = useState(false);
+  const [crop, setCrop] = useState<CropBox>({
+    top: savedPrefs?.cropTop ?? 0,
+    right: savedPrefs?.cropRight ?? 0,
+    bottom: savedPrefs?.cropBottom ?? 0,
+    left: savedPrefs?.cropLeft ?? 0,
+  });
+  const [cropMode, setCropMode] = useState(false);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<{
@@ -75,6 +85,13 @@ export function PdfViewerPage() {
     setFitWidth(prefs?.fitWidth ?? false);
     setTwoPageView(prefs?.twoPageView ?? false);
     setCurrentPage(prefs?.currentPage ?? 1);
+    setCrop({
+      top: prefs?.cropTop ?? 0,
+      right: prefs?.cropRight ?? 0,
+      bottom: prefs?.cropBottom ?? 0,
+      left: prefs?.cropLeft ?? 0,
+    });
+    setCropMode(false);
     setShowToc(false);
     setShowRightPanel(false);
     setEditingNoteId(null);
@@ -163,6 +180,12 @@ export function PdfViewerPage() {
           setFitWidth(serverPrefs.fitWidth ?? false);
           setTwoPageView(serverPrefs.twoPageView ?? false);
           setCurrentPage(serverPrefs.currentPage ?? 1);
+          setCrop({
+            top: serverPrefs.cropTop ?? 0,
+            right: serverPrefs.cropRight ?? 0,
+            bottom: serverPrefs.cropBottom ?? 0,
+            left: serverPrefs.cropLeft ?? 0,
+          });
           lastScrollPosRef.current = {
             page: serverPrefs.currentPage ?? 1,
             offsetTop: serverPrefs.scrollOffsetTop ?? 0,
@@ -226,8 +249,12 @@ export function PdfViewerPage() {
       currentPage: pos.page,
       twoPageView,
       scrollOffsetTop: pos.offsetTop,
+      cropTop: crop.top,
+      cropRight: crop.right,
+      cropBottom: crop.bottom,
+      cropLeft: crop.left,
     };
-  }, [zoom, fitWidth, currentPage, twoPageView]);
+  }, [zoom, fitWidth, currentPage, twoPageView, crop]);
 
   // Debounced save of viewer preferences
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -318,6 +345,26 @@ export function PdfViewerPage() {
 
   const handleTwoPageViewToggle = useCallback(() => {
     setTwoPageView(prev => !prev);
+  }, []);
+
+  const handleCropModeToggle = useCallback(() => {
+    setCropMode(prev => !prev);
+  }, []);
+
+  const handleCropApply = useCallback((newCrop: CropBox) => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+    setCrop(newCrop);
+    setCropMode(false);
+  }, []);
+
+  const handleCropReset = useCallback(() => {
+    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+    setCrop(NO_CROP);
+    setCropMode(false);
+  }, []);
+
+  const handleCropCancel = useCallback(() => {
+    setCropMode(false);
   }, []);
 
   const handleTocToggle = useCallback(() => {
@@ -430,8 +477,10 @@ export function PdfViewerPage() {
       - (editingNoteId ? editorPanelWidth : 0)
       - 40
     : 0;
+  // Use cropped page width for fit-width calculation so content fills the screen
+  const croppedPageWidth = pageWidth * (1 - crop.left - crop.right);
   // In two-page view, two pages sit side by side with an 8px gap between them.
-  const fitWidthPageSpan = twoPageView ? pageWidth * 2 + 8 : pageWidth;
+  const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / fitWidthPageSpan) : zoom;
 
   // When effectiveZoom changes, restore the scroll position that was saved before the change.
@@ -499,6 +548,8 @@ export function PdfViewerPage() {
         onCreateNote={handleCreateNote}
         onOpenInNewTab={handleOpenInNewTab}
         immersiveMode={immersiveMode}
+        cropActive={hasCrop(crop)}
+        onCropToggle={handleCropModeToggle}
       />
       <div ref={bodyRef} className={styles.body}>
         {showToc && (
@@ -513,6 +564,7 @@ export function PdfViewerPage() {
           pageHeight={pageHeight}
           pageDimensions={pageDimensions}
           highlights={annotations.highlights}
+          crop={hasCrop(crop) ? crop : undefined}
           twoPageView={twoPageView}
           onTextSelected={handleTextSelected}
           onSelectionCleared={handleSelectionCleared}
@@ -550,6 +602,17 @@ export function PdfViewerPage() {
           </button>
         </div>
       </div>
+
+      {cropMode && (
+        <PdfCropOverlay
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
+          currentCrop={crop}
+          onApply={handleCropApply}
+          onReset={handleCropReset}
+          onCancel={handleCropCancel}
+        />
+      )}
 
       {textSelection && (
         <PdfSelectionToolbar

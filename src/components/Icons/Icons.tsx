@@ -112,6 +112,14 @@ export function CollapseIcon({ size = 16, ...props }: IconProps) {
   );
 }
 
+export function CropIcon({ size = 16, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
+      <path d="M6 2v4H2v2h4v10h10v4h2v-4h4v-2H8V6h10v10" />
+    </svg>
+  );
+}
+
 export function PaletteIcon({ size = 16, ...props }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
