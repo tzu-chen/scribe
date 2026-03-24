@@ -4,6 +4,10 @@ export interface ViewerPrefs {
   currentPage: number;
   twoPageView?: boolean;
   scrollOffsetTop?: number;
+  cropTop?: number;
+  cropRight?: number;
+  cropBottom?: number;
+  cropLeft?: number;
 }
 
 const STORAGE_KEY = 'scribe_viewer_prefs';
@@ -50,6 +54,10 @@ export const viewerPrefsStorage = {
         currentPage: data.currentPage,
         twoPageView: data.twoPageView ?? false,
         scrollOffsetTop: data.scrollOffsetTop ?? 0,
+        cropTop: data.cropTop ?? 0,
+        cropRight: data.cropRight ?? 0,
+        cropBottom: data.cropBottom ?? 0,
+        cropLeft: data.cropLeft ?? 0,
       };
     } catch {
       return null;
@@ -66,6 +74,10 @@ export const viewerPrefsStorage = {
         currentPage: prefs.currentPage,
         twoPageView: prefs.twoPageView ?? false,
         scrollOffsetTop: prefs.scrollOffsetTop ?? 0,
+        cropTop: prefs.cropTop ?? 0,
+        cropRight: prefs.cropRight ?? 0,
+        cropBottom: prefs.cropBottom ?? 0,
+        cropLeft: prefs.cropLeft ?? 0,
       }),
     });
   },

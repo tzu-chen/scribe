@@ -24,6 +24,8 @@ interface Props {
   onCreateNote: () => void;
   onOpenInNewTab: () => void;
   immersiveMode?: boolean;
+  cropActive?: boolean;
+  onCropToggle?: () => void;
 }
 
 export function PdfToolbar({
@@ -46,6 +48,8 @@ export function PdfToolbar({
   onCreateNote,
   onOpenInNewTab,
   immersiveMode,
+  cropActive,
+  onCropToggle,
 }: Props) {
   const [editingPage, setEditingPage] = useState(false);
   const [pageInput, setPageInput] = useState('');
@@ -119,6 +123,13 @@ export function PdfToolbar({
           title="Two-page view"
         >
           2-Page
+        </button>
+        <button
+          className={`${styles.cropBtn} ${cropActive ? styles.cropBtnActive : ''}`}
+          onClick={onCropToggle}
+          title={cropActive ? 'Edit crop (crop is active)' : 'Crop pages'}
+        >
+          Crop
         </button>
         <span className={styles.divider} />
         <button

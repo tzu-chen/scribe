@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TextLayer, setLayerDimensions } from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfHighlight, HighlightRect } from '../../types/annotation';
+import type { CropBox } from '../../types/crop';
 import { PdfHighlightLayer } from './PdfHighlightLayer';
 import styles from './PdfPageView.module.css';
 
@@ -19,6 +20,7 @@ interface Props {
   expectedWidth: number;
   expectedHeight: number;
   highlights: PdfHighlight[];
+  crop?: CropBox;
   onTextSelected: (selection: TextSelection) => void;
   onSelectionCleared: () => void;
   onHighlightClick: (highlightId: string, anchorRect: DOMRect) => void;
@@ -31,6 +33,7 @@ export function PdfPageView({
   expectedWidth,
   expectedHeight,
   highlights,
+  crop,
   onTextSelected,
   onSelectionCleared,
   onHighlightClick,
@@ -38,6 +41,7 @@ export function PdfPageView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageContentRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const textLayerInstanceRef = useRef<TextLayer | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
@@ -150,7 +154,10 @@ export function PdfPageView({
     }
 
     const text = selection.toString().trim();
-    const pageRect = container.getBoundingClientRect();
+    // Use the full-page content div for coordinate calculations so highlight
+    // rects stay normalized to the full (uncropped) page dimensions.
+    const coordEl = pageContentRef.current ?? container;
+    const pageRect = coordEl.getBoundingClientRect();
     const { width: pageWidth, height: pageHeight } = dimensionsRef.current;
 
     if (pageWidth === 0 || pageHeight === 0) return;
@@ -184,25 +191,49 @@ export function PdfPageView({
 
   const pageHighlights = highlights.filter(h => h.pageNumber === pageNumber);
 
+  const cropT = crop?.top ?? 0;
+  const cropR = crop?.right ?? 0;
+  const cropB = crop?.bottom ?? 0;
+  const cropL = crop?.left ?? 0;
+  const isCropped = cropT > 0 || cropR > 0 || cropB > 0 || cropL > 0;
+
+  const fullW = Math.floor(expectedWidth * scale);
+  const fullH = Math.floor(expectedHeight * scale);
+  const croppedW = isCropped ? Math.floor(expectedWidth * (1 - cropL - cropR) * scale) : fullW;
+  const croppedH = isCropped ? Math.floor(expectedHeight * (1 - cropT - cropB) * scale) : fullH;
+
   return (
     <div
       ref={containerRef}
       className={styles.page}
       style={{
-        width: Math.floor(expectedWidth * scale),
-        height: Math.floor(expectedHeight * scale),
+        width: croppedW,
+        height: croppedH,
       }}
       onMouseUp={handleMouseUp}
     >
-      <canvas ref={canvasRef} className={styles.canvas} />
-      {/* Use unscoped "textLayer" class so pdfjs-dist/web/pdf_viewer.css applies */}
-      <div ref={textLayerRef} className="textLayer" />
-      <PdfHighlightLayer
-        highlights={pageHighlights}
-        pageWidth={dimensions.width}
-        pageHeight={dimensions.height}
-        onHighlightClick={onHighlightClick}
-      />
+      <div
+        ref={pageContentRef}
+        style={isCropped ? {
+          width: fullW,
+          height: fullH,
+          marginLeft: -Math.floor(cropL * expectedWidth * scale),
+          marginTop: -Math.floor(cropT * expectedHeight * scale),
+        } : {
+          width: fullW,
+          height: fullH,
+        }}
+      >
+        <canvas ref={canvasRef} className={styles.canvas} />
+        {/* Use unscoped "textLayer" class so pdfjs-dist/web/pdf_viewer.css applies */}
+        <div ref={textLayerRef} className="textLayer" />
+        <PdfHighlightLayer
+          highlights={pageHighlights}
+          pageWidth={dimensions.width}
+          pageHeight={dimensions.height}
+          onHighlightClick={onHighlightClick}
+        />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle, type ReactNode } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfHighlight } from '../../types/annotation';
+import type { CropBox } from '../../types/crop';
 import { PdfPageView, type TextSelection } from './PdfPageView';
 import styles from './PdfDocumentView.module.css';
 
@@ -12,6 +13,7 @@ interface Props {
   pageHeight: number;
   pageDimensions: { width: number; height: number }[];
   highlights: PdfHighlight[];
+  crop?: CropBox;
   twoPageView: boolean;
   onTextSelected: (selection: TextSelection) => void;
   onSelectionCleared: () => void;
@@ -28,7 +30,7 @@ const BUFFER = 2;
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -148,26 +150,36 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       [pageDimensions, pageWidth, pageHeight],
     );
 
+    const cropT = crop?.top ?? 0;
+    const cropR = crop?.right ?? 0;
+    const cropB = crop?.bottom ?? 0;
+    const cropL = crop?.left ?? 0;
+
     const renderPageContent = (pageNum: number) => {
       const dims = getPageDims(pageNum);
-      return isPageVisible(pageNum) ? (
-        <PdfPageView
-          pdfDoc={pdfDoc}
-          pageNumber={pageNum}
-          scale={scale}
-          expectedWidth={dims.width}
-          expectedHeight={dims.height}
-          highlights={highlights}
-          onTextSelected={onTextSelected}
-          onSelectionCleared={onSelectionCleared}
-          onHighlightClick={onHighlightClick}
-        />
-      ) : (
+      if (isPageVisible(pageNum)) {
+        return (
+          <PdfPageView
+            pdfDoc={pdfDoc}
+            pageNumber={pageNum}
+            scale={scale}
+            expectedWidth={dims.width}
+            expectedHeight={dims.height}
+            highlights={highlights}
+            crop={crop}
+            onTextSelected={onTextSelected}
+            onSelectionCleared={onSelectionCleared}
+            onHighlightClick={onHighlightClick}
+          />
+        );
+      }
+      const isCropped = cropT > 0 || cropR > 0 || cropB > 0 || cropL > 0;
+      return (
         <div
           className={styles.placeholder}
           style={{
-            width: Math.floor(dims.width * scale),
-            height: Math.floor(dims.height * scale),
+            width: Math.floor(dims.width * (isCropped ? 1 - cropL - cropR : 1) * scale),
+            height: Math.floor(dims.height * (isCropped ? 1 - cropT - cropB : 1) * scale),
           }}
         />
       );

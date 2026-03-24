@@ -84,6 +84,10 @@ db.exec(`
     current_page INTEGER NOT NULL DEFAULT 1,
     two_page_view INTEGER NOT NULL DEFAULT 0,
     scroll_offset_top REAL NOT NULL DEFAULT 0,
+    crop_top REAL NOT NULL DEFAULT 0,
+    crop_right REAL NOT NULL DEFAULT 0,
+    crop_bottom REAL NOT NULL DEFAULT 0,
+    crop_left REAL NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
   );
 
@@ -93,6 +97,17 @@ db.exec(`
 const columns = db.prepare("PRAGMA table_info(attachments)").all() as Array<{ name: string }>;
 if (!columns.some(c => c.name === 'last_opened_at')) {
   db.exec('ALTER TABLE attachments ADD COLUMN last_opened_at TEXT');
+}
+
+// Migration: add crop columns to viewer_prefs if missing
+const vpColumns = db.prepare("PRAGMA table_info(viewer_prefs)").all() as Array<{ name: string }>;
+if (!vpColumns.some(c => c.name === 'crop_top')) {
+  db.exec(`
+    ALTER TABLE viewer_prefs ADD COLUMN crop_top REAL NOT NULL DEFAULT 0;
+    ALTER TABLE viewer_prefs ADD COLUMN crop_right REAL NOT NULL DEFAULT 0;
+    ALTER TABLE viewer_prefs ADD COLUMN crop_bottom REAL NOT NULL DEFAULT 0;
+    ALTER TABLE viewer_prefs ADD COLUMN crop_left REAL NOT NULL DEFAULT 0;
+  `);
 }
 
 export { db, ATTACHMENTS_DIR };

@@ -1,0 +1,169 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  max-width: 90vw;
+  max-height: 85vh;
+}
+
+.pageContainer {
+  position: relative;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  user-select: none;
+  touch-action: none;
+}
+
+/* Dark semi-transparent overlay on cropped regions */
+.dimTop,
+.dimBottom,
+.dimLeft,
+.dimRight {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.dimTop {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.dimBottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.dimLeft {
+  left: 0;
+}
+
+.dimRight {
+  right: 0;
+}
+
+/* Crop area outline */
+.cropArea {
+  position: absolute;
+  border: 2px dashed var(--color-primary);
+  pointer-events: none;
+}
+
+/* Edge handles */
+.handle {
+  position: absolute;
+  z-index: 1;
+}
+
+.handleTop,
+.handleBottom {
+  left: 20%;
+  right: 20%;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.handleTop {
+  top: -6px;
+}
+
+.handleBottom {
+  bottom: -6px;
+}
+
+.handleLeft,
+.handleRight {
+  top: 20%;
+  bottom: 20%;
+  width: 12px;
+  cursor: ew-resize;
+}
+
+.handleLeft {
+  left: -6px;
+}
+
+.handleRight {
+  right: -6px;
+}
+
+/* Visual handle bar */
+.handleBar {
+  position: absolute;
+  background: var(--color-primary);
+  border-radius: 2px;
+}
+
+.handleTop .handleBar,
+.handleBottom .handleBar {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 4px;
+}
+
+.handleLeft .handleBar,
+.handleRight .handleBar {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 40px;
+}
+
+/* Controls bar */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.applyBtn {
+  font-size: 0.85rem;
+  padding: 8px 20px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  white-space: nowrap;
+}
+
+.applyBtn:hover {
+  background: var(--color-primary-hover);
+}
+
+.resetBtn,
+.cancelBtn {
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  color: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.resetBtn:hover,
+.cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
