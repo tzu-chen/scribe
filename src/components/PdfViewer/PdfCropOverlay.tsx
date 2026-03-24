@@ -35,12 +35,14 @@ export function PdfCropOverlay({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
 
-  // Calculate preview size — use most of the viewport
+  // Calculate preview size — fit the ENTIRE page within the viewport,
+  // leaving room for the hint text and control buttons (~100px).
   const aspect = pageWidth / pageHeight;
-  const maxW = Math.min(800, window.innerWidth * 0.85);
-  const maxH = window.innerHeight * 0.75;
+  const maxW = window.innerWidth * 0.85;
+  const maxH = window.innerHeight - 120;
   let previewW: number;
   let previewH: number;
+  // Always constrain by whichever dimension is tighter
   if (maxW / aspect <= maxH) {
     previewW = maxW;
     previewH = maxW / aspect;
