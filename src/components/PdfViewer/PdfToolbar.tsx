@@ -82,7 +82,7 @@ export function PdfToolbar({
   const commitZoom = () => {
     const value = parseInt(zoomInput, 10);
     if (!isNaN(value)) {
-      const clamped = Math.min(300, Math.max(50, value));
+      const clamped = Math.min(1000, Math.max(50, value));
       onZoomChange(clamped / 100);
     }
     setEditingZoom(false);
