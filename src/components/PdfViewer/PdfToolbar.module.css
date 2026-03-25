@@ -82,6 +82,29 @@
   text-align: center;
 }
 
+.zoomLevelClickable {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.zoomLevelClickable:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.zoomInput {
+  width: 4ch;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 1px 2px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
 .fitBtn {
   font-size: 0.8rem;
   padding: 4px 8px;

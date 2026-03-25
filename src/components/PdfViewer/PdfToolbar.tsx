@@ -55,11 +55,21 @@ export function PdfToolbar({
   const [pageInput, setPageInput] = useState('');
   const pageInputRef = useRef<HTMLInputElement>(null);
 
+  const [editingZoom, setEditingZoom] = useState(false);
+  const [zoomInput, setZoomInput] = useState('');
+  const zoomInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (editingPage) {
       pageInputRef.current?.select();
     }
   }, [editingPage]);
+
+  useEffect(() => {
+    if (editingZoom) {
+      zoomInputRef.current?.select();
+    }
+  }, [editingZoom]);
 
   const commitPageJump = () => {
     const page = parseInt(pageInput, 10);
@@ -67,6 +77,15 @@ export function PdfToolbar({
       onPageJump(page);
     }
     setEditingPage(false);
+  };
+
+  const commitZoom = () => {
+    const value = parseInt(zoomInput, 10);
+    if (!isNaN(value)) {
+      const clamped = Math.min(300, Math.max(50, value));
+      onZoomChange(clamped / 100);
+    }
+    setEditingZoom(false);
   };
 
   const zoomOut = () => {
@@ -106,7 +125,29 @@ export function PdfToolbar({
         <button className={styles.zoomBtn} onClick={zoomOut} title="Zoom out">
           <MinusIcon size={16} />
         </button>
-        <span className={styles.zoomLevel}>{Math.round(zoom * 100)}%</span>
+        {editingZoom ? (
+          <input
+            ref={zoomInputRef}
+            className={styles.zoomInput}
+            type="text"
+            inputMode="numeric"
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitZoom();
+              if (e.key === 'Escape') setEditingZoom(false);
+            }}
+            onBlur={commitZoom}
+          />
+        ) : (
+          <span
+            className={`${styles.zoomLevel} ${styles.zoomLevelClickable}`}
+            onClick={() => { setZoomInput(String(Math.round(zoom * 100))); setEditingZoom(true); }}
+            title="Click to set zoom level"
+          >
+            {Math.round(zoom * 100)}%
+          </span>
+        )}
         <button className={styles.zoomBtn} onClick={zoomIn} title="Zoom in">
           <PlusIcon size={16} />
         </button>
