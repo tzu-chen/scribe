@@ -215,15 +215,21 @@ export function PdfPageView({
     >
       <div
         ref={pageContentRef}
-        style={isCropped ? {
+        style={{
+          position: 'relative',
           width: fullW,
           height: fullH,
-          marginLeft: -Math.floor(cropL * expectedWidth * scale),
-          marginTop: -Math.floor(cropT * expectedHeight * scale),
-        } : {
-          width: fullW,
-          height: fullH,
-        }}
+          // pdfjs-dist text layer CSS expects these variables on an ancestor;
+          // normally set by .pdfViewer .page which we don't use.
+          '--scale-factor': `${scale}`,
+          '--total-scale-factor': `${scale}`,
+          '--scale-round-x': '1px',
+          '--scale-round-y': '1px',
+          ...(isCropped ? {
+            marginLeft: -Math.floor(cropL * expectedWidth * scale),
+            marginTop: -Math.floor(cropT * expectedHeight * scale),
+          } : undefined),
+        } as React.CSSProperties}
       >
         <canvas ref={canvasRef} className={styles.canvas} />
         {/* Use unscoped "textLayer" class so pdfjs-dist/web/pdf_viewer.css applies */}
