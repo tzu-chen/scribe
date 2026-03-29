@@ -4,6 +4,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfHighlight, HighlightRect } from '../../types/annotation';
 import type { CropBox } from '../../types/crop';
 import { PdfHighlightLayer } from './PdfHighlightLayer';
+import { filterTinyRects, mergeRectsOnSameLine } from './rectUtils';
 import styles from './PdfPageView.module.css';
 
 export interface TextSelection {
@@ -48,11 +49,6 @@ export function PdfPageView({
     width: Math.floor(expectedWidth * scale),
     height: Math.floor(expectedHeight * scale),
   });
-  const dimensionsRef = useRef(dimensions);
-  useEffect(() => {
-    dimensionsRef.current = dimensions;
-  }, [dimensions]);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -158,21 +154,26 @@ export function PdfPageView({
     // rects stay normalized to the full (uncropped) page dimensions.
     const coordEl = pageContentRef.current ?? container;
     const pageRect = coordEl.getBoundingClientRect();
-    const { width: pageWidth, height: pageHeight } = dimensionsRef.current;
+    const pw = pageRect.width;
+    const ph = pageRect.height;
 
-    if (pageWidth === 0 || pageHeight === 0) return;
+    if (pw === 0 || ph === 0) return;
 
     const clientRects = range.getClientRects();
-    const rects: HighlightRect[] = [];
+    const rawRects: HighlightRect[] = [];
     for (let i = 0; i < clientRects.length; i++) {
       const cr = clientRects[i];
-      rects.push({
-        x: (cr.left - pageRect.left) / pageWidth,
-        y: (cr.top - pageRect.top) / pageHeight,
-        width: cr.width / pageWidth,
-        height: cr.height / pageHeight,
+      rawRects.push({
+        x: (cr.left - pageRect.left) / pw,
+        y: (cr.top - pageRect.top) / ph,
+        width: cr.width / pw,
+        height: cr.height / ph,
       });
     }
+
+    // Filter out tiny artifact rects and merge overlapping same-line rects
+    // produced by per-span getClientRects().
+    const rects = mergeRectsOnSameLine(filterTinyRects(rawRects));
 
     if (rects.length === 0) return;
 
