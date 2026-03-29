@@ -233,10 +233,13 @@ export function PdfViewerPage() {
 
   // Wrap onPageChange to also capture the precise scroll offset into a ref
   const handlePageChange = useCallback((page: number) => {
+    if (fitWidth) {
+      scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+    }
     setCurrentPage(page);
     const pos = docViewRef.current?.getScrollPosition();
     if (pos) lastScrollPosRef.current = pos;
-  }, []);
+  }, [fitWidth]);
 
   // Helper to build current prefs including precise scroll offset
   const buildPrefs = useCallback(() => {
@@ -477,8 +480,11 @@ export function PdfViewerPage() {
       - (editingNoteId ? editorPanelWidth : 0)
       - 40
     : 0;
-  // Use cropped page width for fit-width calculation so content fills the screen
-  const croppedPageWidth = pageWidth * (1 - crop.left - crop.right);
+  // Use the current page's width so fit-width adapts as the user scrolls
+  const currentPageWidth = pageDimensions.length > 0
+    ? (pageDimensions[currentPage - 1]?.width ?? pageWidth)
+    : pageWidth;
+  const croppedPageWidth = currentPageWidth * (1 - crop.left - crop.right);
   // In two-page view, two pages sit side by side with an 8px gap between them.
   const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / fitWidthPageSpan) : zoom;
