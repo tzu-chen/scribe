@@ -13,6 +13,16 @@
   overflow: hidden;
 }
 
+.pdfArea {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .loadingContainer {
   flex: 1;
   display: flex;

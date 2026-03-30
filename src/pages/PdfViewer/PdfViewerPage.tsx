@@ -561,6 +561,7 @@ export function PdfViewerPage() {
         {showToc && (
           <PdfSidebar outline={outline} onNavigate={handleTocNavigate} />
         )}
+        <div className={styles.pdfArea}>
         <PdfDocumentView
           ref={docViewRef}
           pdfDoc={pdfDoc}
@@ -577,6 +578,16 @@ export function PdfViewerPage() {
           onHighlightClick={handleHighlightClick}
           onPageChange={handlePageChange}
         />
+        <div className={styles.immersiveZone}>
+          <button
+            className={styles.immersiveToggle}
+            onClick={handleImmersiveToggle}
+            title={immersiveMode ? 'Exit immersive mode (Esc)' : 'Enter immersive mode'}
+          >
+            {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
+          </button>
+        </div>
+        </div>
         {showRightPanel && (
           <PdfRightPanel
             highlights={annotations.highlights}
@@ -598,15 +609,6 @@ export function PdfViewerPage() {
             onWidthChange={setEditorPanelWidth}
           />
         )}
-        <div className={styles.immersiveZone}>
-          <button
-            className={styles.immersiveToggle}
-            onClick={handleImmersiveToggle}
-            title={immersiveMode ? 'Exit immersive mode (Esc)' : 'Enter immersive mode'}
-          >
-            {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
-          </button>
-        </div>
       </div>
 
       {cropMode && (
