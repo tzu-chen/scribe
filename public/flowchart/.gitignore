@@ -1,0 +1,5 @@
+# Flowchart HTML files (user-generated content)
+*.html
+
+# Keep integration/theming files and manifest
+!.gitignore
