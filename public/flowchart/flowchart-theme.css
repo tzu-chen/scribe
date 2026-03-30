@@ -39,6 +39,13 @@ html[data-theme="dark"] .c3 .node-div    { background: #6a4080 !important; }
 html[data-theme="dark"] .c3 .node-refs   { color: #a068c8 !important; }
 html[data-theme="dark"] .c3 .node-topics { color: #8a6a98 !important; }
 
+/* ── Stage 3c: warm slate (SPDE computational wing) ── */
+html[data-theme="dark"] .c3c { background: #1e1a14 !important; border-color: #6a5a3a !important; }
+html[data-theme="dark"] .c3c .node-title  { color: #d4b878 !important; }
+html[data-theme="dark"] .c3c .node-div    { background: #6a5a3a !important; }
+html[data-theme="dark"] .c3c .node-refs   { color: #b8a060 !important; }
+html[data-theme="dark"] .c3c .node-topics { color: #9a8a58 !important; }
+
 /* ── Stage 4: slate blue ── */
 html[data-theme="dark"] .c4 { background: #121820 !important; border-color: #3a5880 !important; }
 html[data-theme="dark"] .c4 .node-title  { color: #7aaad8 !important; }

@@ -20,6 +20,12 @@
     '#2a4a70': '#7aaad8',
     '#1a5a50': '#60c8b8',
     '#8a8a80': '#6a6a62',
+    /* SPDE stage/wing label text */
+    '#2a6030': '#80c888',
+    '#1a4a70': '#7aaad8',
+    '#5a4030': '#d4b878',
+    '#6a7a9a': '#8aaac8',
+    '#8a7a60': '#c8b888',
     /* Timeline cell backgrounds */
     '#f6f0e4': '#1e1a10',
     '#f4ebe2': '#1e1610',
@@ -43,8 +49,8 @@
   var entries = [];
 
   function collect() {
-    /* Stage labels that carry an inline color: */
-    document.querySelectorAll('.stage-lbl[style]').forEach(function (el) {
+    /* Stage and wing labels that carry an inline color: */
+    document.querySelectorAll('.stage-lbl[style], .wing-lbl[style]').forEach(function (el) {
       var v = el.style.color;
       if (v) entries.push({ el: el, prop: 'color', light: v });
     });
