@@ -133,7 +133,14 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       wrappers.forEach(el => observer.observe(el));
 
       return () => observer.disconnect();
-    }, [numPages, onPageChange, scale, twoPageView]);
+      // Note: `scale` is intentionally excluded.  IntersectionObserver
+      // auto-recalculates when observed elements resize (zoom changes page
+      // element sizes), so tearing down and recreating the observer on every
+      // scale change is unnecessary.  Including it caused an infinite loop
+      // when fit-width mode adapts zoom per-page: scale change → observer
+      // recreates and fires immediately → detects different first-visible
+      // page → currentPage changes → scale changes → repeat.
+    }, [numPages, onPageChange, twoPageView]);
 
     const isPageVisible = useCallback(
       (page: number) => page >= visibleRange.start && page <= visibleRange.end,

@@ -231,15 +231,17 @@ export function PdfViewerPage() {
     scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
   }, [pdfDoc, loading, attachmentId]);
 
-  // Wrap onPageChange to also capture the precise scroll offset into a ref
+  // Wrap onPageChange to also capture the precise scroll offset into a ref.
+  // NOTE: Do NOT save scrollPositionToRestoreRef here — that ref is reserved
+  // for explicit user actions (panel toggles, zoom changes, etc.).  Saving it
+  // on every scroll-triggered page change creates an infinite loop when
+  // fit-width is on and adjacent pages have different widths: page change →
+  // effectiveZoom change → scroll restore → different page detected → repeat.
   const handlePageChange = useCallback((page: number) => {
-    if (fitWidth) {
-      scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
-    }
     setCurrentPage(page);
     const pos = docViewRef.current?.getScrollPosition();
     if (pos) lastScrollPosRef.current = pos;
-  }, [fitWidth]);
+  }, []);
 
   // Helper to build current prefs including precise scroll offset
   const buildPrefs = useCallback(() => {
