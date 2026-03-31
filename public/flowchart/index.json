@@ -1,10 +1,47 @@
 {
   "flowcharts": [
     {
+      "id": "condensed",
+      "name": "Condensed Mathematics — Study Roadmap",
+      "filename": "condensed.html"
+    },
+    {
       "id": "flowchart-interactive",
       "name": "From Analysis to Stochastic Frontiers",
       "filename": "flowchart-interactive.html",
       "description": "A study roadmap covering analysis, probability, PDEs, stochastic calculus, and research frontiers"
+    },
+    {
+      "id": "hyperfunctions",
+      "name": "Hyperfunctions — Study Roadmap",
+      "filename": "hyperfunctions.html"
+    },
+    {
+      "id": "macroeconomics",
+      "name": "Macroeconomics Study Roadmap — Toward Romer's Advanced Macroeconomics",
+      "filename": "macroeconomics.html"
+    },
+    {
+      "id": "pde",
+      "name": "PDE Study Roadmap — Prerequisites to Frontier Research",
+      "filename": "pde.html"
+    },
+    {
+      "id": "spde",
+      "name": "SPDE Research Frontiers — Interactive Roadmap",
+      "filename": "spde.html"
+    },
+    {
+      "id": "stochastic",
+      "name": "From Analysis to Stochastic Frontiers",
+      "filename": "stochastic.html",
+      "description": "A study roadmap covering analysis, probability, PDEs, stochastic calculus, and research frontiers"
+    },
+    {
+      "id": "transformer",
+      "name": "Transformers — A Research Roadmap",
+      "filename": "transformer.html",
+      "description": "From sequence modelling foundations to frontier architectures"
     },
     {
       "id": "transformers-flowchart",

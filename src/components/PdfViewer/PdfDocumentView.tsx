@@ -26,7 +26,10 @@ export interface PdfDocumentViewHandle {
   getScrollPosition: () => { page: number; offsetTop: number } | null;
 }
 
-const BUFFER = 2;
+// Reduce buffer on touch/mobile devices to limit canvas memory usage.
+// 3 pages (BUFFER=1) is sufficient for smooth touch scrolling; desktop
+// benefits from the extra buffer for fast wheel/keyboard scrolling.
+const BUFFER = ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 1 : 2;
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(

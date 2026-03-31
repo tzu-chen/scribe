@@ -69,6 +69,11 @@ export function PdfViewerPage() {
   const [containerWidth, setContainerWidth] = useState(0);
   const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
   const prevEffectiveZoomRef = useRef<number>(0);
+  // Locked page width used for fit-width zoom — captured at toggle time so
+  // effectiveZoom doesn't change as the user scrolls across pages.
+  const fitWidthRefPageWidth = useRef<number>(pageWidth);
+  // Flag to suppress ResizeObserver scroll-position saves during zoom-induced resizes
+  const isZoomResizeRef = useRef(false);
   const prevTwoPageViewRef = useRef(twoPageView);
   const currentPageRef = useRef(currentPage);
   // Cached scroll position, updated on page changes — used as fallback when
@@ -103,6 +108,7 @@ export function PdfViewerPage() {
       offsetTop: prefs?.scrollOffsetTop ?? 0,
     };
     prevEffectiveZoomRef.current = 0;
+    // fitWidthRefPageWidth will be set once pageDimensions are available
   }, [attachmentId]);
 
   // Sync immersive mode with document attribute (hides Layout header via global CSS)
@@ -138,7 +144,11 @@ export function PdfViewerPage() {
     if (!el) return;
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
-        scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+        // Don't capture scroll position during zoom-induced resizes — the
+        // position would be stale and feed back into the restoration loop.
+        if (!isZoomResizeRef.current) {
+          scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+        }
         setContainerWidth(entry.contentRect.width);
       }
     });
@@ -230,6 +240,14 @@ export function PdfViewerPage() {
     }
     scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
   }, [pdfDoc, loading, attachmentId]);
+
+  // Once pageDimensions are available, initialize the fit-width reference width
+  // based on the saved/current page so restored fit-width prefs work correctly.
+  useEffect(() => {
+    if (pageDimensions.length === 0 || !fitWidth) return;
+    fitWidthRefPageWidth.current = pageDimensions[currentPage - 1]?.width ?? pageWidth;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run when dimensions first load
+  }, [pageDimensions.length > 0]);
 
   // Wrap onPageChange to also capture the precise scroll offset into a ref.
   // NOTE: Do NOT save scrollPositionToRestoreRef here — that ref is reserved
@@ -345,8 +363,14 @@ export function PdfViewerPage() {
 
   const handleFitWidthToggle = useCallback(() => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
-    setFitWidth(prev => !prev);
-  }, []);
+    setFitWidth(prev => {
+      const next = !prev;
+      if (next) {
+        fitWidthRefPageWidth.current = pageDimensions[currentPage - 1]?.width ?? pageWidth;
+      }
+      return next;
+    });
+  }, [pageDimensions, currentPage, pageWidth]);
 
   const handleTwoPageViewToggle = useCallback(() => {
     setTwoPageView(prev => !prev);
@@ -482,10 +506,9 @@ export function PdfViewerPage() {
       - (editingNoteId ? editorPanelWidth : 0)
       - 40
     : 0;
-  // Use the current page's width so fit-width adapts as the user scrolls
-  const currentPageWidth = pageDimensions.length > 0
-    ? (pageDimensions[currentPage - 1]?.width ?? pageWidth)
-    : pageWidth;
+  // Use the locked page width captured at fit-width toggle time so
+  // effectiveZoom doesn't change as the user scrolls across pages.
+  const currentPageWidth = fitWidth ? fitWidthRefPageWidth.current : pageWidth;
   const croppedPageWidth = currentPageWidth * (1 - crop.left - crop.right);
   // In two-page view, two pages sit side by side with an 8px gap between them.
   const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
@@ -501,7 +524,13 @@ export function PdfViewerPage() {
     const pos = scrollPositionToRestoreRef.current;
     scrollPositionToRestoreRef.current = null;
     if (pos) {
+      // Suppress ResizeObserver scroll-position saves while zoom-induced
+      // layout changes propagate, to prevent a stale-position feedback loop.
+      isZoomResizeRef.current = true;
       docViewRef.current?.scrollToPage(pos.page, pos.offsetTop, 'instant');
+      requestAnimationFrame(() => {
+        isZoomResizeRef.current = false;
+      });
     }
   }, [effectiveZoom]);
 

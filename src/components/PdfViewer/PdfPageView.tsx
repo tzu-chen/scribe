@@ -56,7 +56,8 @@ export function PdfPageView({
       const page = await pdfDoc.getPage(pageNumber);
       if (cancelled) return;
 
-      const dpr = window.devicePixelRatio || 1;
+      // Cap DPR to 2 to limit canvas memory on 3x displays (iPad Pro)
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       // CSS-size viewport (for display dimensions and text layer)
       const viewport = page.getViewport({ scale });
       // High-res viewport for sharp canvas rendering on HiDPI displays
@@ -65,6 +66,11 @@ export function PdfPageView({
       const canvas = canvasRef.current;
       const textLayerDiv = textLayerRef.current;
       if (!canvas || !textLayerDiv) return;
+
+      // Release old backing buffer before allocating new one to prevent
+      // transient double-allocation that exhausts WebKit canvas memory.
+      canvas.width = 0;
+      canvas.height = 0;
 
       // Set actual canvas pixel dimensions (high-res for sharp rendering)
       canvas.width = Math.floor(renderViewport.width);
@@ -124,12 +130,23 @@ export function PdfPageView({
       }
     };
 
-    renderPage();
+    // Debounce render to batch rapid scale/visibility changes during fast
+    // scroll or zoom gestures, preventing excessive concurrent canvas allocations.
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) renderPage();
+    }, 50);
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       renderTaskRef.current?.cancel();
       textLayerInstanceRef.current?.cancel();
+      // Release canvas memory explicitly so WebKit frees the backing buffer
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
     };
   }, [pdfDoc, pageNumber, scale]);
 
