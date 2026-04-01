@@ -13,10 +13,11 @@ export const attachmentStorage = {
     return res.json();
   },
 
-  async add(subject: string, file: File): Promise<AttachmentMeta> {
+  async add(subject: string, file: File, folderId?: string | null): Promise<AttachmentMeta> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('subject', subject);
+    if (folderId) formData.append('folder_id', folderId);
     const res = await fetch('/api/attachments', {
       method: 'POST',
       body: formData,
@@ -63,6 +64,15 @@ export const attachmentStorage = {
       body: JSON.stringify({ filename }),
     });
     if (!res.ok) throw new Error(`Failed to rename attachment: ${res.status}`);
+  },
+
+  async moveToFolder(id: string, folderId: string | null): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId }),
+    });
+    if (!res.ok) throw new Error(`Failed to move attachment: ${res.status}`);
   },
 
   async markOpened(id: string): Promise<void> {

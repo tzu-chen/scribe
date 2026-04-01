@@ -18,6 +18,7 @@ interface AttachmentRow {
   file_path: string;
   created_at: string;
   last_opened_at: string | null;
+  folder_id: string | null;
 }
 
 function rowToMeta(row: AttachmentRow) {
@@ -29,6 +30,7 @@ function rowToMeta(row: AttachmentRow) {
     size: row.size,
     createdAt: row.created_at,
     lastOpenedAt: row.last_opened_at ?? undefined,
+    folderId: row.folder_id ?? undefined,
   };
 }
 
@@ -72,12 +74,13 @@ router.post('/', upload.single('file'), (req, res) => {
   fs.renameSync(file.path, storedPath);
 
   const subject = (req.body.subject as string) ?? '';
+  const folderId = (req.body.folder_id as string) || null;
   const now = new Date().toISOString();
 
   db.prepare(`
-    INSERT INTO attachments (id, subject, filename, type, size, file_path, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, subject, file.originalname, file.mimetype, file.size, storedFilename, now);
+    INSERT INTO attachments (id, subject, filename, type, size, file_path, created_at, folder_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, subject, file.originalname, file.mimetype, file.size, storedFilename, now, folderId);
 
   res.json({
     id,
@@ -86,6 +89,7 @@ router.post('/', upload.single('file'), (req, res) => {
     type: file.mimetype,
     size: file.size,
     createdAt: now,
+    folderId: folderId ?? undefined,
   });
 });
 
@@ -131,6 +135,13 @@ router.patch('/:id/filename', (req, res) => {
 router.patch('/:id/last-opened', (req, res) => {
   const now = new Date().toISOString();
   db.prepare('UPDATE attachments SET last_opened_at = ? WHERE id = ?').run(now, req.params.id);
+  res.json({ ok: true });
+});
+
+// PATCH /api/attachments/:id/folder
+router.patch('/:id/folder', (req, res) => {
+  const { folderId } = req.body;
+  db.prepare('UPDATE attachments SET folder_id = ? WHERE id = ?').run(folderId ?? null, req.params.id);
   res.json({ ok: true });
 });
 

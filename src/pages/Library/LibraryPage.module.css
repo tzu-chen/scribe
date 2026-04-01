@@ -79,18 +79,132 @@
   pointer-events: none;
 }
 
+/* Layout: sidebar + content */
+.layout {
+  display: flex;
+  gap: var(--spacing-lg);
+}
+
+.sidebar {
+  width: 160px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--spacing-xs);
+}
+
+.sidebarItem {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarItem:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.sidebarItemActive {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.sidebarItemActive:hover {
+  background: var(--color-primary-light);
+}
+
+.sidebarRenameInput {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.8125rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.newFolderBtn {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  margin-top: var(--spacing-sm);
+  transition: background 0.1s, color 0.1s;
+}
+
+.newFolderBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Search row */
 .searchRow {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.selectToggleBtn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.selectToggleBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.selectToggleActive {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.selectToggleActive:hover {
+  background: var(--color-primary-light);
 }
 
 /* Card grid layout */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--spacing-md);
 }
 
 .card {
+  position: relative;
   background: var(--color-surface);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg);
@@ -111,6 +225,31 @@
 .card:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.cardSelected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.cardCheckbox {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cardCheckbox:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z'/%3E%3C/svg%3E");
 }
 
 .cardTitle {
@@ -144,28 +283,15 @@
   font-style: italic;
 }
 
-.deleteBtn {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  align-self: flex-end;
-  cursor: pointer;
+/* Wrapper for list area */
+.listArea {
 }
 
-.deleteBtn:hover {
-  color: var(--color-danger, #e53e3e);
-  background: var(--color-bg);
-}
-
-/* Bulk toolbar */
-.bulkToolbar {
+/* Toolbar row: select button + bulk actions */
+.toolbarRow {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-primary-light);
-  border-radius: var(--radius-md);
   margin-bottom: var(--spacing-md);
 }
 
@@ -174,6 +300,20 @@
   font-weight: 500;
   color: var(--color-text);
   margin-right: auto;
+}
+
+.bulkMoveBtn {
+  font-size: 0.8125rem;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.bulkMoveBtn:hover {
+  background: var(--color-bg);
 }
 
 .bulkDeleteBtn {
@@ -251,8 +391,20 @@
 }
 
 .checkbox {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   cursor: pointer;
-  accent-color: var(--color-primary);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.checkbox:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z'/%3E%3C/svg%3E");
 }
 
 .listRow {
@@ -301,30 +453,6 @@
   white-space: nowrap;
 }
 
-.listActionsCell {
-  padding: var(--spacing-sm) var(--spacing-md);
-  white-space: nowrap;
-}
-
-.listActionBtn {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  background: none;
-  border: none;
-}
-
-.listActionBtn:hover {
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-
-.listDeleteBtn:hover {
-  color: var(--color-danger, #e53e3e);
-}
-
 .renameInput {
   width: 100%;
   padding: 2px 6px;
@@ -359,6 +487,27 @@
 }
 
 @media (max-width: 640px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    padding-top: 0;
+  }
+
+  .sidebarItem {
+    width: auto;
+  }
+
+  .newFolderBtn {
+    width: auto;
+    margin-top: 0;
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }

@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SearchBar } from '../../components/SearchBar/SearchBar';
+import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
+import type { ContextMenuItem } from '../../components/ContextMenu/ContextMenu';
 import { attachmentStorage } from '../../services/attachmentStorage';
+import { folderStorage } from '../../services/folderStorage';
 import type { AttachmentMeta } from '../../types/attachment';
+import type { Folder } from '../../types/folder';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import styles from './LibraryPage.module.css';
 
@@ -34,6 +38,7 @@ function getFileExtension(filename: string): string {
 export function LibraryPage() {
   const navigate = useNavigate();
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,9 +51,24 @@ export function LibraryPage() {
   const [sortField, setSortField] = useState<SortField>('lastOpened');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Folder state
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameFolderValue, setRenameFolderValue] = useState('');
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
+  const renameFolderInputRef = useRef<HTMLInputElement>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; book: AttachmentMeta } | null>(null);
+  const [folderContextMenu, setFolderContextMenu] = useState<{ x: number; y: number; folder: Folder } | null>(null);
+  const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
 
   const loadBooks = useCallback(async () => {
     try {
@@ -63,9 +83,19 @@ export function LibraryPage() {
     }
   }, []);
 
+  const loadFolders = useCallback(async () => {
+    try {
+      const all = await folderStorage.getAll();
+      setFolders(all);
+    } catch (err) {
+      console.error('Failed to load folders:', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
-  }, [loadBooks]);
+    loadFolders();
+  }, [loadBooks, loadFolders]);
 
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode);
@@ -78,15 +108,30 @@ export function LibraryPage() {
     }
   }, [renamingId]);
 
+  useEffect(() => {
+    if (creatingFolder && newFolderInputRef.current) {
+      newFolderInputRef.current.focus();
+    }
+  }, [creatingFolder]);
+
+  useEffect(() => {
+    if (renamingFolderId && renameFolderInputRef.current) {
+      renameFolderInputRef.current.focus();
+      renameFolderInputRef.current.select();
+    }
+  }, [renamingFolderId]);
+
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      await attachmentStorage.add('', file);
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      for (const file of Array.from(files)) {
+        await attachmentStorage.add('', file, currentFolderId);
+      }
       await loadBooks();
       e.target.value = '';
     },
-    [loadBooks],
+    [loadBooks, currentFolderId],
   );
 
   const handleOpen = useCallback(
@@ -106,8 +151,7 @@ export function LibraryPage() {
   );
 
   const handleDelete = useCallback(
-    async (e: React.MouseEvent, id: string) => {
-      e.stopPropagation();
+    async (id: string) => {
       await attachmentStorage.delete(id);
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -143,6 +187,13 @@ export function LibraryPage() {
     setSelectedIds(new Set());
   }, []);
 
+  const toggleSelectMode = useCallback(() => {
+    setSelectMode(prev => {
+      if (prev) setSelectedIds(new Set());
+      return !prev;
+    });
+  }, []);
+
   const startRename = useCallback((book: AttachmentMeta) => {
     setRenamingId(book.id);
     setRenameValue(book.filename);
@@ -175,11 +226,81 @@ export function LibraryPage() {
     });
   }, []);
 
-  const filteredBooks = searchQuery
-    ? books.filter(b =>
+  // Folder handlers
+  const handleCreateFolder = useCallback(async () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed) {
+      setCreatingFolder(false);
+      setNewFolderName('');
+      return;
+    }
+    await folderStorage.create(trimmed);
+    await loadFolders();
+    setCreatingFolder(false);
+    setNewFolderName('');
+  }, [newFolderName, loadFolders]);
+
+  const startRenameFolder = useCallback((folder: Folder) => {
+    setRenamingFolderId(folder.id);
+    setRenameFolderValue(folder.name);
+  }, []);
+
+  const commitRenameFolder = useCallback(async () => {
+    if (!renamingFolderId) return;
+    const trimmed = renameFolderValue.trim();
+    if (trimmed && trimmed !== folders.find(f => f.id === renamingFolderId)?.name) {
+      await folderStorage.rename(renamingFolderId, trimmed);
+      await loadFolders();
+    }
+    setRenamingFolderId(null);
+    setRenameFolderValue('');
+  }, [renamingFolderId, renameFolderValue, folders, loadFolders]);
+
+  const cancelRenameFolder = useCallback(() => {
+    setRenamingFolderId(null);
+    setRenameFolderValue('');
+  }, []);
+
+  const handleDeleteFolder = useCallback(async (folderId: string) => {
+    await folderStorage.delete(folderId);
+    if (currentFolderId === folderId) setCurrentFolderId(null);
+    await loadFolders();
+    await loadBooks();
+  }, [currentFolderId, loadFolders, loadBooks]);
+
+  const handleMoveToFolder = useCallback(async (bookIds: string[], folderId: string | null) => {
+    await Promise.all(bookIds.map(id => attachmentStorage.moveToFolder(id, folderId)));
+    await loadBooks();
+    setMoveMenu(null);
+  }, [loadBooks]);
+
+  // Context menu for books
+  const openBookContextMenu = useCallback((e: React.MouseEvent, book: AttachmentMeta) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, book });
+    setFolderContextMenu(null);
+    setMoveMenu(null);
+  }, []);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeFolderContextMenu = useCallback(() => setFolderContextMenu(null), []);
+  const closeMoveMenu = useCallback(() => setMoveMenu(null), []);
+
+  // Filtered and sorted books
+  const filteredBooks = useMemo(() => {
+    let result = books;
+    if (currentFolderId) {
+      result = result.filter(b => b.folderId === currentFolderId);
+    } else {
+      result = result.filter(b => !b.folderId);
+    }
+    if (searchQuery) {
+      result = result.filter(b =>
         b.filename.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : books;
+      );
+    }
+    return result;
+  }, [books, currentFolderId, searchQuery]);
 
   const sortedBooks = useMemo(() => {
     const sorted = [...filteredBooks].sort((a, b) => {
@@ -205,6 +326,41 @@ export function LibraryPage() {
 
   const allFilteredIds = sortedBooks.map(b => b.id);
   const allSelected = sortedBooks.length > 0 && selectedIds.size === sortedBooks.length && sortedBooks.every(b => selectedIds.has(b.id));
+
+  // Build context menu items for a book
+  const bookContextMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!contextMenu) return [];
+    const items: ContextMenuItem[] = [
+      { label: 'Rename', onClick: () => startRename(contextMenu.book) },
+    ];
+    if (folders.length > 0) {
+      items.push({
+        label: 'Move to folder...',
+        onClick: () => {
+          setMoveMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: [contextMenu.book.id] });
+        },
+      });
+    }
+    if (contextMenu.book.folderId) {
+      items.push({
+        label: 'Remove from folder',
+        onClick: () => handleMoveToFolder([contextMenu.book.id], null),
+      });
+    }
+    items.push({ label: 'Delete', onClick: () => handleDelete(contextMenu.book.id), danger: true });
+    return items;
+  }, [contextMenu, folders, startRename, handleMoveToFolder, handleDelete]);
+
+  // Build move menu items
+  const moveMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!moveMenu) return [];
+    const items: ContextMenuItem[] = folders.map(f => ({
+      label: f.name,
+      onClick: () => handleMoveToFolder(moveMenu.bookIds, f.id),
+    }));
+    items.push({ label: 'No folder', onClick: () => handleMoveToFolder(moveMenu.bookIds, null) });
+    return items;
+  }, [moveMenu, folders, handleMoveToFolder]);
 
   if (loading) {
     return (
@@ -274,183 +430,306 @@ export function LibraryPage() {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             className={styles.hiddenInput}
             onChange={handleUpload}
           />
         </div>
       </div>
 
-      {books.length > 0 && (
-        <div className={styles.searchRow}>
-          <SearchBar value={searchQuery} onChange={setSearchQuery} />
-        </div>
-      )}
-
-      {selectedIds.size > 0 && viewMode === 'list' && (
-        <div className={styles.bulkToolbar}>
-          <span className={styles.bulkCount}>{selectedIds.size} selected</span>
-          <button className={styles.bulkDeleteBtn} onClick={handleDeleteSelected}>
-            Delete selected
+      <div className={styles.layout}>
+        {/* Folder sidebar */}
+        <nav className={styles.sidebar}>
+          <button
+            className={`${styles.sidebarItem} ${currentFolderId === null ? styles.sidebarItemActive : ''}`}
+            onClick={() => setCurrentFolderId(null)}
+          >
+            All
           </button>
-          <button className={styles.bulkDeselectBtn} onClick={handleDeselectAll}>
-            Deselect all
-          </button>
-        </div>
-      )}
-
-      {sortedBooks.length === 0 ? (
-        <div className={styles.empty}>
-          {books.length === 0 ? (
-            <>
-              <p className={styles.emptyTitle}>No books yet</p>
-              <p className={styles.emptyText}>
-                Upload your first book to get started.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className={styles.emptyTitle}>No matching books</p>
-              <p className={styles.emptyText}>
-                Try adjusting your search.
-              </p>
-            </>
-          )}
-        </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.grid}>
-          {sortedBooks.map(book => (
-            <article
-              key={book.id}
-              className={styles.card}
-              onClick={e => handleOpen(book, e.ctrlKey || e.metaKey)}
-              onAuxClick={e => {
-                if (e.button === 1) handleOpen(book, true);
-              }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleOpen(book);
-              }}
-            >
-              <div className={styles.cardTitle}>{book.filename}</div>
-              <div className={styles.cardMeta}>
-                <span className={styles.cardSize}>
-                  {formatFileSize(book.size)}
-                </span>
-                <span className={styles.cardDate}>
-                  {formatDate(book.createdAt)}
-                </span>
-              </div>
-              {book.subject && (
-                <div className={styles.cardSubject}>{book.subject}</div>
-              )}
-              <button
-                className={styles.deleteBtn}
-                onClick={e => handleDelete(e, book.id)}
-                title="Remove from library"
-              >
-                Remove
-              </button>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className={styles.listContainer}>
-          <table className={styles.listTable}>
-            <thead>
-              <tr className={styles.listHeaderRow}>
-                <th className={styles.listCheckboxCol}>
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={() => allSelected ? handleDeselectAll() : handleSelectAll(allFilteredIds)}
-                    className={styles.checkbox}
-                  />
-                </th>
-                <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>
-                  Name{sortIndicator('name')}
-                </th>
-                <th className={styles.listHeaderCell}>Type</th>
-                <th className={styles.listHeaderCell} onClick={() => handleSort('size')}>
-                  Size{sortIndicator('size')}
-                </th>
-                <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>
-                  Uploaded{sortIndicator('uploaded')}
-                </th>
-                <th className={styles.listHeaderCell} onClick={() => handleSort('lastOpened')}>
-                  Last Opened{sortIndicator('lastOpened')}
-                </th>
-                <th className={styles.listHeaderCell}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedBooks.map(book => (
-                <tr
-                  key={book.id}
-                  className={`${styles.listRow} ${selectedIds.has(book.id) ? styles.listRowSelected : ''}`}
+          {folders.map(folder => (
+            <div key={folder.id}>
+              {renamingFolderId === folder.id ? (
+                <input
+                  ref={renameFolderInputRef}
+                  className={styles.sidebarRenameInput}
+                  value={renameFolderValue}
+                  onChange={e => setRenameFolderValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitRenameFolder();
+                    if (e.key === 'Escape') cancelRenameFolder();
+                  }}
+                  onBlur={commitRenameFolder}
+                />
+              ) : (
+                <button
+                  className={`${styles.sidebarItem} ${currentFolderId === folder.id ? styles.sidebarItemActive : ''}`}
+                  onClick={() => setCurrentFolderId(folder.id)}
+                  onContextMenu={e => {
+                    e.preventDefault();
+                    setFolderContextMenu({ x: e.clientX, y: e.clientY, folder });
+                    setContextMenu(null);
+                    setMoveMenu(null);
+                  }}
                 >
-                  <td className={styles.listCheckboxCol}>
+                  {folder.name}
+                </button>
+              )}
+            </div>
+          ))}
+          {creatingFolder ? (
+            <input
+              ref={newFolderInputRef}
+              className={styles.sidebarRenameInput}
+              value={newFolderName}
+              placeholder="Folder name"
+              onChange={e => setNewFolderName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCreateFolder();
+                if (e.key === 'Escape') {
+                  setCreatingFolder(false);
+                  setNewFolderName('');
+                }
+              }}
+              onBlur={handleCreateFolder}
+            />
+          ) : (
+            <button
+              className={styles.newFolderBtn}
+              onClick={() => setCreatingFolder(true)}
+            >
+              + New Folder
+            </button>
+          )}
+        </nav>
+
+        {/* Main content */}
+        <div className={styles.content}>
+          {books.length > 0 && (
+            <div className={styles.searchRow}>
+              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            </div>
+          )}
+
+          {books.length > 0 && (
+            <div className={styles.toolbarRow}>
+              <button
+                className={`${styles.selectToggleBtn} ${selectMode ? styles.selectToggleActive : ''}`}
+                onClick={toggleSelectMode}
+              >
+                {selectMode ? 'Cancel' : 'Select'}
+              </button>
+              {selectMode && selectedIds.size > 0 && (
+                <>
+                  <span className={styles.bulkCount}>{selectedIds.size} selected</span>
+                  {folders.length > 0 && (
+                    <button
+                      className={styles.bulkMoveBtn}
+                      onClick={e => setMoveMenu({ x: e.clientX, y: e.clientY, bookIds: Array.from(selectedIds) })}
+                    >
+                      Move to folder
+                    </button>
+                  )}
+                  <button className={styles.bulkDeleteBtn} onClick={handleDeleteSelected}>
+                    Delete selected
+                  </button>
+                  <button className={styles.bulkDeselectBtn} onClick={handleDeselectAll}>
+                    Deselect all
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className={styles.listArea}>
+          {sortedBooks.length === 0 ? (
+            <div className={styles.empty}>
+              {books.length === 0 ? (
+                <>
+                  <p className={styles.emptyTitle}>No books yet</p>
+                  <p className={styles.emptyText}>
+                    Upload your first book to get started.
+                  </p>
+                </>
+              ) : filteredBooks.length === 0 && currentFolderId && !searchQuery ? (
+                <>
+                  <p className={styles.emptyTitle}>This folder is empty</p>
+                  <p className={styles.emptyText}>
+                    Right-click a book and choose &quot;Move to folder&quot; to add books here.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className={styles.emptyTitle}>No matching books</p>
+                  <p className={styles.emptyText}>
+                    Try adjusting your search.
+                  </p>
+                </>
+              )}
+            </div>
+          ) : viewMode === 'card' ? (
+            <div className={styles.grid}>
+              {sortedBooks.map(book => (
+                <article
+                  key={book.id}
+                  className={`${styles.card} ${selectMode && selectedIds.has(book.id) ? styles.cardSelected : ''}`}
+                  onClick={e => {
+                    if (selectMode) {
+                      handleToggleSelect(book.id);
+                    } else {
+                      handleOpen(book, e.ctrlKey || e.metaKey);
+                    }
+                  }}
+                  onAuxClick={e => {
+                    if (e.button === 1 && !selectMode) handleOpen(book, true);
+                  }}
+                  onContextMenu={e => openBookContextMenu(e, book)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !selectMode) handleOpen(book);
+                  }}
+                >
+                  {selectMode && (
                     <input
                       type="checkbox"
                       checked={selectedIds.has(book.id)}
                       onChange={() => handleToggleSelect(book.id)}
-                      className={styles.checkbox}
+                      className={styles.cardCheckbox}
+                      onClick={e => e.stopPropagation()}
                     />
-                  </td>
-                  <td
-                    className={styles.listNameCell}
-                    onClick={e => {
-                      if (renamingId !== book.id) handleOpen(book, e.ctrlKey || e.metaKey);
-                    }}
-                    onDoubleClick={e => {
-                      e.stopPropagation();
-                      startRename(book);
-                    }}
-                  >
-                    {renamingId === book.id ? (
-                      <input
-                        ref={renameInputRef}
-                        className={styles.renameInput}
-                        value={renameValue}
-                        onChange={e => setRenameValue(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') commitRename();
-                          if (e.key === 'Escape') cancelRename();
-                        }}
-                        onBlur={commitRename}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span className={styles.listFileName}>{book.filename}</span>
-                    )}
-                  </td>
-                  <td className={styles.listCell}>{getFileExtension(book.filename)}</td>
-                  <td className={styles.listCell}>{formatFileSize(book.size)}</td>
-                  <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
-                  <td className={styles.listCell}>
-                    {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
-                  </td>
-                  <td className={styles.listActionsCell}>
-                    <button
-                      className={styles.listActionBtn}
-                      onClick={() => startRename(book)}
-                      title="Rename"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      className={`${styles.listActionBtn} ${styles.listDeleteBtn}`}
-                      onClick={e => handleDelete(e, book.id)}
-                      title="Remove from library"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
+                  )}
+                  <div className={styles.cardTitle}>{book.filename}</div>
+                  <div className={styles.cardMeta}>
+                    <span className={styles.cardSize}>
+                      {formatFileSize(book.size)}
+                    </span>
+                    <span className={styles.cardDate}>
+                      {formatDate(book.createdAt)}
+                    </span>
+                  </div>
+                  {book.subject && (
+                    <div className={styles.cardSubject}>{book.subject}</div>
+                  )}
+                </article>
               ))}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <div className={styles.listContainer}>
+              <table className={styles.listTable}>
+                <thead>
+                  <tr className={styles.listHeaderRow}>
+                    {selectMode && (
+                      <th className={styles.listCheckboxCol}>
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={() => allSelected ? handleDeselectAll() : handleSelectAll(allFilteredIds)}
+                          className={styles.checkbox}
+                        />
+                      </th>
+                    )}
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>
+                      Name{sortIndicator('name')}
+                    </th>
+                    <th className={styles.listHeaderCell}>Type</th>
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('size')}>
+                      Size{sortIndicator('size')}
+                    </th>
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>
+                      Uploaded{sortIndicator('uploaded')}
+                    </th>
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('lastOpened')}>
+                      Last Opened{sortIndicator('lastOpened')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedBooks.map(book => (
+                    <tr
+                      key={book.id}
+                      className={`${styles.listRow} ${selectedIds.has(book.id) ? styles.listRowSelected : ''}`}
+                      onContextMenu={e => openBookContextMenu(e, book)}
+                    >
+                      {selectMode && (
+                        <td className={styles.listCheckboxCol}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(book.id)}
+                            onChange={() => handleToggleSelect(book.id)}
+                            className={styles.checkbox}
+                          />
+                        </td>
+                      )}
+                      <td
+                        className={styles.listNameCell}
+                        onClick={e => {
+                          if (selectMode) {
+                            handleToggleSelect(book.id);
+                          } else if (renamingId !== book.id) {
+                            handleOpen(book, e.ctrlKey || e.metaKey);
+                          }
+                        }}
+                      >
+                        {renamingId === book.id ? (
+                          <input
+                            ref={renameInputRef}
+                            className={styles.renameInput}
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') commitRename();
+                              if (e.key === 'Escape') cancelRename();
+                            }}
+                            onBlur={commitRename}
+                            onClick={e => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className={styles.listFileName}>{book.filename}</span>
+                        )}
+                      </td>
+                      <td className={styles.listCell}>{getFileExtension(book.filename)}</td>
+                      <td className={styles.listCell}>{formatFileSize(book.size)}</td>
+                      <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
+                      <td className={styles.listCell}>
+                        {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          </div>
         </div>
+      </div>
+
+      {/* Context menus */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={bookContextMenuItems}
+          onClose={closeContextMenu}
+        />
+      )}
+      {folderContextMenu && (
+        <ContextMenu
+          x={folderContextMenu.x}
+          y={folderContextMenu.y}
+          items={[
+            { label: 'Rename', onClick: () => startRenameFolder(folderContextMenu.folder) },
+            { label: 'Delete folder', onClick: () => handleDeleteFolder(folderContextMenu.folder.id), danger: true },
+          ]}
+          onClose={closeFolderContextMenu}
+        />
+      )}
+      {moveMenu && (
+        <ContextMenu
+          x={moveMenu.x}
+          y={moveMenu.y}
+          items={moveMenuItems}
+          onClose={closeMoveMenu}
+        />
       )}
     </div>
   );

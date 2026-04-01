@@ -7,6 +7,7 @@ export interface Attachment {
   data: Blob;
   createdAt: string;
   lastOpenedAt?: string;
+  folderId?: string;
 }
 
 export interface AttachmentMeta {
@@ -17,4 +18,5 @@ export interface AttachmentMeta {
   size: number;
   createdAt: string;
   lastOpenedAt?: string;
+  folderId?: string;
 }

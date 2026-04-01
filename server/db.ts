@@ -32,6 +32,12 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS folders (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS attachments (
     id TEXT PRIMARY KEY,
     subject TEXT NOT NULL DEFAULT '',
@@ -40,7 +46,8 @@ db.exec(`
     size INTEGER NOT NULL,
     file_path TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    last_opened_at TEXT
+    last_opened_at TEXT,
+    folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL
   );
   CREATE INDEX IF NOT EXISTS idx_attachments_subject ON attachments(subject);
 
@@ -109,5 +116,14 @@ if (!vpColumns.some(c => c.name === 'crop_top')) {
     ALTER TABLE viewer_prefs ADD COLUMN crop_left REAL NOT NULL DEFAULT 0;
   `);
 }
+
+// Migration: add folder_id column to attachments if missing
+const attColumns = db.prepare("PRAGMA table_info(attachments)").all() as Array<{ name: string }>;
+if (!attColumns.some(c => c.name === 'folder_id')) {
+  db.exec('ALTER TABLE attachments ADD COLUMN folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL');
+}
+
+// Create index after migration ensures folder_id column exists
+db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_folder ON attachments(folder_id)');
 
 export { db, ATTACHMENTS_DIR };

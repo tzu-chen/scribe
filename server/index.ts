@@ -7,6 +7,7 @@ import attachmentsRouter from './routes/attachments.ts';
 import annotationsRouter from './routes/annotations.ts';
 import readingTimeRouter from './routes/readingTime.ts';
 import viewerPrefsRouter from './routes/viewerPrefs.ts';
+import foldersRouter from './routes/folders.ts';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
@@ -38,6 +39,7 @@ app.use('/api/attachments', attachmentsRouter);
 app.use('/api/annotations', annotationsRouter);
 app.use('/api/reading-time', readingTimeRouter);
 app.use('/api/viewer-prefs', viewerPrefsRouter);
+app.use('/api/folders', foldersRouter);
 
 // --- Static Frontend (production) ---
 if (fs.existsSync(DIST_DIR)) {
