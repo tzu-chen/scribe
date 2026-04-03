@@ -7,7 +7,7 @@ import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useNotes } from '../../hooks/useNotes';
 import type { CropBox } from '../../types/crop';
 import { NO_CROP, hasCrop } from '../../types/crop';
-import { ArrowLeftIcon, ExpandIcon, CollapseIcon } from '../../components/Icons/Icons';
+import { ExpandIcon, CollapseIcon } from '../../components/Icons/Icons';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
 import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
 import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
@@ -27,7 +27,6 @@ export function PdfViewerPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const subject = searchParams.get('subject') || '';
-  const flowchartId = searchParams.get('flowchart') || '';
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [filename, setFilename] = useState('');
@@ -337,10 +336,6 @@ export function PdfViewerPage() {
     setImmersiveMode(prev => !prev);
   }, []);
 
-  const handleReturnToFlowchart = useCallback(() => {
-    navigate(`/flowcharts${flowchartId ? `?view=${flowchartId}` : ''}`);
-  }, [navigate, flowchartId]);
-
   const handleCreateNote = useCallback(() => {
     if (subject) {
       navigate(`/note/new?subject=${encodeURIComponent(subject)}`);
@@ -541,9 +536,6 @@ export function PdfViewerPage() {
       <div className={styles.page}>
         <div className={styles.errorContainer}>
           <p className={styles.error}>{errorMessage}</p>
-          <button className={styles.backBtn} onClick={handleReturnToFlowchart}>
-            <ArrowLeftIcon size={14} /> Return to Flowchart
-          </button>
         </div>
       </div>
     );
@@ -581,7 +573,6 @@ export function PdfViewerPage() {
         onTocToggle={handleTocToggle}
         showRightPanel={showRightPanel}
         onRightPanelToggle={handleRightPanelToggle}
-        onReturnToFlowchart={handleReturnToFlowchart}
         onCreateNote={handleCreateNote}
         onOpenInNewTab={handleOpenInNewTab}
         immersiveMode={immersiveMode}

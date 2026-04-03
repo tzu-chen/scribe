@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeftIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from '../Icons/Icons';
+import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from '../Icons/Icons';
 import styles from './PdfToolbar.module.css';
 
 const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -20,7 +20,6 @@ interface Props {
   onTocToggle: () => void;
   showRightPanel: boolean;
   onRightPanelToggle: () => void;
-  onReturnToFlowchart: () => void;
   onCreateNote: () => void;
   onOpenInNewTab: () => void;
   immersiveMode?: boolean;
@@ -44,7 +43,6 @@ export function PdfToolbar({
   onTocToggle,
   showRightPanel,
   onRightPanelToggle,
-  onReturnToFlowchart,
   onCreateNote,
   onOpenInNewTab,
   immersiveMode,
@@ -113,11 +111,8 @@ export function PdfToolbar({
   return (
     <div className={styles.toolbar}>
       <div className={styles.left}>
-        <button className={styles.backBtn} onClick={onReturnToFlowchart}>
-          <ArrowLeftIcon size={14} /> Flowchart
-        </button>
         <span className={styles.filename} title={filename}>
-          {filename}
+          {filename.replace(/\.pdf$/i, '')}
         </span>
       </div>
 
