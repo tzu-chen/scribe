@@ -12,7 +12,6 @@ interface Props {
   zoom: number;
   fitWidth: boolean;
   showToc: boolean;
-  hasOutline: boolean;
   twoPageView: boolean;
   onZoomChange: (zoom: number) => void;
   onFitWidthToggle: () => void;
@@ -35,7 +34,6 @@ export function PdfToolbar({
   zoom,
   fitWidth,
   showToc,
-  hasOutline,
   twoPageView,
   onZoomChange,
   onFitWidthToggle,
@@ -210,18 +208,14 @@ export function PdfToolbar({
         >
           <ChevronRightIcon size={18} />
         </button>
-        {hasOutline && (
-          <>
-            <span className={styles.divider} />
-            <button
-              className={`${styles.tocBtn} ${showToc ? styles.tocBtnActive : ''}`}
-              onClick={onTocToggle}
-              title="Table of contents"
-            >
-              TOC
-            </button>
-          </>
-        )}
+        <span className={styles.divider} />
+        <button
+          className={`${styles.tocBtn} ${showToc ? styles.tocBtnActive : ''}`}
+          onClick={onTocToggle}
+          title="Table of contents"
+        >
+          TOC
+        </button>
       </div>
 
       <div className={styles.right}>

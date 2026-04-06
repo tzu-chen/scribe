@@ -6,6 +6,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .header {
@@ -13,10 +14,34 @@
   border-bottom: 1px solid var(--color-border-light);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .title {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.addButton {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .content {
@@ -28,6 +53,10 @@
 .list {
   list-style: none;
   margin: 0;
+}
+
+.itemWrapper {
+  position: relative;
 }
 
 .item {
@@ -67,4 +96,93 @@
   color: var(--color-text-secondary);
   padding: var(--spacing-lg);
   font-size: 0.85rem;
+}
+
+/* Add form */
+.addForm {
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
+.addInput {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+}
+
+.addInput:focus {
+  border-color: var(--color-primary);
+}
+
+/* Inline rename */
+.inlineEdit {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+}
+
+/* Context menu */
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  min-width: 120px;
+}
+
+.contextMenuItem {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.contextMenuItem:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* Drag-and-drop indicators */
+.dragOverBefore {
+  border-top: 2px solid var(--color-primary);
+}
+
+.dragOverAfter {
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.dragOverInto {
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+}
+
+/* Reset link */
+.resetLink {
+  display: block;
+  margin: var(--spacing-md) auto;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.resetLink:hover {
+  color: var(--color-primary);
 }

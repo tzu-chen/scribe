@@ -98,6 +98,19 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS custom_outlines (
+    id TEXT PRIMARY KEY,
+    attachment_id TEXT NOT NULL,
+    parent_id TEXT,
+    title TEXT NOT NULL,
+    page_number INTEGER NOT NULL,
+    dest_top REAL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (attachment_id) REFERENCES attachments(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_id) REFERENCES custom_outlines(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_custom_outlines_attachment ON custom_outlines(attachment_id);
+
 `);
 
 // Migration: add last_opened_at column if missing (for existing databases)

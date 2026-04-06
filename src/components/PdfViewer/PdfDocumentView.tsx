@@ -37,6 +37,8 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
+    // Flag set by scrollToPage so newly-rendered pages skip the render debounce.
+    const navigationPendingRef = useRef(false);
     const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({
       start: 1,
       end: Math.min(numPages, 5),
@@ -46,6 +48,10 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       scrollToPage(page: number, offsetTop?: number | null, behavior: ScrollBehavior = 'smooth') {
         const container = containerRef.current;
         if (!container) return;
+
+        // Mark as deliberate navigation so newly-mounted pages skip the
+        // render debounce.  Cleared after the IO → React render cycle settles.
+        navigationPendingRef.current = true;
 
         const doScroll = () => {
           const pageEl = container.querySelector(`[data-page-wrapper="${page}"]`) as HTMLElement | null;
@@ -77,6 +83,19 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               doScroll();
+              // Clear the navigation flag after the render cycle has settled
+              // (IO fired, React re-rendered, layout corrected).
+              requestAnimationFrame(() => {
+                navigationPendingRef.current = false;
+              });
+            });
+          });
+        } else {
+          // For smooth scrolls, clear after the animation has time to trigger
+          // the IO callback and subsequent React render.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              navigationPendingRef.current = false;
             });
           });
         }
@@ -177,6 +196,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
             expectedHeight={dims.height}
             highlights={highlights}
             crop={crop}
+            priority={navigationPendingRef.current}
             onTextSelected={onTextSelected}
             onSelectionCleared={onSelectionCleared}
             onHighlightClick={onHighlightClick}

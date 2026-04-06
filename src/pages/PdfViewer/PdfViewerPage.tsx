@@ -4,6 +4,7 @@ import { attachmentStorage } from '../../services/attachmentStorage';
 import { viewerPrefsStorage, type ViewerPrefs } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
+import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
 import type { CropBox } from '../../types/crop';
 import { NO_CROP, hasCrop } from '../../types/crop';
@@ -36,6 +37,7 @@ export function PdfViewerPage() {
 
   const { pdfDoc, numPages, pageWidth, pageHeight, pageDimensions, outline, loading, error: pdfError } = usePdfDocument(blob);
   const annotations = usePdfAnnotations(attachmentId || '');
+  const customOutline = useCustomOutline(attachmentId, outline);
   const { notes, saveNote } = useNotes();
 
   const savedPrefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
@@ -565,7 +567,6 @@ export function PdfViewerPage() {
         zoom={effectiveZoom}
         fitWidth={fitWidth}
         showToc={showToc}
-        hasOutline={outline.length > 0}
         twoPageView={twoPageView}
         onZoomChange={handleZoomChange}
         onFitWidthToggle={handleFitWidthToggle}
@@ -581,7 +582,17 @@ export function PdfViewerPage() {
       />
       <div ref={bodyRef} className={styles.body}>
         {showToc && (
-          <PdfSidebar outline={outline} onNavigate={handleTocNavigate} />
+          <PdfSidebar
+            outline={customOutline.outline}
+            onNavigate={handleTocNavigate}
+            onAddItem={customOutline.addItem}
+            onRenameItem={customOutline.renameItem}
+            onDeleteItem={customOutline.deleteItem}
+            onReorderItems={customOutline.reorderItems}
+            onResetOutline={customOutline.resetToOriginal}
+            hasCustomOutline={customOutline.hasCustomOutline}
+            getScrollPosition={() => docViewRef.current?.getScrollPosition() ?? null}
+          />
         )}
         <div className={styles.pdfArea}>
         <PdfDocumentView

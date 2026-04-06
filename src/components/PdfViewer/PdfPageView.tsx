@@ -22,6 +22,8 @@ interface Props {
   expectedHeight: number;
   highlights: PdfHighlight[];
   crop?: CropBox;
+  /** When true, skip the render debounce for immediate display (e.g. deliberate navigation). */
+  priority?: boolean;
   onTextSelected: (selection: TextSelection) => void;
   onSelectionCleared: () => void;
   onHighlightClick: (highlightId: string, anchorRect: DOMRect) => void;
@@ -35,6 +37,7 @@ export function PdfPageView({
   expectedHeight,
   highlights,
   crop,
+  priority,
   onTextSelected,
   onSelectionCleared,
   onHighlightClick,
@@ -45,6 +48,10 @@ export function PdfPageView({
   const pageContentRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const textLayerInstanceRef = useRef<TextLayer | null>(null);
+  // Capture priority at mount time so the render effect can read it without
+  // adding it to the dependency array (avoids re-triggering renders).
+  const priorityRef = useRef(priority);
+  priorityRef.current = priority;
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
     width: Math.floor(expectedWidth * scale),
     height: Math.floor(expectedHeight * scale),
@@ -132,9 +139,12 @@ export function PdfPageView({
 
     // Debounce render to batch rapid scale/visibility changes during fast
     // scroll or zoom gestures, preventing excessive concurrent canvas allocations.
+    // Skip debounce for priority renders (deliberate navigation via TOC, page
+    // input, or prev/next buttons) so the target page appears immediately.
+    const delay = priorityRef.current ? 0 : 50;
     const timeoutId = setTimeout(() => {
       if (!cancelled) renderPage();
-    }, 50);
+    }, delay);
 
     return () => {
       cancelled = true;
