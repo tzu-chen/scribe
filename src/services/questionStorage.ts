@@ -1,51 +1,48 @@
 import type { Question } from '../types/question';
 
-const STORAGE_KEY = 'scribe_questions';
-
 export const questionStorage = {
-  getAll(): Question[] {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+  async getAll(): Promise<Question[]> {
+    const res = await fetch('/api/questions');
+    if (!res.ok) throw new Error(`Failed to fetch questions: ${res.status}`);
+    return res.json();
   },
 
-  save(question: Question): void {
-    const questions = this.getAll();
-    const index = questions.findIndex(q => q.id === question.id);
-    if (index >= 0) {
-      questions[index] = question;
-    } else {
-      questions.push(question);
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+  async save(question: Question): Promise<void> {
+    const res = await fetch('/api/questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(question),
+    });
+    if (!res.ok) throw new Error(`Failed to save question: ${res.status}`);
   },
 
-  setChecked(id: string, checked: boolean): void {
-    const questions = this.getAll();
-    const q = questions.find(q => q.id === id);
-    if (q) {
-      q.checked = checked;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
-    }
+  async setChecked(id: string, checked: boolean): Promise<void> {
+    const res = await fetch(`/api/questions/${id}/checked`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checked }),
+    });
+    if (!res.ok) throw new Error(`Failed to update question: ${res.status}`);
   },
 
-  delete(id: string): void {
-    const questions = this.getAll().filter(q => q.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+  async delete(id: string): Promise<void> {
+    const res = await fetch(`/api/questions/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Failed to delete question: ${res.status}`);
   },
 
-  getByNode(nodeId: string, flowchartId: string): Question[] {
-    return this.getAll().filter(
-      q => q.nodeId === nodeId && q.flowchartId === flowchartId,
+  async getByNode(nodeId: string, flowchartId: string): Promise<Question[]> {
+    const res = await fetch(
+      `/api/questions/by-node?nodeId=${encodeURIComponent(nodeId)}&flowchartId=${encodeURIComponent(flowchartId)}`,
     );
+    if (!res.ok) throw new Error(`Failed to fetch questions: ${res.status}`);
+    return res.json();
   },
 
-  getCountsByNode(flowchartId: string): Record<string, number> {
-    const counts: Record<string, number> = {};
-    this.getAll()
-      .filter(q => q.flowchartId === flowchartId)
-      .forEach(q => {
-        counts[q.nodeId] = (counts[q.nodeId] || 0) + 1;
-      });
-    return counts;
+  async getCountsByNode(flowchartId: string): Promise<Record<string, number>> {
+    const res = await fetch(
+      `/api/questions/counts-by-node?flowchartId=${encodeURIComponent(flowchartId)}`,
+    );
+    if (!res.ok) throw new Error(`Failed to fetch question counts: ${res.status}`);
+    return res.json();
   },
 };

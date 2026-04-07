@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import MDEditor from '@uiw/react-md-editor';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
+import { renderKatexToString } from '../../utils/katex';
 import { useTheme } from '../../contexts/ThemeContext';
 import styles from './NoteEditor.module.css';
 
@@ -9,17 +8,6 @@ interface NoteEditorProps {
   value: string;
   onChange: (value: string) => void;
   height?: number;
-}
-
-function renderKatex(expression: string, displayMode: boolean): string {
-  try {
-    return katex.renderToString(expression, {
-      throwOnError: false,
-      displayMode,
-    });
-  } catch {
-    return expression;
-  }
 }
 
 // Process LaTeX in the preview by intercepting code rendering
@@ -30,7 +18,7 @@ const previewOptions = {
 
       // Block KaTeX: ```katex ... ```
       if (typeof className === 'string' && /^language-katex/i.test(className)) {
-        const html = renderKatex(codeString, true);
+        const html = renderKatexToString(codeString, true);
         return <code dangerouslySetInnerHTML={{ __html: html }} style={{ whiteSpace: 'normal' }} />;
       }
 
@@ -38,7 +26,7 @@ const previewOptions = {
       const text = typeof children === 'string' ? children : '';
       if (/^\$\$([\s\S]+)\$\$$/m.test(text)) {
         const expression = text.slice(2, -2);
-        const html = renderKatex(expression, false);
+        const html = renderKatexToString(expression, false);
         return <code dangerouslySetInnerHTML={{ __html: html }} style={{ background: 'none', padding: 0 }} />;
       }
 

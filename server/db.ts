@@ -111,6 +111,43 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_custom_outlines_attachment ON custom_outlines(attachment_id);
 
+  CREATE TABLE IF NOT EXISTS flowcharts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    spec TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS flowchart_nodes (
+    id TEXT PRIMARY KEY,
+    flowchart_id TEXT NOT NULL,
+    node_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    refs TEXT,
+    topics TEXT,
+    stage_key TEXT,
+    FOREIGN KEY (flowchart_id) REFERENCES flowcharts(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_fn_flowchart ON flowchart_nodes(flowchart_id);
+  CREATE INDEX IF NOT EXISTS idx_fn_key ON flowchart_nodes(node_key);
+  CREATE INDEX IF NOT EXISTS idx_fn_title ON flowchart_nodes(title);
+
+  CREATE TABLE IF NOT EXISTS questions (
+    id TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    node_title TEXT NOT NULL,
+    flowchart_id TEXT NOT NULL,
+    flowchart_name TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_questions_node ON questions(node_id, flowchart_id);
+  CREATE INDEX IF NOT EXISTS idx_questions_flowchart ON questions(flowchart_id);
+
 `);
 
 // Migration: add last_opened_at column if missing (for existing databases)

@@ -3,10 +3,37 @@
   margin: 0 auto;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-lg);
+}
+
 .title {
   font-size: 1.5rem;
   font-weight: 700;
-  margin-bottom: var(--spacing-lg);
+}
+
+.headerActions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.importButton {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.importButton:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .loading {
@@ -58,11 +85,18 @@
   line-height: 1.5;
 }
 
-/* View mode */
+.cardMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-sm);
+}
+
+/* ── Detail view ── */
+
 .viewPage {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--header-height));
+  min-height: calc(100vh - var(--header-height));
 }
 
 .viewHeader {
@@ -83,6 +117,8 @@
   cursor: pointer;
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-sm);
+  background: none;
+  border: none;
 }
 
 .backButton:hover {
@@ -95,28 +131,173 @@
   font-weight: 600;
 }
 
-.iframeContainer {
+.viewBody {
+  display: flex;
   flex: 1;
   min-height: 0;
-}
-
-.iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-/* Hidden file input */
-.hiddenInput {
-  position: absolute;
-  width: 0;
-  height: 0;
   overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
 }
 
-/* Popup animations */
+.chartArea {
+  flex: 1;
+  overflow: auto;
+  padding: var(--spacing-md);
+}
+
+/* ── Node action panel ── */
+
+.nodePanel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border-light);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nodePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg);
+}
+
+.nodePanelTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.nodePanelClose {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nodePanelClose:hover {
+  color: var(--color-text);
+  background: var(--color-border-light);
+}
+
+.nodePanelBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+}
+
+.nodePanelSection {
+  margin-bottom: var(--spacing-md);
+}
+
+.nodePanelSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.nodePanelSectionTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+}
+
+.nodePanelAddButton {
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.nodePanelAddButton:hover {
+  background: var(--color-primary-light);
+}
+
+.nodePanelEmpty {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-sm);
+  text-align: center;
+}
+
+.nodePanelItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.nodePanelItem:hover {
+  background: var(--color-bg);
+}
+
+.nodePanelItemLink {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.nodePanelItemLink:hover {
+  text-decoration: underline;
+}
+
+.nodePanelItemMeta {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nodePanelItemText {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodePanelItemCheck {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Import JSON modal ── */
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -133,8 +314,7 @@
   }
 }
 
-/* Attachment modal overlay */
-.attachmentOverlay {
+.modalOverlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
@@ -147,20 +327,20 @@
   animation: fadeIn 0.2s ease-out;
 }
 
-.attachmentPanel {
+.modalPanel {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 90%;
-  max-width: 480px;
-  max-height: 70vh;
+  max-width: 600px;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: slideUp 0.25s ease-out;
 }
 
-.attachmentHeader {
+.modalHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -169,130 +349,147 @@
   background: var(--color-bg);
 }
 
-.attachmentTitle {
+.modalTitle {
   font-size: 1rem;
   font-weight: 700;
   color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.attachmentClose {
+.modalClose {
   width: 28px;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.125rem;
   color: var(--color-text-secondary);
   cursor: pointer;
-  line-height: 1;
   border-radius: 50%;
   flex-shrink: 0;
+  background: none;
+  border: none;
   transition: background 0.15s, color 0.15s;
 }
 
-.attachmentClose:hover {
+.modalClose:hover {
   color: var(--color-text);
   background: var(--color-border-light);
 }
 
-.attachmentEmpty {
-  text-align: center;
-  color: var(--color-text-secondary);
-  padding: var(--spacing-2xl) var(--spacing-lg);
-  font-size: 0.875rem;
-}
-
-.attachmentList {
-  list-style: none;
-  padding: var(--spacing-sm);
-  margin: 0;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.attachmentItem {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  margin-bottom: 2px;
-  border-radius: var(--radius-md);
-  transition: background 0.15s;
-}
-
-.attachmentItem:hover {
-  background: var(--color-bg);
-}
-
-.attachmentFilename {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  color: var(--color-primary);
-  cursor: pointer;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
-}
-
-.attachmentFilename:hover {
-  text-decoration: underline;
-}
-
-.attachmentSize {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.attachmentDelete {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  line-height: 1;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
-}
-
-.attachmentDelete:hover {
-  color: var(--color-danger);
-  background: var(--color-danger-light);
-}
-
-/* Question dialog */
-.questionDialogBody {
+.modalBody {
   padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modalLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modalInput {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.modalInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(66, 99, 235, 0.15);
+}
+
+.modalTextarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.modalTextarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.modalError {
+  font-size: 0.8rem;
+  color: var(--color-danger);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.modalButton {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.modalButton:hover {
+  border-color: var(--color-primary);
+}
+
+.modalButtonPrimary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+}
+
+.modalButtonPrimary:hover {
+  background: var(--color-primary-hover);
+}
+
+.modalButtonPrimary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Question dialog (in node panel) ── */
+
+.questionForm {
+  padding: var(--spacing-xs) var(--spacing-sm);
 }
 
 .questionTextarea {
   width: 100%;
-  min-height: 100px;
-  padding: var(--spacing-sm);
+  min-height: 60px;
+  padding: var(--spacing-xs);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.4;
   resize: vertical;
-  transition: border-color 0.15s;
+  margin-bottom: var(--spacing-xs);
 }
 
 .questionTextarea:focus {
@@ -300,51 +497,46 @@
   border-color: var(--color-primary);
 }
 
-.questionActions {
+.questionFormActions {
   display: flex;
+  gap: var(--spacing-xs);
   justify-content: flex-end;
-  gap: var(--spacing-sm);
 }
 
-.questionCancel {
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  border: 1px solid var(--color-border-light);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.questionCancel:hover {
+.questionFormButton {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   color: var(--color-text);
-  background: var(--color-bg);
-  border-color: var(--color-border);
+  cursor: pointer;
 }
 
-.questionSave {
-  padding: var(--spacing-xs) var(--spacing-lg);
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  font-weight: 600;
+.questionFormButtonPrimary {
   background: var(--color-primary);
   color: var(--color-primary-text);
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  border-color: var(--color-primary);
 }
 
-.questionSave:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
-}
-
-.questionSave:disabled {
+.questionFormButtonPrimary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* ── BookPicker wrapper (already has its own styles) ── */
+
 @media (max-width: 640px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .nodePanel {
+    position: fixed;
+    right: 0;
+    top: var(--header-height);
+    bottom: 0;
+    z-index: 50;
+    box-shadow: var(--shadow-lg);
   }
 }

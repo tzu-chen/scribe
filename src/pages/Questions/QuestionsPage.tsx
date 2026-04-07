@@ -9,22 +9,22 @@ export function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
 
   const reload = useCallback(() => {
-    setQuestions(questionStorage.getAll());
+    questionStorage.getAll().then(setQuestions).catch(() => setQuestions([]));
   }, []);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
-  const handleToggle = useCallback((id: string, checked: boolean) => {
-    questionStorage.setChecked(id, checked);
+  const handleToggle = useCallback(async (id: string, checked: boolean) => {
+    await questionStorage.setChecked(id, checked);
     setQuestions(prev =>
       prev.map(q => (q.id === id ? { ...q, checked } : q)),
     );
   }, []);
 
-  const handleDelete = useCallback((id: string) => {
-    questionStorage.delete(id);
+  const handleDelete = useCallback(async (id: string) => {
+    await questionStorage.delete(id);
     setQuestions(prev => prev.filter(q => q.id !== id));
   }, []);
 
