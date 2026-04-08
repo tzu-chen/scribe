@@ -8,6 +8,7 @@ import { folderStorage } from '../../services/folderStorage';
 import type { AttachmentMeta } from '../../types/attachment';
 import type { Folder } from '../../types/folder';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
+import { stripExtension } from '../../utils/filename';
 import styles from './LibraryPage.module.css';
 
 type ViewMode = 'card' | 'list';
@@ -598,7 +599,7 @@ export function LibraryPage() {
                       onClick={e => e.stopPropagation()}
                     />
                   )}
-                  <div className={styles.cardTitle}>{book.filename}</div>
+                  <div className={styles.cardTitle}>{stripExtension(book.filename)}</div>
                   <div className={styles.cardMeta}>
                     <span className={styles.cardSize}>
                       {formatFileSize(book.size)}
@@ -684,7 +685,7 @@ export function LibraryPage() {
                             onClick={e => e.stopPropagation()}
                           />
                         ) : (
-                          <span className={styles.listFileName}>{book.filename}</span>
+                          <span className={styles.listFileName}>{stripExtension(book.filename)}</span>
                         )}
                       </td>
                       <td className={styles.listCell}>{getFileExtension(book.filename)}</td>

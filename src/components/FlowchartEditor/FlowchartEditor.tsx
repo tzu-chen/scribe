@@ -13,7 +13,7 @@ interface FlowchartEditorProps {
   flowchartDescription?: string;
   onNodeSelect?: (nodeId: string, nodeTitle: string) => void;
   onNodeDeselect?: () => void;
-  onNodeAction?: (action: NodeAction, nodeId: string, nodeTitle: string) => void;
+  onNodeAction?: (action: NodeAction, nodeId: string, nodeTitle: string, anchorRect?: DOMRect) => void;
   nodeCounts?: NodeCounts;
 }
 

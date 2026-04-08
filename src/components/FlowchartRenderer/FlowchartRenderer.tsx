@@ -20,7 +20,7 @@ interface FlowchartRendererProps {
   onNodeDeselect?: () => void;
   onNodeMouseDown?: (e: React.MouseEvent, nodeId: string) => void;
   onNodeDoubleClick?: (e: React.MouseEvent, nodeId: string) => void;
-  onNodeAction?: (action: NodeAction, nodeId: string, nodeTitle: string) => void;
+  onNodeAction?: (action: NodeAction, nodeId: string, nodeTitle: string, anchorRect?: DOMRect) => void;
   nodeCounts?: NodeCounts;
   /** CSS class applied to the chart container (for editor overlays) */
   className?: string;
@@ -213,21 +213,21 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
                 <button
                   className={styles.nodeActionBtn}
                   title="Write note"
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('write-note', node.id, node.title); }}
+                  onClick={(e) => { e.stopPropagation(); onNodeAction('write-note', node.id, node.title, e.currentTarget.getBoundingClientRect()); }}
                 >
                   <svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
                 </button>
                 <button
                   className={styles.nodeActionBtn}
                   title="Attach file"
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('attach-file', node.id, node.title); }}
+                  onClick={(e) => { e.stopPropagation(); onNodeAction('attach-file', node.id, node.title, e.currentTarget.getBoundingClientRect()); }}
                 >
                   <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 </button>
                 <button
                   className={styles.nodeActionBtn}
                   title="View attachments"
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('view-attachments', node.id, node.title); }}
+                  onClick={(e) => { e.stopPropagation(); onNodeAction('view-attachments', node.id, node.title, e.currentTarget.getBoundingClientRect()); }}
                 >
                   <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   {(nodeCounts?.attachments[node.title] ?? 0) > 0 && (
@@ -237,14 +237,14 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
                 <button
                   className={styles.nodeActionBtn}
                   title="View notes"
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('view-notes', node.id, node.title); }}
+                  onClick={(e) => { e.stopPropagation(); onNodeAction('view-notes', node.id, node.title, e.currentTarget.getBoundingClientRect()); }}
                 >
                   <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 </button>
                 <button
                   className={styles.nodeActionBtn}
                   title="Add question"
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('add-question', node.id, node.title); }}
+                  onClick={(e) => { e.stopPropagation(); onNodeAction('add-question', node.id, node.title, e.currentTarget.getBoundingClientRect()); }}
                 >
                   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   {(nodeCounts?.questions[node.id] ?? 0) > 0 && (

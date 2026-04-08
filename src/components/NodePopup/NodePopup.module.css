@@ -1,0 +1,205 @@
+.popup {
+  position: fixed;
+  z-index: 500;
+  width: 280px;
+  max-height: 360px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.body {
+  padding: var(--spacing-sm);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Shared content styles for popup consumers */
+
+.emptyText {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  min-height: 28px;
+}
+
+.itemLink {
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.itemLink:hover {
+  color: var(--color-primary);
+}
+
+.itemMeta {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.itemCheck {
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+
+.itemText {
+  font-size: 0.75rem;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.actionRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border-light);
+  margin-top: var(--spacing-xs);
+}
+
+.actionBtn {
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.actionBtn:hover {
+  text-decoration: underline;
+}
+
+/* Inline question form */
+
+.questionForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.questionTextarea {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.questionTextarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.questionActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+}
+
+.questionBtn {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.questionBtn:hover {
+  background: var(--color-bg-secondary);
+}
+
+.questionBtnPrimary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+}
+
+.questionBtnPrimary:hover {
+  background: var(--color-primary-hover);
+}
+
+.questionBtnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

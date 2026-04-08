@@ -12,6 +12,9 @@ import { FlowchartEditor } from '../../components/FlowchartEditor/FlowchartEdito
 import type { NodeAction, NodeCounts } from '../../components/FlowchartRenderer/FlowchartRenderer';
 import { BookPicker } from '../../components/BookPicker/BookPicker';
 import { ArrowLeftIcon, CloseIcon } from '../../components/Icons/Icons';
+import { stripExtension } from '../../utils/filename';
+import { NodePopup } from '../../components/NodePopup/NodePopup';
+import popupStyles from '../../components/NodePopup/NodePopup.module.css';
 import styles from './FlowchartsPage.module.css';
 
 // ─── Import JSON Modal ───
@@ -250,7 +253,7 @@ function NodeActionPanel({ nodeId, nodeTitle, flowchartId, flowchartName, onClos
                     className={styles.nodePanelItemLink}
                     onClick={() => handleOpenFile(file)}
                   >
-                    {file.filename}
+                    {stripExtension(file.filename)}
                   </button>
                 </div>
               ))
@@ -332,6 +335,19 @@ export function FlowchartsPage() {
   const [nodeCounts, setNodeCounts] = useState<NodeCounts>({ attachments: {}, questions: {} });
   const [showBookPicker, setShowBookPicker] = useState(false);
 
+  // Popup state for node action icons
+  const [popup, setPopup] = useState<{
+    type: 'attachments' | 'notes' | 'questions';
+    nodeId: string;
+    nodeTitle: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+  const [popupNotes, setPopupNotes] = useState<Note[]>([]);
+  const [popupAttachments, setPopupAttachments] = useState<AttachmentMeta[]>([]);
+  const [popupQuestions, setPopupQuestions] = useState<Question[]>([]);
+  const [popupQuestionText, setPopupQuestionText] = useState('');
+  const [showPopupQuestionForm, setShowPopupQuestionForm] = useState(false);
+
   const activeId = searchParams.get('view');
 
   // Load flowchart list
@@ -407,9 +423,10 @@ export function FlowchartsPage() {
 
   const handleNodeDeselect = useCallback(() => {
     setSelectedNode(null);
+    setPopup(null);
   }, []);
 
-  const handleNodeAction = useCallback((action: NodeAction, nodeId: string, nodeTitle: string) => {
+  const handleNodeAction = useCallback((action: NodeAction, nodeId: string, nodeTitle: string, anchorRect?: DOMRect) => {
     if (!activeFlowchart) return;
 
     switch (action) {
@@ -417,19 +434,33 @@ export function FlowchartsPage() {
         navigate(`/note/new?subject=${encodeURIComponent(nodeTitle)}`);
         break;
       case 'view-notes':
-        navigate(`/notes?subject=${encodeURIComponent(nodeTitle)}`);
+        setSelectedNode({ id: nodeId, title: nodeTitle });
+        if (anchorRect) {
+          setPopup({ type: 'notes', nodeId, nodeTitle, anchorRect });
+          noteStorage.getAll().then((all) => {
+            setPopupNotes(all.filter((n) => n.subject === nodeTitle || n.subject === nodeId));
+          });
+        }
         break;
       case 'attach-file':
         setSelectedNode({ id: nodeId, title: nodeTitle });
         setShowBookPicker(true);
         break;
       case 'view-attachments':
-        // Open the node panel (select the node to show side panel)
         setSelectedNode({ id: nodeId, title: nodeTitle });
+        if (anchorRect) {
+          setPopup({ type: 'attachments', nodeId, nodeTitle, anchorRect });
+          attachmentStorage.getBySubject(nodeTitle).then(setPopupAttachments).catch(() => setPopupAttachments([]));
+        }
         break;
       case 'add-question':
-        // Open the node panel with question form focus
         setSelectedNode({ id: nodeId, title: nodeTitle });
+        if (anchorRect) {
+          setPopup({ type: 'questions', nodeId, nodeTitle, anchorRect });
+          setShowPopupQuestionForm(false);
+          setPopupQuestionText('');
+          questionStorage.getByNode(nodeId, activeFlowchart.id).then(setPopupQuestions).catch(() => setPopupQuestions([]));
+        }
         break;
     }
   }, [activeFlowchart, navigate]);
@@ -440,6 +471,53 @@ export function FlowchartsPage() {
     setShowBookPicker(false);
     refreshCounts();
   }, [selectedNode, refreshCounts]);
+
+  const closePopup = useCallback(() => {
+    setPopup(null);
+    setShowPopupQuestionForm(false);
+    setPopupQuestionText('');
+  }, []);
+
+  const handlePopupOpenFile = useCallback((file: AttachmentMeta) => {
+    if (!activeFlowchart || !popup) return;
+    if (file.type === 'application/pdf') {
+      const params = new URLSearchParams();
+      params.set('subject', popup.nodeTitle);
+      params.set('flowchart', activeFlowchart.id);
+      navigate(`/pdf/${file.id}?${params.toString()}`);
+    } else {
+      attachmentStorage.openFile(file.id);
+    }
+  }, [activeFlowchart, popup, navigate]);
+
+  const handlePopupSaveQuestion = useCallback(async () => {
+    if (!popupQuestionText.trim() || !popup || !activeFlowchart) return;
+    const q: Question = {
+      id: crypto.randomUUID(),
+      text: popupQuestionText.trim(),
+      nodeId: popup.nodeId,
+      nodeTitle: popup.nodeTitle,
+      flowchartId: activeFlowchart.id,
+      flowchartName: activeFlowchart.name,
+      checked: false,
+      createdAt: new Date().toISOString(),
+    };
+    await questionStorage.save(q);
+    setPopupQuestions((prev) => [...prev, q]);
+    setPopupQuestionText('');
+    setShowPopupQuestionForm(false);
+    refreshCounts();
+  }, [popupQuestionText, popup, activeFlowchart, refreshCounts]);
+
+  const handlePopupToggleQuestion = useCallback(async (id: string, checked: boolean) => {
+    await questionStorage.setChecked(id, checked);
+    setPopupQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, checked } : q)));
+  }, []);
+
+  const handlePopupAttach = useCallback(() => {
+    setPopup(null);
+    setShowBookPicker(true);
+  }, []);
 
   // ── Detail view ──
 
@@ -477,6 +555,114 @@ export function FlowchartsPage() {
             />
           )}
         </div>
+
+        {popup && (
+          <NodePopup
+            anchorRect={popup.anchorRect}
+            title={popup.type === 'attachments' ? 'Attachments' : popup.type === 'notes' ? 'Notes' : 'Questions'}
+            onClose={closePopup}
+          >
+            {popup.type === 'attachments' && (
+              <>
+                <div className={popupStyles.itemList}>
+                  {popupAttachments.length === 0 && (
+                    <p className={popupStyles.emptyText}>No linked files</p>
+                  )}
+                  {popupAttachments.map((file) => (
+                    <div key={file.id} className={popupStyles.item}>
+                      <button className={popupStyles.itemLink} onClick={() => handlePopupOpenFile(file)}>
+                        {stripExtension(file.filename)}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className={popupStyles.actionRow}>
+                  <button className={popupStyles.actionBtn} onClick={handlePopupAttach}>+ Attach</button>
+                </div>
+              </>
+            )}
+
+            {popup.type === 'notes' && (
+              <>
+                <div className={popupStyles.itemList}>
+                  {popupNotes.length === 0 && (
+                    <p className={popupStyles.emptyText}>No linked notes</p>
+                  )}
+                  {popupNotes.map((note) => (
+                    <div key={note.id} className={popupStyles.item}>
+                      <button className={popupStyles.itemLink} onClick={() => navigate(`/note/${note.id}`)}>
+                        {note.title || 'Untitled'}
+                      </button>
+                      <span className={popupStyles.itemMeta}>{note.status}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className={popupStyles.actionRow}>
+                  <button className={popupStyles.actionBtn} onClick={() => navigate(`/note/new?subject=${encodeURIComponent(popup.nodeTitle)}`)}>
+                    + New
+                  </button>
+                  {popupNotes.length > 0 && (
+                    <button className={popupStyles.actionBtn} onClick={() => navigate(`/notes?subject=${encodeURIComponent(popup.nodeTitle)}`)}>
+                      View all &rarr;
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {popup.type === 'questions' && (
+              <>
+                <div className={popupStyles.itemList}>
+                  {popupQuestions.length === 0 && !showPopupQuestionForm && (
+                    <p className={popupStyles.emptyText}>No questions</p>
+                  )}
+                  {popupQuestions.map((q) => (
+                    <div key={q.id} className={popupStyles.item}>
+                      <input
+                        type="checkbox"
+                        className={popupStyles.itemCheck}
+                        checked={q.checked}
+                        onChange={(e) => handlePopupToggleQuestion(q.id, e.target.checked)}
+                      />
+                      <span className={popupStyles.itemText} style={q.checked ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>
+                        {q.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {showPopupQuestionForm && (
+                  <div className={popupStyles.questionForm}>
+                    <textarea
+                      className={popupStyles.questionTextarea}
+                      placeholder="Enter your question..."
+                      value={popupQuestionText}
+                      onChange={(e) => setPopupQuestionText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePopupSaveQuestion();
+                      }}
+                      autoFocus
+                    />
+                    <div className={popupStyles.questionActions}>
+                      <button className={popupStyles.questionBtn} onClick={() => { setShowPopupQuestionForm(false); setPopupQuestionText(''); }}>
+                        Cancel
+                      </button>
+                      <button
+                        className={`${popupStyles.questionBtn} ${popupStyles.questionBtnPrimary}`}
+                        onClick={handlePopupSaveQuestion}
+                        disabled={!popupQuestionText.trim()}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className={popupStyles.actionRow}>
+                  <button className={popupStyles.actionBtn} onClick={() => setShowPopupQuestionForm(true)}>+ Add</button>
+                </div>
+              </>
+            )}
+          </NodePopup>
+        )}
 
         {showBookPicker && (
           <BookPicker

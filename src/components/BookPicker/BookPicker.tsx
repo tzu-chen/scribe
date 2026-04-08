@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import type { AttachmentMeta } from '../../types/attachment';
 import { CloseIcon } from '../Icons/Icons';
+import { stripExtension } from '../../utils/filename';
 import styles from './BookPicker.module.css';
 
 function formatFileSize(bytes: number): string {
@@ -65,9 +66,9 @@ export function BookPicker({ onSelect, onCancel }: BookPickerProps) {
                 <button
                   className={styles.filename}
                   onClick={() => onSelect(book)}
-                  title={`Select ${book.filename}`}
+                  title={`Select ${stripExtension(book.filename)}`}
                 >
-                  {book.filename}
+                  {stripExtension(book.filename)}
                 </button>
                 <span className={styles.size}>
                   {formatFileSize(book.size)}

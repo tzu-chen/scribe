@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from '../Icons/Icons';
+import { stripExtension } from '../../utils/filename';
 import styles from './PdfToolbar.module.css';
 
 const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -109,8 +110,8 @@ export function PdfToolbar({
   return (
     <div className={styles.toolbar}>
       <div className={styles.left}>
-        <span className={styles.filename} title={filename}>
-          {filename.replace(/\.pdf$/i, '')}
+        <span className={styles.filename} title={stripExtension(filename)}>
+          {stripExtension(filename)}
         </span>
       </div>
 

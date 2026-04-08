@@ -9,6 +9,7 @@ import {
 } from 'date-fns';
 import { readingTimeStorage, getCSTDateString } from '../services/readingTimeStorage';
 import type { ReadingTimeEntry } from '../types/readingTime';
+import { stripExtension } from '../utils/filename';
 
 export type ViewMode = 'week' | 'month';
 
@@ -27,9 +28,6 @@ export interface BookInfo {
   roundedSeconds: number;
 }
 
-function stripPdfExtension(filename: string): string {
-  return filename.replace(/\.pdf$/i, '');
-}
 
 function roundDown30Min(totalSeconds: number): number {
   return Math.floor(totalSeconds / 1800) * 1800;
@@ -97,7 +95,7 @@ function computeSummary(entries: ReadingTimeEntry[], viewMode: ViewMode) {
       bookMap.set(entry.attachmentId, {
         attachmentId: entry.attachmentId,
         filename: entry.filename,
-        displayName: stripPdfExtension(entry.filename),
+        displayName: stripExtension(entry.filename),
         color: BOOK_COLORS[hashStringToIndex(entry.attachmentId, BOOK_COLORS.length)],
         totalSeconds: 0,
         roundedSeconds: 0,
