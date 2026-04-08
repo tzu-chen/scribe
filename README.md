@@ -6,7 +6,7 @@ A browser-based study tool for managing PDFs, notes, flowcharts, and reading tim
 
 - **Library** — Upload and browse PDF files and other documents
 - **Notes** — Write notes in Markdown with LaTeX math support
-- **Flowcharts** — Interactive flowcharts with node-linked actions (notes, attachments, questions)
+- **Flowcharts** — Data-driven interactive flowcharts with BFS prerequisite highlighting, drag editing, and node-linked actions (notes, attachments, questions)
 - **Questions** — Create and review questions linked to flowchart nodes
 - **Reading Summary** — Track reading time with daily heatmaps and charts
 
@@ -17,7 +17,7 @@ Scribe uses a **client-server architecture**:
 - **Frontend**: React 19 SPA built with Vite, using CSS Modules for styling and React Router for navigation
 - **Backend**: Express 5 REST API with SQLite (via `better-sqlite3`) for persistent storage
 - **File storage**: Uploaded files stored on the server filesystem (`data/attachments/`)
-- **Client-only storage**: Theme preference, viewer preferences, and questions use localStorage
+- **Client-only storage**: Theme preference uses localStorage
 
 In development, Vite proxies `/api/*` requests to the Express server. In production, Express serves both the API and the built React app.
 
@@ -84,8 +84,7 @@ data/             # Runtime data (git-ignored)
   scribe.db       # SQLite database
   attachments/    # Uploaded files
 
-public/
-  flowchart/      # Static flowchart HTML files + integration scripts
+public/           # Static assets
 ```
 
 See [CLAUDE.md](./CLAUDE.md) for detailed architecture documentation, conventions, and API endpoint reference.

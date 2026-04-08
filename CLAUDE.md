@@ -6,7 +6,7 @@ Scribe is a study tool built with React 19, TypeScript, and Vite on the frontend
 
 - A **Library** of uploaded PDF and other files
 - **Notes** written in Markdown with LaTeX support
-- **Flowcharts** (static HTML files served from `/public/flowchart/`) with interactive node actions
+- **Flowcharts** — data-driven flowcharts stored in SQLite, rendered with React+SVG, with interactive node actions
 - **Questions** linked to flowchart nodes
 - A **Reading Summary** with time-tracking heatmaps
 
@@ -17,7 +17,7 @@ The project was originally a **fully client-side, offline-first application** us
 - SQLite (via `better-sqlite3`) for persistent storage
 - File uploads stored on the server filesystem
 
-**A few features still use client-side storage** (see [Data Storage](#data-storage) below).
+**Theme preference** still uses client-side localStorage (see [Data Storage](#data-storage) below).
 
 ---
 
@@ -84,7 +84,13 @@ server/
     attachments.ts           # Upload, download, list, delete attachments
     annotations.ts           # PDF highlights and comments
     readingTime.ts           # Per-attachment reading time tracking
-    globalTimer.ts           # Global daily timer
+    viewerPrefs.ts           # Per-attachment PDF viewer preferences
+    folders.ts               # Folder management for library
+    outlines.ts              # Custom PDF outlines (table of contents)
+    flowcharts.ts            # Flowchart CRUD + node index + node queries
+    questions.ts             # Questions linked to flowchart nodes
+  scripts/
+    migrate-flowcharts.ts    # One-time migration from old HTML flowcharts to SQLite
 
 data/                        # Created at runtime, git-ignored
   scribe.db                  # SQLite database file
@@ -100,15 +106,20 @@ src/
     annotation.ts            # PdfHighlight, PdfComment, HighlightRect
     question.ts              # Question
     readingTime.ts           # ReadingTimeEntry, ReadingTimeMap
+    flowchart.ts             # FlowchartSpec, FlowchartNode, FlowchartEdge, etc.
+    folder.ts                # Folder
+    crop.ts                  # Crop settings
   services/                  # Data access layer (calls REST API or localStorage)
     noteStorage.ts           # REST API → /api/notes
     attachmentStorage.ts     # REST API → /api/attachments
     annotationStorage.ts     # REST API → /api/annotations
     readingTimeStorage.ts    # REST API → /api/reading-time
-    globalTimerStorage.ts    # REST API → /api/global-timer
-    questionStorage.ts       # localStorage (key: scribe_questions) — not yet migrated
+    viewerPrefsStorage.ts    # REST API → /api/viewer-prefs (+ localStorage fallback)
+    folderStorage.ts         # REST API → /api/folders
+    outlineStorage.ts        # REST API → /api/outlines
+    flowchartStorage.ts      # REST API → /api/flowcharts
+    questionStorage.ts       # REST API → /api/questions
     themeStorage.ts          # localStorage (key: scribe_theme)
-    viewerPrefsStorage.ts    # localStorage (key: scribe_viewer_prefs)
   hooks/                     # Custom React hooks (wrap services + React state)
     useNotes.ts
     useAutoSave.ts
@@ -119,7 +130,7 @@ src/
     usePdfAnnotations.ts
     useReadingTimeTracker.ts
     useReadingSummary.ts
-    useGlobalTimer.ts
+    useCustomOutline.ts
   contexts/
     ThemeContext.tsx          # Theme ('default' | 'dark'), reads/writes themeStorage
   components/                # Reusable UI components
@@ -133,22 +144,20 @@ src/
     SearchBar/               # Search input
     ThemeMenu/               # Light/dark toggle
     BookPicker/              # Modal for picking an existing attachment
+    Icons/                   # SVG icon components
+    ContextMenu/             # Reusable context menu
     PdfViewer/               # All PDF viewer sub-components (see below)
+    FlowchartRenderer/       # React+SVG flowchart renderer (nodes, arrows, BFS highlight)
+    FlowchartEditor/         # Wraps FlowchartRenderer with editing (drag, inline edit, add/remove)
   pages/                     # Route-level components
     Library/LibraryPage.tsx          # / — upload and browse attachments
     Notes/NotesPage.tsx              # /notes — list/filter/search notes
     Editor/EditorPage.tsx            # /note/new, /note/:id/edit
     View/ViewPage.tsx                # /note/:id (read-only)
-    Flowcharts/FlowchartsPage.tsx    # /flowcharts — flowchart picker + iframe viewer
+    Flowcharts/FlowchartsPage.tsx    # /flowcharts — list + detail view with FlowchartEditor
     PdfViewer/PdfViewerPage.tsx      # /pdf/:attachmentId
     Questions/QuestionsPage.tsx      # /questions — review node questions
     Summary/SummaryPage.tsx          # /summary — reading time heatmap
-public/
-  flowchart/
-    flowchart-integration.js  # Injected into flowchart iframes at runtime
-    flowchart-theme.css        # Theme CSS injected into flowchart iframes
-    flowchart-interactive.html # Example flowchart structure
-    index.json                 # Flowchart manifest (loaded by FlowchartsPage)
 ```
 
 ### TypeScript Configuration
@@ -163,28 +172,31 @@ The project uses **TypeScript project references** with three configs:
 
 ## Data Storage
 
-Data is split between the **server** (SQLite + filesystem) and **client** (localStorage).
+Nearly all data lives on the **server** (SQLite + filesystem). Only theme preference uses client-side localStorage.
 
 ### Server-side (SQLite database at `data/scribe.db`)
 
 | Table | Key | Description |
 |---|---|---|
 | `notes` | `id` (TEXT) | Note content, tags (JSON), status, category, subject |
+| `folders` | `id` (TEXT) | Library folder names |
 | `attachments` | `id` (TEXT) | File metadata; actual blobs stored at `data/attachments/` |
 | `highlights` | `id` (TEXT) | PDF highlight rects (JSON), selected text, color; FK → attachments |
 | `comments` | `id` (TEXT) | Annotation comments; FK → highlights, FK → attachments |
 | `reading_time` | `(attachment_id, date_cst)` | Per-attachment daily reading seconds |
-| `global_timer` | `date_cst` | Global daily reading seconds |
+| `viewer_prefs` | `attachment_id` (TEXT) | Per-attachment PDF viewer settings (zoom, page, crop, etc.) |
+| `custom_outlines` | `id` (TEXT) | User-created PDF table of contents entries; FK → attachments |
+| `flowcharts` | `id` (TEXT) | Flowchart metadata + full spec JSON (`FlowchartSpec`) |
+| `flowchart_nodes` | `id` (TEXT) | Denormalized node index rebuilt from spec on save; FK → flowcharts |
+| `questions` | `id` (TEXT) | Questions linked to flowchart nodes by `node_id` + `flowchart_id` |
 
 SQLite features enabled: WAL mode, foreign key constraints, CASCADE deletes.
 
-### Client-side (localStorage) — not yet migrated to server
+### Client-side (localStorage)
 
 | Key | Type | Contents |
 |---|---|---|
-| `scribe_questions` | JSON array | `Question[]` |
 | `scribe_theme` | string | `'default'` or `'dark'` |
-| `scribe_viewer_prefs` | JSON object | `Record<attachmentId, ViewerPrefs>` |
 
 ### File Storage
 
@@ -228,10 +240,26 @@ All endpoints are prefixed with `/api/`.
 - `POST /api/reading-time` — accumulate seconds for attachment + date
 - `DELETE /api/reading-time` — clear all reading time data
 
-### Global Timer
-- `GET /api/global-timer?date=YYYY-MM-DD` — get total seconds for a date
-- `POST /api/global-timer` — accumulate seconds for a date
-- `DELETE /api/global-timer?date=YYYY-MM-DD` — reset (or all if no date param)
+### Flowcharts
+- `GET /api/flowcharts` — list all (id, name, description, dates — no spec)
+- `GET /api/flowcharts/:id` — full record including spec JSON
+- `POST /api/flowcharts` — create from `{ name, description?, spec }`
+- `PUT /api/flowcharts/:id` — full spec replacement
+- `PATCH /api/flowcharts/:id/nodes/:nodeKey` — partial node update (position and/or content)
+- `DELETE /api/flowcharts/:id` — delete + cascade
+- `GET /api/flowcharts/:id/nodes` — list nodes for one flowchart (from index table)
+- `GET /api/flowcharts/nodes/search?title=X` — search nodes across all flowcharts by title substring
+- `GET /api/flowcharts/nodes/:flowchartId/:nodeKey` — get single node content
+
+On POST and PUT, the route handler validates the spec, stores/updates the `flowcharts` row, then rebuilds the `flowchart_nodes` index from the spec's nodes array. On PATCH, it reads the spec, applies the partial update to the target node, writes back the spec, and updates the corresponding `flowchart_nodes` row.
+
+### Questions
+- `GET /api/questions` — list all questions
+- `GET /api/questions/by-node?nodeId=X&flowchartId=Y` — questions for a specific node
+- `GET /api/questions/counts-by-node?flowchartId=Y` — question counts per node
+- `POST /api/questions` — create a question
+- `PATCH /api/questions/:id/checked` — update checked state
+- `DELETE /api/questions/:id` — delete a question
 
 ### Health
 - `GET /api/health` — returns `{ status: 'ok', timestamp: ... }`
@@ -247,7 +275,7 @@ All endpoints are prefixed with `/api/`.
 | `/note/new` | `EditorPage` | Create new note (optional `?subject=` param) |
 | `/note/:id/edit` | `EditorPage` | Edit existing note |
 | `/note/:id` | `ViewPage` | Read-only note view |
-| `/flowcharts` | `FlowchartsPage` | Flowchart list; `?view=<id>` to open one |
+| `/flowcharts` | `FlowchartsPage` | Flowchart list + detail view (`?view=<id>`) with FlowchartEditor |
 | `/pdf/:attachmentId` | `PdfViewerPage` | PDF viewer (optional `?subject=` and `?flowchart=`) |
 | `/questions` | `QuestionsPage` | Review questions from flowchart nodes |
 | `/summary` | `SummaryPage` | Reading time heatmap |
@@ -274,14 +302,14 @@ All endpoints are prefixed with `/api/`.
 
 - The theme is toggled by setting or removing `data-theme="dark"` on `document.documentElement`.
 - Theme is persisted to `localStorage` via `themeStorage` and consumed through `ThemeContext`.
-- Flowchart iframes receive the theme via direct DOM manipulation (`htmlEl.setAttribute('data-theme', 'dark')`) — not postMessage.
+- Flowcharts use programmatic color adjustment in dark mode (reduce lightness, increase saturation) on stage colors from the spec JSON.
 - The PDF viewer uses `--color-pdf-bg` and `--pdf-highlight-blend` CSS variables that change between light (`multiply`) and dark (`screen`) modes.
 
 ### Service Layer Pattern
 
 - Services are plain objects (not classes) exported as `const serviceName = { ... }`.
-- **Server-backed services** (notes, attachments, annotations, reading time, global timer) are async and use `fetch()` to call the REST API.
-- **Client-only services** (questions, theme, viewer prefs) use localStorage and may be synchronous.
+- **Server-backed services** (notes, attachments, annotations, reading time, viewer prefs, folders, outlines, flowcharts, questions) are async and use `fetch()` to call the REST API.
+- **Client-only services** (theme) use localStorage and may be synchronous.
 - Services do **not** use React hooks.
 - Hooks wrap services and expose React state + callbacks.
 
@@ -306,20 +334,19 @@ All endpoints are prefixed with `/api/`.
 - Flushes to the server (`POST /api/reading-time`) every 30 s and on page unload / tab hide.
 - Dates are recorded in **CST (UTC-6, fixed offset)** — the code does not adjust for CDT.
 
-### Flowchart Integration
+### Flowchart System
 
-Flowcharts are static HTML files placed in `public/flowchart/`. They must expose `highlightChain`, `clearHighlight`, and `selectedNode` as globals. The app:
-1. Renders the flowchart HTML in a same-origin `<iframe>`.
-2. Injects `flowchart-integration.js`, `flowchart-theme.css`, and `flowchart-theme.js` into the iframe at `onLoad` time.
-3. Communicates with the iframe via `window.postMessage` for attachment counts and question counts.
-4. Receives `node-selected`, `node-deselected`, and `node-action` messages from the iframe.
+Flowcharts are stored in SQLite as `FlowchartSpec` JSON (nodes, edges, positions, stage colors) and rendered with a React+SVG component. The old iframe-based static HTML system has been fully replaced.
+
+**Data model:** The `flowcharts` table stores the full spec JSON. The `flowchart_nodes` table is a denormalized index rebuilt from the spec whenever a flowchart is created or updated — it enables joins with notes/questions without parsing JSON, and powers cross-app node queries.
+
+**Components:**
+- `FlowchartRenderer` — core rendering component. Nodes are positioned HTML divs overlaid on an SVG arrow layer. Arrows are drawn in a `useEffect` after first paint using `getBoundingClientRect()` for anchor positions, then rendered as SVG Bézier `<path>` elements. BFS highlight system: click a node to highlight its ancestor chain with depth badges, dimming non-ancestor nodes and edges.
+- `FlowchartEditor` — wraps `FlowchartRenderer` with editing: drag-to-reposition (debounced auto-save via PATCH), inline text editing (double-click), add/remove nodes and edges.
+
+**Node identification:** The node `id` field (e.g., `"qsvt"`, `"linalg"`) is the stable cross-app reference key (`node_key`). Notes, attachments, and questions link to nodes via `node_key`, not the display title.
 
 Node actions supported: `write-note`, `attach-file`, `view-attachments`, `view-notes`, `add-question`.
-
-Flowcharts are listed via `/flowchart/index.json` (served from `public/`) with shape:
-```json
-{ "flowcharts": [{ "id": "...", "name": "...", "filename": "...", "description": "..." }] }
-```
 
 ### Note Model
 
@@ -331,7 +358,7 @@ interface Note {
   tags: string[];
   status: 'draft' | 'published';
   category?: string;
-  subject?: string;      // Links notes to flowchart node titles / attachment subjects
+  subject?: string;      // Links notes to flowchart nodes (via node_key) / attachment subjects
   createdAt: string;     // ISO 8601
   updatedAt: string;     // ISO 8601
 }
@@ -370,9 +397,9 @@ Run: `npm run lint`
 
 ## Adding a New Flowchart
 
-1. Create an HTML file in `public/flowchart/` following the existing conventions (nodes use `.node` class, have `highlightChain` / `clearHighlight` / `selectedNode` globals).
-2. Add an entry to `public/flowchart/index.json`.
-3. The integration script and theme files are injected automatically — do not `<script>` them in the HTML.
+1. Generate a `FlowchartSpec` JSON conforming to the schema in `src/types/flowchart.ts` (Claude can generate these using the `interactive-flowchart` skill as a layout reference).
+2. Import via the "Import JSON" button in the Flowcharts page UI, or `POST /api/flowcharts` with `{ name, description?, spec }`.
+3. Use Markdown (not HTML) for refs (`*italic*` not `<em>`), `$...$` for inline math (KaTeX), and semantic short node IDs (e.g., `"linalg"`, `"qsvt"`).
 
 ## Adding a New Page / Route
 

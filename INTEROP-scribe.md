@@ -1,6 +1,6 @@
 # Scribe — INTEROP.md
 
-Cross-app integration spec for Scribe. This documents the endpoints and data shapes that sibling apps (Navigate, Monolith, Granary) may call or reference.
+Cross-app integration spec for Scribe. This documents the endpoints and data shapes that sibling apps (Pyramid, Navigate, Monolith, Granary) may call or reference.
 
 **Base URL:** `http://localhost:3003/api`  
 **Port:** 3003 (server), 5173 (Vite dev)  
@@ -95,29 +95,78 @@ GET /api/global-timer?date=YYYY-MM-DD
 
 ### Flowcharts
 
-Flowcharts are static HTML files in `public/flowchart/`, listed via a manifest:
+Flowcharts are stored in SQLite and served via a REST API. Each flowchart contains a `FlowchartSpec` JSON with nodes, edges, positions, and stage colors.
+
+**List all flowcharts (summaries):**
 ```
-GET /flowchart/index.json
+GET /api/flowcharts
 ```
-Returns:
-```json
-{ "flowcharts": [{ "id": "...", "name": "...", "filename": "...", "description": "..." }] }
+Returns `{ id, name, description, created_at, updated_at }[]` (no spec JSON).
+
+**Get full flowchart with spec:**
+```
+GET /api/flowcharts/:id
 ```
 
-Flowchart node IDs and titles are embedded in the HTML files — there is no API for querying individual nodes. Cross-app references to flowchart nodes should use the **node title** (which matches the `subject` field on notes and attachments).
+**List nodes for a flowchart:**
+```
+GET /api/flowcharts/:id/nodes
+```
+Returns `FlowchartNodeRecord[]` from the denormalized index table.
+
+**Search nodes across all flowcharts:**
+```
+GET /api/flowcharts/nodes/search?title=X
+```
+Searches by title substring. Useful for cross-app linking.
+
+**Get a single node:**
+```
+GET /api/flowcharts/nodes/:flowchartId/:nodeKey
+```
+Returns a single node's content (title, refs, topics, stage). Primary endpoint for Pyramid to fetch node details.
+
+```typescript
+interface FlowchartNodeRecord {
+  id: string;              // Composite: "{flowchart_id}:{node_key}"
+  flowchart_id: string;
+  node_key: string;        // Stable short ID (e.g., "qsvt", "linalg")
+  title: string;           // Display title
+  refs?: string;           // Markdown references
+  topics?: string;         // Covered topics
+  stage_key?: string;      // Stage grouping
+}
+```
 
 ### Questions
 
-**Note:** Questions are currently stored in **localStorage** (`scribe_questions` key), not server-side. They are not accessible via API. This is a known migration gap.
+Questions are linked to flowchart nodes and stored in SQLite.
+
+**List all questions:**
+```
+GET /api/questions
+```
+
+**Get questions for a specific node:**
+```
+GET /api/questions/by-node?nodeId=X&flowchartId=Y
+```
+
+**Get question counts per node:**
+```
+GET /api/questions/counts-by-node?flowchartId=Y
+```
+Returns `Record<nodeId, count>`.
 
 ```typescript
 interface Question {
   id: string;
-  nodeId: string;           // Flowchart node ID
-  nodeTitle: string;        // Human-readable node name
+  text: string;            // The question text
+  nodeId: string;          // Flowchart node key
+  nodeTitle: string;       // Human-readable node name
   flowchartId: string;
-  question: string;         // The question text
-  answer?: string;          // Optional answer
+  flowchartName: string;
+  checked: boolean;
   createdAt: string;
 }
 ```
@@ -132,19 +181,23 @@ When other apps link to Scribe entities, use these identifiers:
 |--------|-----|---------|
 | Note | `id` (UUID string) | `"a1b2c3d4-..."` |
 | Attachment | `id` (UUID string) | `"e5f6g7h8-..."` |
-| Flowchart | `id` (string from index.json) | `"stochastic-analysis"` |
-| Flowchart node | `nodeTitle` (string) | `"Hahn-Banach Theorem"` |
+| Flowchart | `id` (UUID string) | `"f1234567-..."` |
+| Flowchart node | `node_key` (short string) | `"qsvt"`, `"linalg"` |
+| Question | `id` (UUID string) | `"q1234567-..."` |
 | Subject | `subject` (string) | `"Functional Analysis"` |
 
-**Recommended:** Use `note_id` (UUID) for linking to specific notes. Use `flowchart_node` title string for linking to flowchart nodes (since nodes don't have stable API-accessible IDs beyond their title).
+**Recommended:** Use `node_key` (the short semantic ID) for linking to flowchart nodes. Query via `GET /api/flowcharts/nodes/:flowchartId/:nodeKey`.
 
 ---
 
-## Planned Endpoints for Cross-App Use (Not Yet Implemented)
+## Cross-App Use Cases
 
 | Consumer | Endpoint | Purpose |
 |----------|----------|---------|
-| Navigate | `POST /api/notes` | "Send to Scribe" — create a note pre-filled with paper metadata |
-| Granary | `POST /api/notes` | Promote a Granary entry to a Scribe note |
-| Granary | `GET /api/notes?subject=<subject>` | Fetch notes for a topic to check for duplication |
-| Monolith | `GET /api/notes?subject=<subject>` | Gather notes for a topic to export as .tex draft |
+| Pyramid | `GET /api/flowcharts/nodes/:fId/:nodeKey` | Fetch node content (title, refs, topics) for display |
+| Pyramid | `GET /api/flowcharts/nodes/search?title=X` | Search for nodes across all flowcharts |
+| Pyramid | `GET /api/flowcharts/:id/nodes` | List all nodes in a flowchart |
+| Pyramid | `GET /api/questions/by-node?nodeId=X&flowchartId=Y` | Fetch questions for a node |
+| Navigate | `PUT /api/notes/:id` | "Send to Scribe" — create a note pre-filled with paper metadata |
+| Granary | `PUT /api/notes/:id` | Promote a Granary entry to a Scribe note |
+| Monolith | `GET /api/notes` | Gather notes for export as .tex draft |
