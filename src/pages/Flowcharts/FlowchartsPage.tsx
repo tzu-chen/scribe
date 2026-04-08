@@ -163,6 +163,11 @@ function NodeActionPanel({ nodeId, nodeTitle, flowchartId, flowchartName, onClos
     setShowBookPicker(false);
   };
 
+  const handleRemoveAttachment = async (fileId: string) => {
+    await attachmentStorage.updateSubject(fileId, '');
+    setAttachments((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
   const handleOpenFile = (file: AttachmentMeta) => {
     if (file.type === 'application/pdf') {
       const params = new URLSearchParams();
@@ -254,6 +259,14 @@ function NodeActionPanel({ nodeId, nodeTitle, flowchartId, flowchartName, onClos
                     onClick={() => handleOpenFile(file)}
                   >
                     {stripExtension(file.filename)}
+                  </button>
+                  <button
+                    className={styles.nodePanelRemoveButton}
+                    onClick={() => handleRemoveAttachment(file.id)}
+                    aria-label={`Remove ${file.filename}`}
+                    title="Remove from node"
+                  >
+                    &times;
                   </button>
                 </div>
               ))
@@ -514,6 +527,12 @@ export function FlowchartsPage() {
     setPopupQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, checked } : q)));
   }, []);
 
+  const handlePopupRemoveAttachment = useCallback(async (fileId: string) => {
+    await attachmentStorage.updateSubject(fileId, '');
+    setPopupAttachments((prev) => prev.filter((f) => f.id !== fileId));
+    refreshCounts();
+  }, [refreshCounts]);
+
   const handlePopupAttach = useCallback(() => {
     setPopup(null);
     setShowBookPicker(true);
@@ -572,6 +591,14 @@ export function FlowchartsPage() {
                     <div key={file.id} className={popupStyles.item}>
                       <button className={popupStyles.itemLink} onClick={() => handlePopupOpenFile(file)}>
                         {stripExtension(file.filename)}
+                      </button>
+                      <button
+                        className={popupStyles.removeBtn}
+                        onClick={() => handlePopupRemoveAttachment(file.id)}
+                        aria-label={`Remove ${file.filename}`}
+                        title="Remove from node"
+                      >
+                        &times;
                       </button>
                     </div>
                   ))}
