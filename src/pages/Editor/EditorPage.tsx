@@ -13,7 +13,7 @@ import { useSubjects } from '../../hooks/useSubjects';
 import type { Note, NoteStatus } from '../../types/note';
 import styles from './EditorPage.module.css';
 
-function createNewNote(defaults?: { subject?: string; category?: string }): Note {
+function createNewNote(defaults?: { subject?: string; category?: string; attachmentId?: string; page?: number }): Note {
   const now = new Date().toISOString();
   return {
     id: uuidv4(),
@@ -23,6 +23,8 @@ function createNewNote(defaults?: { subject?: string; category?: string }): Note
     status: 'draft',
     category: defaults?.category,
     subject: defaults?.subject,
+    attachmentId: defaults?.attachmentId,
+    page: defaults?.page,
     createdAt: now,
     updatedAt: now,
   };
@@ -37,9 +39,14 @@ export function EditorPage() {
   const { allCategories } = useCategories(notes);
   const { allSubjects } = useSubjects(notes);
 
-  const [note, setNote] = useState<Note>(() => createNewNote({
-    subject: searchParams.get('subject') || undefined,
-  }));
+  const [note, setNote] = useState<Note>(() => {
+    const pageParam = searchParams.get('page');
+    return createNewNote({
+      subject: searchParams.get('subject') || undefined,
+      attachmentId: searchParams.get('attachmentId') || undefined,
+      page: pageParam ? parseInt(pageParam, 10) : undefined,
+    });
+  });
   const [initialized, setInitialized] = useState(false);
 
   // Load existing note once notes are fetched
@@ -58,7 +65,7 @@ export function EditorPage() {
   }, [id, notes, loading, initialized, navigate]);
 
   const tagsKey = note.tags.join(',');
-  const autoSaveNote = useMemo(() => note, [note.title, note.content, tagsKey, note.category, note.subject]);
+  const autoSaveNote = useMemo(() => note, [note.title, note.content, tagsKey, note.category, note.subject, note.attachmentId, note.page]);
   const saveStatus = useAutoSave(autoSaveNote);
 
   const updateField = useCallback(<K extends keyof Note>(field: K, value: Note[K]) => {
@@ -149,12 +156,12 @@ export function EditorPage() {
           <summary>LaTeX help</summary>
           <div className={styles.helpContent}>
             <p>
-              <strong>Inline math:</strong> <code>{"`$$E = mc^2$$`"}</code>
+              <strong>Inline math:</strong> <code>{"$E = mc^2$"}</code>
             </p>
             <p>
-              <strong>Block math:</strong> Use a fenced code block with language <code>katex</code>:
+              <strong>Display math:</strong> Wrap in double dollars on their own lines:
             </p>
-            <pre>{"```katex\n\\int_0^\\infty e^{-x} dx = 1\n```"}</pre>
+            <pre>{"$$\n\\int_0^\\infty e^{-x} dx = 1\n$$"}</pre>
           </div>
         </details>
       </div>

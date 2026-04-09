@@ -1,34 +1,13 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import MDEditor from '@uiw/react-md-editor';
-import katex from 'katex';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { useNotes } from '../../hooks/useNotes';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ArrowLeftIcon } from '../../components/Icons/Icons';
 import styles from './ViewPage.module.css';
-
-const previewOptions = {
-  components: {
-    code: ({ children, className, ...props }: React.ComponentProps<'code'> & { 'data-code'?: string }) => {
-      const codeString = props['data-code'] || (typeof children === 'string' ? children : '');
-
-      if (typeof className === 'string' && /^language-katex/i.test(className)) {
-        const html = katex.renderToString(codeString, { throwOnError: false, displayMode: true });
-        return <code dangerouslySetInnerHTML={{ __html: html }} style={{ whiteSpace: 'normal' }} />;
-      }
-
-      const text = typeof children === 'string' ? children : '';
-      if (/^\$\$([\s\S]+)\$\$$/m.test(text)) {
-        const expression = text.slice(2, -2);
-        const html = katex.renderToString(expression, { throwOnError: false });
-        return <code dangerouslySetInnerHTML={{ __html: html }} style={{ background: 'none', padding: 0 }} />;
-      }
-
-      return <code className={className}>{children}</code>;
-    },
-  },
-};
 
 export function ViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -106,7 +85,11 @@ export function ViewPage() {
         </header>
 
         <div className={styles.content} data-color-mode={scheme.type === 'dark' ? 'dark' : 'light'}>
-          <MDEditor.Markdown source={note.content} components={previewOptions.components} />
+          <MDEditor.Markdown
+            source={note.content}
+            remarkPlugins={[remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          />
         </div>
       </article>
     </div>

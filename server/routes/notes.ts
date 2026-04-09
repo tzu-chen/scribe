@@ -11,6 +11,8 @@ interface NoteRow {
   status: string;
   category: string | null;
   subject: string | null;
+  attachment_id: string | null;
+  page: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,15 +26,23 @@ function rowToNote(row: NoteRow) {
     status: row.status as 'draft' | 'published',
     category: row.category ?? undefined,
     subject: row.subject ?? undefined,
+    attachmentId: row.attachment_id ?? undefined,
+    page: row.page ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 // GET /api/notes
-router.get('/', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM notes').all() as NoteRow[];
-  res.json(rows.map(rowToNote));
+router.get('/', (req, res) => {
+  const attachmentId = req.query.attachment_id as string | undefined;
+  if (attachmentId) {
+    const rows = db.prepare('SELECT * FROM notes WHERE attachment_id = ?').all(attachmentId) as NoteRow[];
+    res.json(rows.map(rowToNote));
+  } else {
+    const rows = db.prepare('SELECT * FROM notes').all() as NoteRow[];
+    res.json(rows.map(rowToNote));
+  }
 });
 
 // GET /api/notes/:id
@@ -51,8 +61,8 @@ router.put('/:id', (req, res) => {
   const id = req.params.id;
 
   db.prepare(`
-    INSERT INTO notes (id, title, content, tags, status, category, subject, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO notes (id, title, content, tags, status, category, subject, attachment_id, page, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       title = excluded.title,
       content = excluded.content,
@@ -60,6 +70,8 @@ router.put('/:id', (req, res) => {
       status = excluded.status,
       category = excluded.category,
       subject = excluded.subject,
+      attachment_id = excluded.attachment_id,
+      page = excluded.page,
       updated_at = excluded.updated_at
   `).run(
     id,
@@ -69,6 +81,8 @@ router.put('/:id', (req, res) => {
     note.status ?? 'draft',
     note.category ?? null,
     note.subject ?? null,
+    note.attachmentId ?? null,
+    note.page ?? null,
     note.createdAt ?? new Date().toISOString(),
     note.updatedAt ?? new Date().toISOString(),
   );

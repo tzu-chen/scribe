@@ -359,14 +359,18 @@ interface Note {
   status: 'draft' | 'published';
   category?: string;
   subject?: string;      // Links notes to flowchart nodes (via node_key) / attachment subjects
+  attachmentId?: string; // Links note to a specific attachment (book)
+  page?: number;         // Page number within that attachment
   createdAt: string;     // ISO 8601
   updatedAt: string;     // ISO 8601
 }
 ```
 
-Notes support **LaTeX** in the Markdown editor:
-- Inline: `` `$$expression$$` ``
-- Block: fenced code block with language `katex`
+Notes support **LaTeX** in the Markdown editor (same convention as Granary):
+- Inline: `$expression$`
+- Display: `$$expression$$` (on its own lines)
+
+Rendering uses `remark-math` + `rehype-katex` plugins with `@uiw/react-md-editor`.
 
 ### PDF Viewer
 

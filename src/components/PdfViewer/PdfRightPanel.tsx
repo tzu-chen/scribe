@@ -12,6 +12,7 @@ interface Props {
   comments: Record<string, PdfComment[]>;
   notes: Note[];
   subject: string;
+  attachmentId?: string;
   onScrollToPage: (page: number) => void;
   onNavigateToNote: (noteId: string) => void;
   onEditNote: (noteId: string) => void;
@@ -22,6 +23,7 @@ export function PdfRightPanel({
   comments,
   notes,
   subject,
+  attachmentId,
   onScrollToPage,
   onNavigateToNote,
   onEditNote,
@@ -56,6 +58,7 @@ export function PdfRightPanel({
           <PdfNotesTab
             notes={notes}
             subject={subject}
+            attachmentId={attachmentId}
             onNavigateToNote={onNavigateToNote}
             onEditNote={onEditNote}
           />

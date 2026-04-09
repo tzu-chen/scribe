@@ -22,6 +22,12 @@ export const noteStorage = {
     if (!res.ok) throw new Error(`Failed to save note: ${res.status}`);
   },
 
+  async getByAttachment(attachmentId: string): Promise<Note[]> {
+    const res = await fetch(`/api/notes?attachment_id=${encodeURIComponent(attachmentId)}`);
+    if (!res.ok) throw new Error(`Failed to fetch notes: ${res.status}`);
+    return res.json();
+  },
+
   async delete(id: string): Promise<void> {
     const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Failed to delete note: ${res.status}`);

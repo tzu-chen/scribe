@@ -1,0 +1,148 @@
+.postit {
+  position: absolute;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: height 0.15s ease;
+}
+
+/* === Title bar (drag handle) === */
+.titleBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-light);
+  cursor: move;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.titleBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  min-width: 0;
+}
+
+.pageBadge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-border-light);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.saveStatus {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.titleBarRight {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  text-decoration: none;
+}
+
+.iconBtn:hover {
+  background: var(--color-border-light);
+  color: var(--color-text);
+}
+
+/* === Title input === */
+.titleRow {
+  padding: 4px 8px 0;
+  flex-shrink: 0;
+}
+
+.titleInput {
+  width: 100%;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 4px 0;
+}
+
+.titleInput::placeholder {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+/* === Editor area === */
+.editorArea {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 4px 4px;
+}
+
+/* Scale down the MDEditor chrome inside the post-it */
+.editorArea :global(.w-md-editor) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.editorArea :global(.w-md-editor-toolbar) {
+  padding: 2px 4px !important;
+  min-height: unset !important;
+}
+
+.editorArea :global(.w-md-editor-toolbar li > button) {
+  height: 22px !important;
+  width: 22px !important;
+}
+
+/* === Resize grip === */
+.resizeGrip {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+
+.resizeGrip::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
+  opacity: 0.5;
+}
+
+.postit:hover .resizeGrip::after {
+  opacity: 1;
+}

@@ -8,6 +8,8 @@ export interface Note {
   status: NoteStatus;
   category?: string;
   subject?: string;
+  attachmentId?: string;
+  page?: number;
   createdAt: string;
   updatedAt: string;
 }

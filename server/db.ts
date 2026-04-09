@@ -176,4 +176,14 @@ if (!attColumns.some(c => c.name === 'folder_id')) {
 // Create index after migration ensures folder_id column exists
 db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_folder ON attachments(folder_id)');
 
+// Migration: add attachment_id and page columns to notes if missing
+const noteColumns = db.prepare("PRAGMA table_info(notes)").all() as Array<{ name: string }>;
+if (!noteColumns.some(c => c.name === 'attachment_id')) {
+  db.exec(`
+    ALTER TABLE notes ADD COLUMN attachment_id TEXT;
+    ALTER TABLE notes ADD COLUMN page INTEGER;
+  `);
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_notes_attachment ON notes(attachment_id)');
+
 export { db, ATTACHMENTS_DIR };

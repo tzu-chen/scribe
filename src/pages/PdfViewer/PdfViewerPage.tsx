@@ -16,12 +16,12 @@ import { PdfDocumentView, type PdfDocumentViewHandle } from '../../components/Pd
 import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionToolbar';
 import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
 import { PdfCropOverlay } from '../../components/PdfViewer/PdfCropOverlay';
-import { PdfNoteEditorPanel } from '../../components/PdfViewer/PdfNoteEditorPanel';
+import { PdfPostItNote } from '../../components/PdfViewer/PdfPostItNote';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import styles from './PdfViewerPage.module.css';
 
-const DEFAULT_EDITOR_WIDTH = 450;
+import { v4 as uuidv4 } from 'uuid';
 
 export function PdfViewerPage() {
   const { attachmentId } = useParams<{ attachmentId: string }>();
@@ -49,7 +49,6 @@ export function PdfViewerPage() {
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_WIDTH);
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [crop, setCrop] = useState<CropBox>({
     top: savedPrefs?.cropTop ?? 0,
@@ -338,13 +337,23 @@ export function PdfViewerPage() {
     setImmersiveMode(prev => !prev);
   }, []);
 
-  const handleCreateNote = useCallback(() => {
-    if (subject) {
-      navigate(`/note/new?subject=${encodeURIComponent(subject)}`);
-    } else {
-      navigate('/note/new');
-    }
-  }, [navigate, subject]);
+  const handleCreateNote = useCallback(async () => {
+    const now = new Date().toISOString();
+    const newNote = {
+      id: uuidv4(),
+      title: '',
+      content: '',
+      tags: [] as string[],
+      status: 'draft' as const,
+      subject: subject || undefined,
+      attachmentId: attachmentId || undefined,
+      page: currentPage || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await saveNote(newNote);
+    setEditingNoteId(newNote.id);
+  }, [subject, attachmentId, currentPage, saveNote]);
 
   const handleOpenInNewTab = useCallback(() => {
     if (!attachmentId) return;
@@ -500,7 +509,6 @@ export function PdfViewerPage() {
     ? containerWidth
       - (showToc ? 280 : 0)
       - (showRightPanel ? 300 : 0)
-      - (editingNoteId ? editorPanelWidth : 0)
       - 40
     : 0;
   // Use the locked page width captured at fit-width toggle time so
@@ -620,6 +628,14 @@ export function PdfViewerPage() {
             {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
           </button>
         </div>
+        {editingNoteId && (
+          <PdfPostItNote
+            noteId={editingNoteId}
+            notes={notes}
+            saveNote={saveNote}
+            onClose={handleCloseEditor}
+          />
+        )}
         </div>
         {showRightPanel && (
           <PdfRightPanel
@@ -627,19 +643,10 @@ export function PdfViewerPage() {
             comments={annotations.comments}
             notes={notes}
             subject={subject}
+            attachmentId={attachmentId}
             onScrollToPage={handlePanelScrollToPage}
             onNavigateToNote={handleNavigateToNote}
             onEditNote={handleEditNote}
-          />
-        )}
-        {editingNoteId && (
-          <PdfNoteEditorPanel
-            noteId={editingNoteId}
-            notes={notes}
-            saveNote={saveNote}
-            onClose={handleCloseEditor}
-            width={editorPanelWidth}
-            onWidthChange={setEditorPanelWidth}
           />
         )}
       </div>
