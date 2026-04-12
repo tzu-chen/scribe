@@ -8,7 +8,7 @@ import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
 import type { CropBox } from '../../types/crop';
 import { NO_CROP, hasCrop } from '../../types/crop';
-import { ExpandIcon, CollapseIcon } from '../../components/Icons/Icons';
+import { ExpandIcon, CollapseIcon, SidebarLeftIcon, SidebarRightIcon } from '../../components/Icons/Icons';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
 import { PdfSidebar } from '../../components/PdfViewer/PdfSidebar';
 import { PdfRightPanel } from '../../components/PdfViewer/PdfRightPanel';
@@ -355,12 +355,6 @@ export function PdfViewerPage() {
     setEditingNoteId(newNote.id);
   }, [subject, attachmentId, currentPage, saveNote]);
 
-  const handleOpenInNewTab = useCallback(() => {
-    if (!attachmentId) return;
-    const url = `/pdf/${attachmentId}${window.location.search}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }, [attachmentId]);
-
   const handleZoomChange = useCallback((newZoom: number) => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(false);
@@ -574,16 +568,11 @@ export function PdfViewerPage() {
         onPageJump={handleToolbarPageJump}
         zoom={effectiveZoom}
         fitWidth={fitWidth}
-        showToc={showToc}
         twoPageView={twoPageView}
         onZoomChange={handleZoomChange}
         onFitWidthToggle={handleFitWidthToggle}
         onTwoPageViewToggle={handleTwoPageViewToggle}
-        onTocToggle={handleTocToggle}
-        showRightPanel={showRightPanel}
-        onRightPanelToggle={handleRightPanelToggle}
         onCreateNote={handleCreateNote}
-        onOpenInNewTab={handleOpenInNewTab}
         immersiveMode={immersiveMode}
         cropActive={hasCrop(crop)}
         onCropToggle={handleCropModeToggle}
@@ -626,6 +615,24 @@ export function PdfViewerPage() {
             title={immersiveMode ? 'Exit immersive mode (Esc)' : 'Enter immersive mode'}
           >
             {immersiveMode ? <CollapseIcon size={18} /> : <ExpandIcon size={18} />}
+          </button>
+        </div>
+        <div className={styles.tocZone}>
+          <button
+            className={`${styles.floatingToggle} ${showToc ? styles.floatingToggleActive : ''}`}
+            onClick={handleTocToggle}
+            title="Table of contents"
+          >
+            <SidebarLeftIcon size={18} />
+          </button>
+        </div>
+        <div className={styles.panelZone}>
+          <button
+            className={`${styles.floatingToggle} ${showRightPanel ? styles.floatingToggleActive : ''}`}
+            onClick={handleRightPanelToggle}
+            title="Comments & Notes panel"
+          >
+            <SidebarRightIcon size={18} />
           </button>
         </div>
         {editingNoteId && (

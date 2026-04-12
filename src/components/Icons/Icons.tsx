@@ -112,10 +112,51 @@ export function CollapseIcon({ size = 16, ...props }: IconProps) {
   );
 }
 
+export function FitWidthIcon({ size = 16, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
+      <path d="M21 3v18" />
+      <path d="M3 3v18" />
+      <path d="M7 12h10" />
+      <path d="M7 12l3-3" />
+      <path d="M7 12l3 3" />
+      <path d="M17 12l-3-3" />
+      <path d="M17 12l-3 3" />
+    </svg>
+  );
+}
+
+export function TwoPageIcon({ size = 16, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
+      <rect x="2" y="4" width="8.5" height="16" rx="1" />
+      <rect x="13.5" y="4" width="8.5" height="16" rx="1" />
+    </svg>
+  );
+}
+
 export function CropIcon({ size = 16, ...props }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
       <path d="M6 2v4H2v2h4v10h10v4h2v-4h4v-2H8V6h10v10" />
+    </svg>
+  );
+}
+
+export function SidebarLeftIcon({ size = 16, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+    </svg>
+  );
+}
+
+export function SidebarRightIcon({ size = 16, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
     </svg>
   );
 }

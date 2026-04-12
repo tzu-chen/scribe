@@ -93,3 +93,66 @@
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
+
+/* Floating TOC toggle — top-left corner of PDF area */
+.tocZone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60px;
+  height: 60px;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 10px;
+  pointer-events: auto;
+}
+
+/* Floating Panel toggle — bottom-right corner of PDF area */
+.panelZone {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 10px;
+  pointer-events: auto;
+}
+
+.floatingToggle {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.tocZone:hover .floatingToggle,
+.panelZone:hover .floatingToggle {
+  opacity: 1;
+}
+
+.floatingToggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.floatingToggleActive {
+  opacity: 1;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}

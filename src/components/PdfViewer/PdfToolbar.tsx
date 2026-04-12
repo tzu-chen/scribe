@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon } from '../Icons/Icons';
+import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon } from '../Icons/Icons';
 import { stripExtension } from '../../utils/filename';
 import styles from './PdfToolbar.module.css';
 
@@ -12,16 +12,11 @@ interface Props {
   onPageJump: (page: number) => void;
   zoom: number;
   fitWidth: boolean;
-  showToc: boolean;
   twoPageView: boolean;
   onZoomChange: (zoom: number) => void;
   onFitWidthToggle: () => void;
   onTwoPageViewToggle: () => void;
-  onTocToggle: () => void;
-  showRightPanel: boolean;
-  onRightPanelToggle: () => void;
   onCreateNote: () => void;
-  onOpenInNewTab: () => void;
   immersiveMode?: boolean;
   cropActive?: boolean;
   onCropToggle?: () => void;
@@ -34,16 +29,11 @@ export function PdfToolbar({
   onPageJump,
   zoom,
   fitWidth,
-  showToc,
   twoPageView,
   onZoomChange,
   onFitWidthToggle,
   onTwoPageViewToggle,
-  onTocToggle,
-  showRightPanel,
-  onRightPanelToggle,
   onCreateNote,
-  onOpenInNewTab,
   immersiveMode,
   cropActive,
   onCropToggle,
@@ -146,25 +136,25 @@ export function PdfToolbar({
           <PlusIcon size={16} />
         </button>
         <button
-          className={`${styles.fitBtn} ${fitWidth ? styles.fitBtnActive : ''}`}
+          className={`${styles.iconBtn} ${fitWidth ? styles.iconBtnActive : ''}`}
           onClick={onFitWidthToggle}
           title="Fit page width"
         >
-          Fit Width
+          <FitWidthIcon size={16} />
         </button>
         <button
-          className={`${styles.twoPageBtn} ${twoPageView ? styles.twoPageBtnActive : ''}`}
+          className={`${styles.iconBtn} ${twoPageView ? styles.iconBtnActive : ''}`}
           onClick={onTwoPageViewToggle}
           title="Two-page view"
         >
-          2-Page
+          <TwoPageIcon size={16} />
         </button>
         <button
-          className={`${styles.cropBtn} ${cropActive ? styles.cropBtnActive : ''}`}
+          className={`${styles.iconBtn} ${cropActive ? styles.iconBtnActive : ''}`}
           onClick={onCropToggle}
           title={cropActive ? 'Edit crop (crop is active)' : 'Crop pages'}
         >
-          Crop
+          <CropIcon size={16} />
         </button>
         <span className={styles.divider} />
         <button
@@ -209,31 +199,9 @@ export function PdfToolbar({
         >
           <ChevronRightIcon size={18} />
         </button>
-        <span className={styles.divider} />
-        <button
-          className={`${styles.tocBtn} ${showToc ? styles.tocBtnActive : ''}`}
-          onClick={onTocToggle}
-          title="Table of contents"
-        >
-          TOC
-        </button>
       </div>
 
       <div className={styles.right}>
-        <button
-          className={styles.newTabBtn}
-          onClick={onOpenInNewTab}
-          title="Open in new tab"
-        >
-          <ExternalLinkIcon size={16} />
-        </button>
-        <button
-          className={`${styles.panelBtn} ${showRightPanel ? styles.panelBtnActive : ''}`}
-          onClick={onRightPanelToggle}
-          title="Comments & Notes panel"
-        >
-          Panel
-        </button>
         <button className={styles.noteBtn} onClick={onCreateNote}>
           + Create Note
         </button>

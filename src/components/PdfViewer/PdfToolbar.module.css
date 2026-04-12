@@ -28,8 +28,10 @@
 .right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--spacing-sm);
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .filename {
@@ -89,58 +91,24 @@
   color: var(--color-text);
 }
 
-.fitBtn {
-  font-size: 0.8rem;
-  padding: 4px 8px;
+.iconBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border-light);
 }
 
-.fitBtn:hover {
+.iconBtn:hover {
   background: var(--color-bg);
   border-color: var(--color-border);
+  color: var(--color-text);
 }
 
-.fitBtnActive {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.twoPageBtn {
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-light);
-}
-
-.twoPageBtn:hover {
-  background: var(--color-bg);
-  border-color: var(--color-border);
-}
-
-.twoPageBtnActive {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.cropBtn {
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-light);
-}
-
-.cropBtn:hover {
-  background: var(--color-bg);
-  border-color: var(--color-border);
-}
-
-.cropBtnActive {
+.iconBtnActive {
   background: var(--color-primary-light);
   color: var(--color-primary);
   border-color: var(--color-primary);
@@ -206,62 +174,6 @@
   border-radius: var(--radius-sm);
   outline: none;
   background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.tocBtn {
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-light);
-}
-
-.tocBtn:hover {
-  background: var(--color-bg);
-  border-color: var(--color-border);
-}
-
-.tocBtnActive {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.panelBtn {
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-light);
-}
-
-.panelBtn:hover {
-  background: var(--color-bg);
-  border-color: var(--color-border);
-}
-
-.panelBtnActive {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.newTabBtn {
-  font-size: 1rem;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-light);
-}
-
-.newTabBtn:hover {
-  background: var(--color-bg);
-  border-color: var(--color-border);
   color: var(--color-text);
 }
 
