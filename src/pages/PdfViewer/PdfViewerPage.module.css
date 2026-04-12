@@ -156,3 +156,13 @@
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
+
+/* In immersive mode, active toggles should still hide until hovered */
+.immersive .floatingToggleActive {
+  opacity: 0;
+}
+
+.immersive .tocZone:hover .floatingToggleActive,
+.immersive .panelZone:hover .floatingToggleActive {
+  opacity: 1;
+}
