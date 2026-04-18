@@ -73,6 +73,12 @@ router.post('/', upload.single('file'), (req, res) => {
   // multer saved the file with a random name; rename it
   fs.renameSync(file.path, storedPath);
 
+  // Browsers often report DjVu files as application/octet-stream; detect by extension
+  let mimeType = file.mimetype;
+  if (file.originalname.toLowerCase().endsWith('.djvu') && mimeType === 'application/octet-stream') {
+    mimeType = 'image/vnd.djvu';
+  }
+
   const subject = (req.body.subject as string) ?? '';
   const folderId = (req.body.folder_id as string) || null;
   const now = new Date().toISOString();
@@ -80,13 +86,13 @@ router.post('/', upload.single('file'), (req, res) => {
   db.prepare(`
     INSERT INTO attachments (id, subject, filename, type, size, file_path, created_at, folder_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, subject, file.originalname, file.mimetype, file.size, storedFilename, now, folderId);
+  `).run(id, subject, file.originalname, mimeType, file.size, storedFilename, now, folderId);
 
   res.json({
     id,
     subject,
     filename: file.originalname,
-    type: file.mimetype,
+    type: mimeType,
     size: file.size,
     createdAt: now,
     folderId: folderId ?? undefined,

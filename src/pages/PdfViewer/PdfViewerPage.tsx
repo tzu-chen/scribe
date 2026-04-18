@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { viewerPrefsStorage, type ViewerPrefs } from '../../services/viewerPrefsStorage';
 import { usePdfDocument } from '../../hooks/usePdfDocument';
+import { useDjvuDocument } from '../../hooks/useDjvuDocument';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
@@ -17,11 +18,19 @@ import { PdfSelectionToolbar } from '../../components/PdfViewer/PdfSelectionTool
 import { PdfCommentPopover } from '../../components/PdfViewer/PdfCommentPopover';
 import { PdfCropOverlay } from '../../components/PdfViewer/PdfCropOverlay';
 import { PdfPostItNote } from '../../components/PdfViewer/PdfPostItNote';
+import { DjvuPageView } from '../../components/PdfViewer/DjvuPageView';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import styles from './PdfViewerPage.module.css';
 
 import { v4 as uuidv4 } from 'uuid';
+
+function isDjvuBlob(blob: Blob | null, filename: string): boolean {
+  if (!blob) return false;
+  return blob.type === 'image/vnd.djvu'
+    || blob.type === 'image/x-djvu'
+    || filename.toLowerCase().endsWith('.djvu');
+}
 
 export function PdfViewerPage() {
   const { attachmentId } = useParams<{ attachmentId: string }>();
@@ -35,7 +44,13 @@ export function PdfViewerPage() {
 
   useReadingTimeTracker(attachmentId, filename);
 
-  const { pdfDoc, numPages, pageWidth, pageHeight, pageDimensions, outline, loading, error: pdfError } = usePdfDocument(blob);
+  const isDjvu = isDjvuBlob(blob, filename);
+  const pdfResult = usePdfDocument(isDjvu ? null : blob);
+  const djvuResult = useDjvuDocument(isDjvu ? blob : null);
+  const { numPages, pageWidth, pageHeight, pageDimensions, outline, loading, error: docError } =
+    isDjvu ? djvuResult : pdfResult;
+  const pdfDoc = pdfResult.pdfDoc;
+  const djvuDoc = djvuResult.djvuDoc;
   const annotations = usePdfAnnotations(attachmentId || '');
   const customOutline = useCustomOutline(attachmentId, outline);
   const { notes, saveNote } = useNotes();
@@ -154,7 +169,7 @@ export function PdfViewerPage() {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [pdfDoc, loading]);
+  }, [pdfDoc, djvuDoc, loading]);
 
   // Load the attachment blob and sync server-side viewer prefs
   useEffect(() => {
@@ -225,7 +240,8 @@ export function PdfViewerPage() {
   const scrolledForAttachmentRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pdfDoc || loading || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
+    const docReady = isDjvu ? !!djvuDoc : !!pdfDoc;
+    if (!docReady || loading || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
     // Read prefs directly to avoid stale closure
     const prefs = viewerPrefsStorage.get(attachmentId);
     const hasPosition = prefs && (prefs.currentPage > 1 || (prefs.scrollOffsetTop && prefs.scrollOffsetTop > 0));
@@ -239,7 +255,7 @@ export function PdfViewerPage() {
       });
     }
     scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
-  }, [pdfDoc, loading, attachmentId]);
+  }, [pdfDoc, djvuDoc, isDjvu, loading, attachmentId]);
 
   // Once pageDimensions are available, initialize the fit-width reference width
   // based on the saved/current page so restored fit-width prefs work correctly.
@@ -533,7 +549,7 @@ export function PdfViewerPage() {
     }
   }, [effectiveZoom]);
 
-  const errorMessage = loadError || pdfError;
+  const errorMessage = loadError || docError;
 
   if (errorMessage) {
     return (
@@ -545,11 +561,12 @@ export function PdfViewerPage() {
     );
   }
 
-  if (loading || !pdfDoc) {
+  const docReady = isDjvu ? !!djvuDoc : !!pdfDoc;
+  if (loading || !docReady) {
     return (
       <div className={styles.page}>
         <div className={styles.loadingContainer}>
-          <p className={styles.loading}>Loading PDF...</p>
+          <p className={styles.loading}>Loading{isDjvu ? ' DjVu' : ' PDF'}...</p>
         </div>
       </div>
     );
@@ -576,6 +593,7 @@ export function PdfViewerPage() {
         immersiveMode={immersiveMode}
         cropActive={hasCrop(crop)}
         onCropToggle={handleCropModeToggle}
+        fileType={isDjvu ? 'djvu' : 'pdf'}
       />
       <div ref={bodyRef} className={styles.body}>
         {showToc && (
@@ -594,19 +612,30 @@ export function PdfViewerPage() {
         <div className={styles.pdfArea}>
         <PdfDocumentView
           ref={docViewRef}
-          pdfDoc={pdfDoc}
+          pdfDoc={isDjvu ? undefined : pdfDoc!}
           numPages={numPages}
           scale={effectiveZoom}
           pageWidth={pageWidth}
           pageHeight={pageHeight}
           pageDimensions={pageDimensions}
-          highlights={annotations.highlights}
+          highlights={isDjvu ? undefined : annotations.highlights}
           crop={hasCrop(crop) ? crop : undefined}
           twoPageView={twoPageView}
-          onTextSelected={handleTextSelected}
-          onSelectionCleared={handleSelectionCleared}
-          onHighlightClick={handleHighlightClick}
+          onTextSelected={isDjvu ? undefined : handleTextSelected}
+          onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}
+          onHighlightClick={isDjvu ? undefined : handleHighlightClick}
           onPageChange={handlePageChange}
+          renderVisiblePage={isDjvu && djvuDoc ? (pageNum, dims, scale, cropBox, priority) => (
+            <DjvuPageView
+              djvuDoc={djvuDoc}
+              pageNumber={pageNum}
+              scale={scale}
+              expectedWidth={dims.width}
+              expectedHeight={dims.height}
+              crop={cropBox}
+              priority={priority}
+            />
+          ) : undefined}
         />
         <div className={styles.immersiveZone}>
           <button
@@ -658,9 +687,9 @@ export function PdfViewerPage() {
         )}
       </div>
 
-      {cropMode && (
+      {!isDjvu && cropMode && (
         <PdfCropOverlay
-          pdfDoc={pdfDoc}
+          pdfDoc={pdfDoc!}
           pageNumber={currentPage}
           pageWidth={pageDimensions[currentPage - 1]?.width ?? pageWidth}
           pageHeight={pageDimensions[currentPage - 1]?.height ?? pageHeight}
@@ -671,7 +700,7 @@ export function PdfViewerPage() {
         />
       )}
 
-      {textSelection && (
+      {!isDjvu && textSelection && (
         <PdfSelectionToolbar
           position={textSelection.anchorPosition}
           onHighlight={handleHighlight}
@@ -679,7 +708,7 @@ export function PdfViewerPage() {
         />
       )}
 
-      {activeHl && activeHighlight && (
+      {!isDjvu && activeHl && activeHighlight && (
         <PdfCommentPopover
           highlight={activeHl}
           comments={annotations.comments[activeHl.id] || []}

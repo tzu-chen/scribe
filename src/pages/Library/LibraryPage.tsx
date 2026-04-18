@@ -138,7 +138,11 @@ export function LibraryPage() {
   const handleOpen = useCallback(
     (book: AttachmentMeta, openInNewTab = false) => {
       attachmentStorage.markOpened(book.id).catch(() => {});
-      if (book.type === 'application/pdf') {
+      const isViewable = book.type === 'application/pdf'
+        || book.type === 'image/vnd.djvu'
+        || book.type === 'image/x-djvu'
+        || book.filename.toLowerCase().endsWith('.djvu');
+      if (isViewable) {
         if (openInNewTab) {
           window.open(`/pdf/${book.id}`, '_blank', 'noopener,noreferrer');
         } else {

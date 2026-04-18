@@ -6,19 +6,21 @@ import { PdfPageView, type TextSelection } from './PdfPageView';
 import styles from './PdfDocumentView.module.css';
 
 interface Props {
-  pdfDoc: PDFDocumentProxy;
+  pdfDoc?: PDFDocumentProxy;
   numPages: number;
   scale: number;
   pageWidth: number;
   pageHeight: number;
   pageDimensions: { width: number; height: number }[];
-  highlights: PdfHighlight[];
+  highlights?: PdfHighlight[];
   crop?: CropBox;
   twoPageView: boolean;
-  onTextSelected: (selection: TextSelection) => void;
-  onSelectionCleared: () => void;
-  onHighlightClick: (highlightId: string, anchorRect: DOMRect) => void;
+  onTextSelected?: (selection: TextSelection) => void;
+  onSelectionCleared?: () => void;
+  onHighlightClick?: (highlightId: string, anchorRect: DOMRect) => void;
   onPageChange: (page: number) => void;
+  /** Custom page renderer. When provided, replaces the default PdfPageView. */
+  renderVisiblePage?: (pageNum: number, dims: { width: number; height: number }, scale: number, crop: CropBox | undefined, priority: boolean) => ReactNode;
 }
 
 export interface PdfDocumentViewHandle {
@@ -33,7 +35,7 @@ const BUFFER = ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 1 : 
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, renderVisiblePage },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -187,19 +189,22 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     const renderPageContent = (pageNum: number) => {
       const dims = getPageDims(pageNum);
       if (isPageVisible(pageNum)) {
+        if (renderVisiblePage) {
+          return renderVisiblePage(pageNum, dims, scale, crop, navigationPendingRef.current);
+        }
         return (
           <PdfPageView
-            pdfDoc={pdfDoc}
+            pdfDoc={pdfDoc!}
             pageNumber={pageNum}
             scale={scale}
             expectedWidth={dims.width}
             expectedHeight={dims.height}
-            highlights={highlights}
+            highlights={highlights || []}
             crop={crop}
             priority={navigationPendingRef.current}
-            onTextSelected={onTextSelected}
-            onSelectionCleared={onSelectionCleared}
-            onHighlightClick={onHighlightClick}
+            onTextSelected={onTextSelected!}
+            onSelectionCleared={onSelectionCleared!}
+            onHighlightClick={onHighlightClick!}
           />
         );
       }

@@ -44,6 +44,18 @@
   white-space: nowrap;
 }
 
+.formatBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-border-light);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
 .zoomBtn {
   width: 28px;
   height: 28px;

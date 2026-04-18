@@ -1,0 +1,16 @@
+.page {
+  position: relative;
+  margin: 0 auto var(--spacing-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  line-height: 0;
+  overflow: hidden;
+}
+
+.canvas {
+  display: block;
+}
+
+:global([data-theme="dark"]) .canvas {
+  filter: invert(0.9);
+}

@@ -20,6 +20,7 @@ interface Props {
   immersiveMode?: boolean;
   cropActive?: boolean;
   onCropToggle?: () => void;
+  fileType?: 'pdf' | 'djvu';
 }
 
 export function PdfToolbar({
@@ -37,6 +38,7 @@ export function PdfToolbar({
   immersiveMode,
   cropActive,
   onCropToggle,
+  fileType,
 }: Props) {
   const [editingPage, setEditingPage] = useState(false);
   const [pageInput, setPageInput] = useState('');
@@ -102,6 +104,9 @@ export function PdfToolbar({
       <div className={styles.left}>
         <span className={styles.filename} title={stripExtension(filename)}>
           {stripExtension(filename)}
+        </span>
+        <span className={styles.formatBadge}>
+          {fileType === 'djvu' ? 'DJVU' : 'PDF'}
         </span>
       </div>
 

@@ -23,6 +23,7 @@ export default function App() {
             <Route path="/questions" element={<QuestionsPage />} />
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/pdf/:attachmentId" element={<PdfViewerPage />} />
+            <Route path="/view/:attachmentId" element={<PdfViewerPage />} />
             <Route path="/note/new" element={<EditorPage />} />
             <Route path="/note/:id/edit" element={<EditorPage />} />
             <Route path="/note/:id" element={<ViewPage />} />
