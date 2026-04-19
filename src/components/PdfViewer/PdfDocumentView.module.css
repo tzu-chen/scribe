@@ -22,3 +22,9 @@
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-sm);
 }
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0;
+  }
+}

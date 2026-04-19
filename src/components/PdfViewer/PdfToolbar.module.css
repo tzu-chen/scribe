@@ -206,6 +206,7 @@
   .toolbar {
     flex-wrap: wrap;
     gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-xs);
   }
 
   .filename {
