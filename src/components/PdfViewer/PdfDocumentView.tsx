@@ -43,7 +43,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     const navigationPendingRef = useRef(false);
     const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({
       start: 1,
-      end: Math.min(numPages, 5),
+      end: Math.min(numPages, 1 + BUFFER * 2),
     });
 
     useImperativeHandle(ref, () => ({
@@ -127,36 +127,51 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       if (!container) return;
 
       const visiblePages = new Set<number>();
+      // Coalesce IO callbacks within a single frame so momentum-scroll bursts
+      // collapse to one setVisibleRange() commit instead of many.
+      let rafId: number | null = null;
+      let pending: IntersectionObserverEntry[] = [];
+
+      const flush = () => {
+        rafId = null;
+        for (const entry of pending) {
+          const pageNum = Number(
+            (entry.target as HTMLElement).dataset.pageWrapper,
+          );
+          if (entry.isIntersecting) {
+            visiblePages.add(pageNum);
+          } else {
+            visiblePages.delete(pageNum);
+          }
+        }
+        pending = [];
+        if (visiblePages.size === 0) return;
+        const sorted = Array.from(visiblePages).sort((a, b) => a - b);
+        onPageChange(sorted[0]);
+        setVisibleRange({
+          start: Math.max(1, sorted[0] - BUFFER),
+          end: Math.min(numPages, sorted[sorted.length - 1] + BUFFER),
+        });
+      };
 
       const observer = new IntersectionObserver(
         entries => {
-          for (const entry of entries) {
-            const pageNum = Number(
-              (entry.target as HTMLElement).dataset.pageWrapper,
-            );
-            if (entry.isIntersecting) {
-              visiblePages.add(pageNum);
-            } else {
-              visiblePages.delete(pageNum);
-            }
-          }
-          if (visiblePages.size > 0) {
-            const sorted = Array.from(visiblePages).sort((a, b) => a - b);
-            onPageChange(sorted[0]);
-            setVisibleRange({
-              start: Math.max(1, sorted[0] - BUFFER),
-              end: Math.min(numPages, sorted[sorted.length - 1] + BUFFER),
-            });
-          }
+          pending.push(...entries);
+          if (rafId === null) rafId = requestAnimationFrame(flush);
         },
-        { root: container, threshold: 0.01 },
+        // threshold 0.1 + rootMargin give hysteresis so pages don't flap
+        // in/out of the visible set when a momentum flick grazes their edges.
+        { root: container, threshold: 0.1, rootMargin: '100px 0px' },
       );
 
       // Observe all wrapper elements
       const wrappers = container.querySelectorAll('[data-page-wrapper]');
       wrappers.forEach(el => observer.observe(el));
 
-      return () => observer.disconnect();
+      return () => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        observer.disconnect();
+      };
       // Note: `scale` is intentionally excluded.  IntersectionObserver
       // auto-recalculates when observed elements resize (zoom changes page
       // element sizes), so tearing down and recreating the observer on every

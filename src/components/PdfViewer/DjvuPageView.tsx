@@ -3,6 +3,11 @@ import type { DjvuDocument } from '../../hooks/useDjvuDocument';
 import type { CropBox } from '../../types/crop';
 import styles from './DjvuPageView.module.css';
 
+// Mobile momentum scrolls last 500–1500 ms; 50 ms rarely coalesces mid-flick.
+const IS_TOUCH = typeof window !== 'undefined'
+  && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+const RENDER_DEBOUNCE_MS = IS_TOUCH ? 180 : 50;
+
 interface Props {
   djvuDoc: DjvuDocument;
   pageNumber: number;
@@ -68,7 +73,7 @@ export function DjvuPageView({
       }
     };
 
-    const delay = priorityRef.current ? 0 : 50;
+    const delay = priorityRef.current ? 0 : RENDER_DEBOUNCE_MS;
     const timeoutId = setTimeout(() => {
       if (!cancelled) renderPage();
     }, delay);

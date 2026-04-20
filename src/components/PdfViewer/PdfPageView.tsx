@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TextLayer, setLayerDimensions } from 'pdfjs-dist';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import type { PdfHighlight, HighlightRect } from '../../types/annotation';
 import type { CropBox } from '../../types/crop';
 import { PdfHighlightLayer } from './PdfHighlightLayer';
 import { filterTinyRects, mergeRectsOnSameLine } from './rectUtils';
 import styles from './PdfPageView.module.css';
+
+// Mobile momentum scrolls last 500–1500 ms; a 50 ms debounce almost never
+// coalesces mid-flick. Bumping to 180 ms on touch devices collapses multiple
+// transient mounts into one render and reduces canvas/heap churn.
+const IS_TOUCH = typeof window !== 'undefined'
+  && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+const RENDER_DEBOUNCE_MS = IS_TOUCH ? 180 : 50;
 
 export interface TextSelection {
   text: string;
@@ -48,6 +55,10 @@ export function PdfPageView({
   const pageContentRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const textLayerInstanceRef = useRef<TextLayer | null>(null);
+  // Hold the PDFPageProxy so cleanup can release its cached operator list,
+  // fonts, and intent state. Without this, every page visited during a fast
+  // scroll permanently inflates the document's retained heap.
+  const pageRef = useRef<PDFPageProxy | null>(null);
   // Capture priority at mount time so the render effect can read it without
   // adding it to the dependency array (avoids re-triggering renders).
   const priorityRef = useRef(priority);
@@ -61,7 +72,13 @@ export function PdfPageView({
 
     const renderPage = async () => {
       const page = await pdfDoc.getPage(pageNumber);
-      if (cancelled) return;
+      if (cancelled) {
+        // Component unmounted mid-await; release the page we just primed
+        // so it doesn't leak into the document's retained heap.
+        page.cleanup();
+        return;
+      }
+      pageRef.current = page;
 
       // Cap DPR to 2 to limit canvas memory on 3x displays (iPad Pro)
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -141,7 +158,7 @@ export function PdfPageView({
     // scroll or zoom gestures, preventing excessive concurrent canvas allocations.
     // Skip debounce for priority renders (deliberate navigation via TOC, page
     // input, or prev/next buttons) so the target page appears immediately.
-    const delay = priorityRef.current ? 0 : 50;
+    const delay = priorityRef.current ? 0 : RENDER_DEBOUNCE_MS;
     const timeoutId = setTimeout(() => {
       if (!cancelled) renderPage();
     }, delay);
@@ -157,6 +174,10 @@ export function PdfPageView({
         canvas.width = 0;
         canvas.height = 0;
       }
+      // Free pdf.js's per-page caches (operator list, fonts, intent state).
+      // Safe to call after cancel(); pdf.js handles in-flight work.
+      pageRef.current?.cleanup();
+      pageRef.current = null;
     };
   }, [pdfDoc, pageNumber, scale]);
 
