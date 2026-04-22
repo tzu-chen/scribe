@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { OpenBooksProvider } from './contexts/OpenBooksContext';
 import { Layout } from './components/Layout/Layout';
 import { LibraryPage } from './pages/Library/LibraryPage';
 import { NotesPage } from './pages/Notes/NotesPage';
@@ -15,6 +16,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
+        <OpenBooksProvider>
         <Layout>
           <Routes>
             <Route path="/" element={<LibraryPage />} />
@@ -29,6 +31,7 @@ export default function App() {
             <Route path="/note/:id" element={<ViewPage />} />
           </Routes>
         </Layout>
+        </OpenBooksProvider>
       </BrowserRouter>
     </ThemeProvider>
   );

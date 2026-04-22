@@ -21,6 +21,8 @@ import { PdfPostItNote } from '../../components/PdfViewer/PdfPostItNote';
 import { DjvuPageView } from '../../components/PdfViewer/DjvuPageView';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
+import { useOpenBooks } from '../../contexts/OpenBooksContext';
+import { BookTabs } from '../../components/BookTabs/BookTabs';
 import styles from './PdfViewerPage.module.css';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -43,6 +45,11 @@ export function PdfViewerPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useReadingTimeTracker(attachmentId, filename);
+
+  const { openBook } = useOpenBooks();
+  useEffect(() => {
+    if (attachmentId && filename) openBook(attachmentId, filename);
+  }, [attachmentId, filename, openBook]);
 
   const isDjvu = isDjvuBlob(blob, filename);
   const pdfResult = usePdfDocument(isDjvu ? null : blob);
@@ -81,6 +88,12 @@ export function PdfViewerPage() {
 
   const docViewRef = useRef<PdfDocumentViewHandle>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Tracks which attachmentId the currently loaded blob/pdfDoc belongs to.
+  // Without this, on a tab switch the scroll-to-saved-page effect runs while
+  // pdfDoc still references the previous tab's document, marks the scroll as
+  // "done" against the new attachmentId, and then no-ops when the actual
+  // document loads — leaving the new tab stuck on page 1.
+  const loadedAttachmentIdRef = useRef<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
   const prevEffectiveZoomRef = useRef<number>(0);
@@ -176,13 +189,20 @@ export function PdfViewerPage() {
     if (!attachmentId) return;
     setBlob(null);
     setLoadError(null);
+    loadedAttachmentIdRef.current = null;
     let cancelled = false;
 
     const load = async () => {
       try {
+        // Local prefs are the source of truth on this device — they're updated
+        // continuously and survive tab switches. Only fall back to the server
+        // when this device has never seen the book (true cross-device sync),
+        // otherwise an in-flight server PUT can race a tab switch and the
+        // fetched data clobbers the just-saved local position.
+        const localPrefs = viewerPrefsStorage.get(attachmentId);
         const [b, serverPrefs] = await Promise.all([
           attachmentStorage.getBlob(attachmentId),
-          viewerPrefsStorage.fetchFromServer(attachmentId),
+          localPrefs ? Promise.resolve(null) : viewerPrefsStorage.fetchFromServer(attachmentId),
         ]);
         if (cancelled) return;
         if (!b) {
@@ -190,7 +210,6 @@ export function PdfViewerPage() {
           return;
         }
 
-        // If server has prefs (cross-device sync), update localStorage and state
         if (serverPrefs) {
           viewerPrefsStorage.get(attachmentId); // ensure localStorage is read
           // Write server prefs to localStorage cache (skip the server save
@@ -217,6 +236,7 @@ export function PdfViewerPage() {
           };
         }
 
+        loadedAttachmentIdRef.current = attachmentId;
         setBlob(b);
 
         // Mark as recently opened so Library "last opened" stays current
@@ -242,6 +262,9 @@ export function PdfViewerPage() {
   useEffect(() => {
     const docReady = isDjvu ? !!djvuDoc : !!pdfDoc;
     if (!docReady || loading || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
+    // Guard against the previous tab's pdfDoc still being live in this render
+    // — only scroll once the loaded document actually corresponds to attachmentId.
+    if (loadedAttachmentIdRef.current !== attachmentId) return;
     // Read prefs directly to avoid stale closure
     const prefs = viewerPrefsStorage.get(attachmentId);
     const hasPosition = prefs && (prefs.currentPage > 1 || (prefs.scrollOffsetTop && prefs.scrollOffsetTop > 0));
@@ -595,6 +618,7 @@ export function PdfViewerPage() {
         onCropToggle={handleCropModeToggle}
         fileType={isDjvu ? 'djvu' : 'pdf'}
       />
+      {!immersiveMode && <BookTabs activeId={attachmentId} />}
       <div ref={bodyRef} className={styles.body}>
         {showToc && (
           <PdfSidebar
