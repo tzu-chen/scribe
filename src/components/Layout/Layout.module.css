@@ -59,6 +59,15 @@
   font-weight: 600;
 }
 
+.navLinkDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.navLinkDisabled:hover {
+  color: var(--color-text-secondary);
+}
+
 .navSpacer {
   flex: 1;
 }

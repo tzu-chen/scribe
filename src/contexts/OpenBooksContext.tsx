@@ -7,11 +7,13 @@ export interface OpenBookTab {
 
 interface OpenBooksContextValue {
   tabs: OpenBookTab[];
+  lastActiveId: string | null;
   openBook: (id: string, filename: string) => void;
   closeBook: (id: string) => OpenBookTab[];
 }
 
 const STORAGE_KEY = 'scribe_open_books';
+const LAST_ACTIVE_KEY = 'scribe_open_books_last_active';
 
 const OpenBooksContext = createContext<OpenBooksContextValue | null>(null);
 
@@ -30,12 +32,25 @@ function loadTabs(): OpenBookTab[] {
   }
 }
 
+function loadLastActive(): string | null {
+  return localStorage.getItem(LAST_ACTIVE_KEY);
+}
+
 export function OpenBooksProvider({ children }: { children: React.ReactNode }) {
   const [tabs, setTabs] = useState<OpenBookTab[]>(() => loadTabs());
+  const [lastActiveId, setLastActiveId] = useState<string | null>(() => loadLastActive());
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
   }, [tabs]);
+
+  useEffect(() => {
+    if (lastActiveId) {
+      localStorage.setItem(LAST_ACTIVE_KEY, lastActiveId);
+    } else {
+      localStorage.removeItem(LAST_ACTIVE_KEY);
+    }
+  }, [lastActiveId]);
 
   const openBook = useCallback((id: string, filename: string) => {
     setTabs(prev => {
@@ -46,6 +61,7 @@ export function OpenBooksProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, { id, filename }];
     });
+    setLastActiveId(id);
   }, []);
 
   const closeBook = useCallback((id: string) => {
@@ -54,11 +70,15 @@ export function OpenBooksProvider({ children }: { children: React.ReactNode }) {
       next = prev.filter(t => t.id !== id);
       return next;
     });
+    setLastActiveId(prev => {
+      if (prev !== id) return prev;
+      return next.length > 0 ? next[next.length - 1].id : null;
+    });
     return next;
   }, []);
 
   return (
-    <OpenBooksContext.Provider value={{ tabs, openBook, closeBook }}>
+    <OpenBooksContext.Provider value={{ tabs, lastActiveId, openBook, closeBook }}>
       {children}
     </OpenBooksContext.Provider>
   );

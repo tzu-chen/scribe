@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeMenu } from '../ThemeMenu/ThemeMenu';
+import { useOpenBooks } from '../../contexts/OpenBooksContext';
 import scribeLogo from '../../scribe.svg';
 import styles from './Layout.module.css';
 
@@ -9,12 +10,17 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const { tabs, lastActiveId } = useOpenBooks();
   const isHome = location.pathname === '/';
   const isNotes = location.pathname === '/notes';
   const isFlowcharts = location.pathname === '/flowcharts';
   const isQuestions = location.pathname === '/questions';
   const isSummary = location.pathname === '/summary';
   const isPdfViewer = location.pathname.startsWith('/pdf/');
+  const readTargetId = lastActiveId && tabs.some(t => t.id === lastActiveId)
+    ? lastActiveId
+    : tabs[tabs.length - 1]?.id ?? null;
+  const readDisabled = !readTargetId;
   const isFlowchartView = isFlowcharts && new URLSearchParams(location.search).has('view');
   const useFullWidth = isPdfViewer || isFlowchartView;
 
@@ -38,6 +44,22 @@ export function Layout({ children }: LayoutProps) {
             >
               Notes
             </Link>
+            {readDisabled ? (
+              <span
+                className={`${styles.navLink} ${styles.navLinkDisabled}`}
+                aria-disabled="true"
+                title="Open a book from the Library to enable Read"
+              >
+                Read
+              </span>
+            ) : (
+              <Link
+                to={`/pdf/${readTargetId}`}
+                className={`${styles.navLink} ${isPdfViewer ? styles.navLinkActive : ''}`}
+              >
+                Read
+              </Link>
+            )}
             <Link
               to="/flowcharts"
               className={`${styles.navLink} ${isFlowcharts ? styles.navLinkActive : ''}`}
