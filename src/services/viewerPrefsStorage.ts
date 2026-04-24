@@ -8,6 +8,10 @@ export interface ViewerPrefs {
   cropRight?: number;
   cropBottom?: number;
   cropLeft?: number;
+  cropTopEven?: number;
+  cropRightEven?: number;
+  cropBottomEven?: number;
+  cropLeftEven?: number;
 }
 
 const STORAGE_KEY = 'scribe_viewer_prefs';
@@ -48,16 +52,24 @@ export const viewerPrefsStorage = {
       const res = await fetch(`/api/viewer-prefs/${encodeURIComponent(attachmentId)}`);
       if (!res.ok) return null;
       const data = await res.json();
+      const oddT = data.cropTop ?? 0;
+      const oddR = data.cropRight ?? 0;
+      const oddB = data.cropBottom ?? 0;
+      const oddL = data.cropLeft ?? 0;
       return {
         zoom: data.zoom,
         fitWidth: data.fitWidth,
         currentPage: data.currentPage,
         twoPageView: data.twoPageView ?? false,
         scrollOffsetTop: data.scrollOffsetTop ?? 0,
-        cropTop: data.cropTop ?? 0,
-        cropRight: data.cropRight ?? 0,
-        cropBottom: data.cropBottom ?? 0,
-        cropLeft: data.cropLeft ?? 0,
+        cropTop: oddT,
+        cropRight: oddR,
+        cropBottom: oddB,
+        cropLeft: oddL,
+        cropTopEven: data.cropTopEven ?? oddT,
+        cropRightEven: data.cropRightEven ?? oddR,
+        cropBottomEven: data.cropBottomEven ?? oddB,
+        cropLeftEven: data.cropLeftEven ?? oddL,
       };
     } catch {
       return null;
@@ -65,6 +77,10 @@ export const viewerPrefsStorage = {
   },
 
   async saveToServer(attachmentId: string, prefs: ViewerPrefs): Promise<void> {
+    const oddT = prefs.cropTop ?? 0;
+    const oddR = prefs.cropRight ?? 0;
+    const oddB = prefs.cropBottom ?? 0;
+    const oddL = prefs.cropLeft ?? 0;
     await fetch(`/api/viewer-prefs/${encodeURIComponent(attachmentId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -74,10 +90,14 @@ export const viewerPrefsStorage = {
         currentPage: prefs.currentPage,
         twoPageView: prefs.twoPageView ?? false,
         scrollOffsetTop: prefs.scrollOffsetTop ?? 0,
-        cropTop: prefs.cropTop ?? 0,
-        cropRight: prefs.cropRight ?? 0,
-        cropBottom: prefs.cropBottom ?? 0,
-        cropLeft: prefs.cropLeft ?? 0,
+        cropTop: oddT,
+        cropRight: oddR,
+        cropBottom: oddB,
+        cropLeft: oddL,
+        cropTopEven: prefs.cropTopEven ?? oddT,
+        cropRightEven: prefs.cropRightEven ?? oddR,
+        cropBottomEven: prefs.cropBottomEven ?? oddB,
+        cropLeftEven: prefs.cropLeftEven ?? oddL,
       }),
     });
   },

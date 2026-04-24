@@ -14,6 +14,7 @@ interface Props {
   pageDimensions: { width: number; height: number }[];
   highlights?: PdfHighlight[];
   crop?: CropBox;
+  cropEven?: CropBox;
   twoPageView: boolean;
   onTextSelected?: (selection: TextSelection) => void;
   onSelectionCleared?: () => void;
@@ -35,7 +36,7 @@ const BUFFER = ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 1 : 
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, renderVisiblePage },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, cropEven, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, renderVisiblePage },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -196,16 +197,17 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       [pageDimensions, pageWidth, pageHeight],
     );
 
-    const cropT = crop?.top ?? 0;
-    const cropR = crop?.right ?? 0;
-    const cropB = crop?.bottom ?? 0;
-    const cropL = crop?.left ?? 0;
+    const cropForPage = (pageNum: number): CropBox | undefined => {
+      const c = pageNum % 2 === 1 ? crop : (cropEven ?? crop);
+      return c;
+    };
 
     const renderPageContent = (pageNum: number) => {
       const dims = getPageDims(pageNum);
+      const pageCrop = cropForPage(pageNum);
       if (isPageVisible(pageNum)) {
         if (renderVisiblePage) {
-          return renderVisiblePage(pageNum, dims, scale, crop, navigationPendingRef.current);
+          return renderVisiblePage(pageNum, dims, scale, pageCrop, navigationPendingRef.current);
         }
         return (
           <PdfPageView
@@ -215,7 +217,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
             expectedWidth={dims.width}
             expectedHeight={dims.height}
             highlights={highlights || []}
-            crop={crop}
+            crop={pageCrop}
             priority={navigationPendingRef.current}
             onTextSelected={onTextSelected!}
             onSelectionCleared={onSelectionCleared!}
@@ -223,6 +225,10 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
           />
         );
       }
+      const cropT = pageCrop?.top ?? 0;
+      const cropR = pageCrop?.right ?? 0;
+      const cropB = pageCrop?.bottom ?? 0;
+      const cropL = pageCrop?.left ?? 0;
       const isCropped = cropT > 0 || cropR > 0 || cropB > 0 || cropL > 0;
       return (
         <div

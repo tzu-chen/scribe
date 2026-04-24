@@ -142,7 +142,8 @@
   gap: var(--spacing-sm);
 }
 
-.applyBtn {
+.applyBtn,
+.applyAllBtn {
   font-size: 0.85rem;
   padding: 8px 20px;
   border-radius: var(--radius-md);
@@ -151,8 +152,43 @@
   white-space: nowrap;
 }
 
-.applyBtn:hover {
+.applyAllBtn {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--color-primary);
+}
+
+.applyBtn:hover,
+.applyAllBtn:hover {
   background: var(--color-primary-hover);
+  color: var(--color-primary-text);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  font-size: 0.85rem;
+  padding: 6px 16px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tabActive,
+.tabActive:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
 }
 
 .resetBtn,

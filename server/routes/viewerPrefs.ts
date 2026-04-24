@@ -14,6 +14,10 @@ interface ViewerPrefsRow {
   crop_right: number;
   crop_bottom: number;
   crop_left: number;
+  crop_top_even: number;
+  crop_right_even: number;
+  crop_bottom_even: number;
+  crop_left_even: number;
   updated_at: string;
 }
 
@@ -28,6 +32,10 @@ function rowToPrefs(row: ViewerPrefsRow) {
     cropRight: row.crop_right,
     cropBottom: row.crop_bottom,
     cropLeft: row.crop_left,
+    cropTopEven: row.crop_top_even,
+    cropRightEven: row.crop_right_even,
+    cropBottomEven: row.crop_bottom_even,
+    cropLeftEven: row.crop_left_even,
   };
 }
 
@@ -49,7 +57,21 @@ router.get('/:attachmentId', (req, res) => {
 // PUT /api/viewer-prefs/:attachmentId
 router.put('/:attachmentId', (req, res) => {
   const { attachmentId } = req.params;
-  const { zoom, fitWidth, currentPage, twoPageView, scrollOffsetTop, cropTop, cropRight, cropBottom, cropLeft } = req.body as {
+  const {
+    zoom,
+    fitWidth,
+    currentPage,
+    twoPageView,
+    scrollOffsetTop,
+    cropTop,
+    cropRight,
+    cropBottom,
+    cropLeft,
+    cropTopEven,
+    cropRightEven,
+    cropBottomEven,
+    cropLeftEven,
+  } = req.body as {
     zoom: number;
     fitWidth: boolean;
     currentPage: number;
@@ -59,6 +81,10 @@ router.put('/:attachmentId', (req, res) => {
     cropRight?: number;
     cropBottom?: number;
     cropLeft?: number;
+    cropTopEven?: number;
+    cropRightEven?: number;
+    cropBottomEven?: number;
+    cropLeftEven?: number;
   };
 
   if (typeof zoom !== 'number' || typeof currentPage !== 'number') {
@@ -68,9 +94,16 @@ router.put('/:attachmentId', (req, res) => {
 
   const now = new Date().toISOString();
 
+  // If the client didn't send even-page values, fall back to odd-page values so
+  // older clients continue to apply one crop to every page.
+  const oddT = cropTop ?? 0;
+  const oddR = cropRight ?? 0;
+  const oddB = cropBottom ?? 0;
+  const oddL = cropLeft ?? 0;
+
   db.prepare(`
-    INSERT INTO viewer_prefs (attachment_id, zoom, fit_width, current_page, two_page_view, scroll_offset_top, crop_top, crop_right, crop_bottom, crop_left, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO viewer_prefs (attachment_id, zoom, fit_width, current_page, two_page_view, scroll_offset_top, crop_top, crop_right, crop_bottom, crop_left, crop_top_even, crop_right_even, crop_bottom_even, crop_left_even, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(attachment_id) DO UPDATE SET
       zoom = excluded.zoom,
       fit_width = excluded.fit_width,
@@ -81,6 +114,10 @@ router.put('/:attachmentId', (req, res) => {
       crop_right = excluded.crop_right,
       crop_bottom = excluded.crop_bottom,
       crop_left = excluded.crop_left,
+      crop_top_even = excluded.crop_top_even,
+      crop_right_even = excluded.crop_right_even,
+      crop_bottom_even = excluded.crop_bottom_even,
+      crop_left_even = excluded.crop_left_even,
       updated_at = excluded.updated_at
   `).run(
     attachmentId,
@@ -89,10 +126,14 @@ router.put('/:attachmentId', (req, res) => {
     currentPage,
     twoPageView ? 1 : 0,
     scrollOffsetTop ?? 0,
-    cropTop ?? 0,
-    cropRight ?? 0,
-    cropBottom ?? 0,
-    cropLeft ?? 0,
+    oddT,
+    oddR,
+    oddB,
+    oddL,
+    cropTopEven ?? oddT,
+    cropRightEven ?? oddR,
+    cropBottomEven ?? oddB,
+    cropLeftEven ?? oddL,
     now,
   );
 

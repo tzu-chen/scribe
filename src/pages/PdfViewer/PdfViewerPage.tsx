@@ -78,6 +78,12 @@ export function PdfViewerPage() {
     bottom: savedPrefs?.cropBottom ?? 0,
     left: savedPrefs?.cropLeft ?? 0,
   });
+  const [cropEven, setCropEven] = useState<CropBox>({
+    top: savedPrefs?.cropTopEven ?? savedPrefs?.cropTop ?? 0,
+    right: savedPrefs?.cropRightEven ?? savedPrefs?.cropRight ?? 0,
+    bottom: savedPrefs?.cropBottomEven ?? savedPrefs?.cropBottom ?? 0,
+    left: savedPrefs?.cropLeftEven ?? savedPrefs?.cropLeft ?? 0,
+  });
   const [cropMode, setCropMode] = useState(false);
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
@@ -123,6 +129,12 @@ export function PdfViewerPage() {
       right: prefs?.cropRight ?? 0,
       bottom: prefs?.cropBottom ?? 0,
       left: prefs?.cropLeft ?? 0,
+    });
+    setCropEven({
+      top: prefs?.cropTopEven ?? prefs?.cropTop ?? 0,
+      right: prefs?.cropRightEven ?? prefs?.cropRight ?? 0,
+      bottom: prefs?.cropBottomEven ?? prefs?.cropBottom ?? 0,
+      left: prefs?.cropLeftEven ?? prefs?.cropLeft ?? 0,
     });
     setCropMode(false);
     setShowToc(false);
@@ -230,6 +242,12 @@ export function PdfViewerPage() {
             bottom: serverPrefs.cropBottom ?? 0,
             left: serverPrefs.cropLeft ?? 0,
           });
+          setCropEven({
+            top: serverPrefs.cropTopEven ?? serverPrefs.cropTop ?? 0,
+            right: serverPrefs.cropRightEven ?? serverPrefs.cropRight ?? 0,
+            bottom: serverPrefs.cropBottomEven ?? serverPrefs.cropBottom ?? 0,
+            left: serverPrefs.cropLeftEven ?? serverPrefs.cropLeft ?? 0,
+          });
           lastScrollPosRef.current = {
             page: serverPrefs.currentPage ?? 1,
             offsetTop: serverPrefs.scrollOffsetTop ?? 0,
@@ -315,8 +333,12 @@ export function PdfViewerPage() {
       cropRight: crop.right,
       cropBottom: crop.bottom,
       cropLeft: crop.left,
+      cropTopEven: cropEven.top,
+      cropRightEven: cropEven.right,
+      cropBottomEven: cropEven.bottom,
+      cropLeftEven: cropEven.left,
     };
-  }, [zoom, fitWidth, currentPage, twoPageView, crop]);
+  }, [zoom, fitWidth, currentPage, twoPageView, crop, cropEven]);
 
   // Debounced save of viewer preferences
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -419,15 +441,17 @@ export function PdfViewerPage() {
     setCropMode(prev => !prev);
   }, []);
 
-  const handleCropApply = useCallback((newCrop: CropBox) => {
+  const handleCropApply = useCallback((newCropOdd: CropBox, newCropEven: CropBox) => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
-    setCrop(newCrop);
+    setCrop(newCropOdd);
+    setCropEven(newCropEven);
     setCropMode(false);
   }, []);
 
   const handleCropReset = useCallback(() => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setCrop(NO_CROP);
+    setCropEven(NO_CROP);
     setCropMode(false);
   }, []);
 
@@ -547,7 +571,14 @@ export function PdfViewerPage() {
   // Use the locked page width captured at fit-width toggle time so
   // effectiveZoom doesn't change as the user scrolls across pages.
   const currentPageWidth = fitWidth ? fitWidthRefPageWidth.current : pageWidth;
-  const croppedPageWidth = currentPageWidth * (1 - crop.left - crop.right);
+  // Use the widest of the two crops so the fit-width scale accommodates whichever
+  // page parity needs the most horizontal space — otherwise the narrower-cropped
+  // pages would overflow.
+  const minHorizCropFactor = Math.min(
+    1 - crop.left - crop.right,
+    1 - cropEven.left - cropEven.right,
+  );
+  const croppedPageWidth = currentPageWidth * minHorizCropFactor;
   // In two-page view, two pages sit side by side with an 8px gap between them.
   const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / fitWidthPageSpan) : zoom;
@@ -614,7 +645,7 @@ export function PdfViewerPage() {
         onTwoPageViewToggle={handleTwoPageViewToggle}
         onCreateNote={handleCreateNote}
         immersiveMode={immersiveMode}
-        cropActive={hasCrop(crop)}
+        cropActive={hasCrop(crop) || hasCrop(cropEven)}
         onCropToggle={handleCropModeToggle}
         fileType={isDjvu ? 'djvu' : 'pdf'}
       />
@@ -644,6 +675,7 @@ export function PdfViewerPage() {
           pageDimensions={pageDimensions}
           highlights={isDjvu ? undefined : annotations.highlights}
           crop={hasCrop(crop) ? crop : undefined}
+          cropEven={hasCrop(cropEven) ? cropEven : undefined}
           twoPageView={twoPageView}
           onTextSelected={isDjvu ? undefined : handleTextSelected}
           onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}
@@ -715,9 +747,11 @@ export function PdfViewerPage() {
         <PdfCropOverlay
           pdfDoc={pdfDoc!}
           pageNumber={currentPage}
+          numPages={numPages}
           pageWidth={pageDimensions[currentPage - 1]?.width ?? pageWidth}
           pageHeight={pageDimensions[currentPage - 1]?.height ?? pageHeight}
-          currentCrop={crop}
+          currentCropOdd={crop}
+          currentCropEven={cropEven}
           onApply={handleCropApply}
           onReset={handleCropReset}
           onCancel={handleCropCancel}

@@ -95,6 +95,10 @@ db.exec(`
     crop_right REAL NOT NULL DEFAULT 0,
     crop_bottom REAL NOT NULL DEFAULT 0,
     crop_left REAL NOT NULL DEFAULT 0,
+    crop_top_even REAL NOT NULL DEFAULT 0,
+    crop_right_even REAL NOT NULL DEFAULT 0,
+    crop_bottom_even REAL NOT NULL DEFAULT 0,
+    crop_left_even REAL NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
   );
 
@@ -164,6 +168,25 @@ if (!vpColumns.some(c => c.name === 'crop_top')) {
     ALTER TABLE viewer_prefs ADD COLUMN crop_right REAL NOT NULL DEFAULT 0;
     ALTER TABLE viewer_prefs ADD COLUMN crop_bottom REAL NOT NULL DEFAULT 0;
     ALTER TABLE viewer_prefs ADD COLUMN crop_left REAL NOT NULL DEFAULT 0;
+  `);
+}
+
+// Migration: add even-page crop columns to viewer_prefs if missing.
+// Existing rows default to 0 for the new columns; the server route backfills
+// from the odd-page values when responding, so pre-existing crops continue to
+// apply to every page until the user explicitly sets different even-page values.
+const vpColumnsAfter = db.prepare("PRAGMA table_info(viewer_prefs)").all() as Array<{ name: string }>;
+if (!vpColumnsAfter.some(c => c.name === 'crop_top_even')) {
+  db.exec(`
+    ALTER TABLE viewer_prefs ADD COLUMN crop_top_even REAL NOT NULL DEFAULT 0;
+    ALTER TABLE viewer_prefs ADD COLUMN crop_right_even REAL NOT NULL DEFAULT 0;
+    ALTER TABLE viewer_prefs ADD COLUMN crop_bottom_even REAL NOT NULL DEFAULT 0;
+    ALTER TABLE viewer_prefs ADD COLUMN crop_left_even REAL NOT NULL DEFAULT 0;
+    UPDATE viewer_prefs SET
+      crop_top_even = crop_top,
+      crop_right_even = crop_right,
+      crop_bottom_even = crop_bottom,
+      crop_left_even = crop_left;
   `);
 }
 

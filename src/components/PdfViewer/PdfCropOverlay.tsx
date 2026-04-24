@@ -6,43 +6,65 @@ import styles from './PdfCropOverlay.module.css';
 
 interface Props {
   pdfDoc: PDFDocumentProxy;
+  /** Page the viewer was on when the overlay opened — used to pick a sensible sample page for each parity. */
   pageNumber: number;
+  numPages: number;
   pageWidth: number;
   pageHeight: number;
-  currentCrop: CropBox;
-  onApply: (crop: CropBox) => void;
+  currentCropOdd: CropBox;
+  currentCropEven: CropBox;
+  onApply: (cropOdd: CropBox, cropEven: CropBox) => void;
   onReset: () => void;
   onCancel: () => void;
 }
 
 type DragEdge = 'top' | 'right' | 'bottom' | 'left' | null;
+type Parity = 'odd' | 'even';
 
 const MAX_CROP = 0.45;
+
+function sampleFor(parity: Parity, currentPage: number, numPages: number): number {
+  if (parity === 'odd') {
+    if (currentPage % 2 === 1) return currentPage;
+    if (currentPage > 1) return currentPage - 1;
+    return Math.min(numPages, currentPage + 1);
+  }
+  if (currentPage % 2 === 0) return currentPage;
+  if (currentPage < numPages) return currentPage + 1;
+  return Math.max(1, currentPage - 1);
+}
 
 export function PdfCropOverlay({
   pdfDoc,
   pageNumber,
+  numPages,
   pageWidth,
   pageHeight,
-  currentCrop,
+  currentCropOdd,
+  currentCropEven,
   onApply,
   onReset,
   onCancel,
 }: Props) {
-  const [crop, setCrop] = useState<CropBox>({ ...currentCrop });
+  const [cropOdd, setCropOdd] = useState<CropBox>({ ...currentCropOdd });
+  const [cropEven, setCropEven] = useState<CropBox>({ ...currentCropEven });
+  const [parity, setParity] = useState<Parity>(pageNumber % 2 === 1 ? 'odd' : 'even');
   const [dragging, setDragging] = useState<DragEdge>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
 
+  const crop = parity === 'odd' ? cropOdd : cropEven;
+  const setCrop = parity === 'odd' ? setCropOdd : setCropEven;
+  const samplePage = sampleFor(parity, pageNumber, numPages);
+
   // Calculate preview size — fit the ENTIRE page within the viewport,
-  // leaving room for the hint text and control buttons (~100px).
+  // leaving room for the hint text, tab bar, and control buttons (~160px).
   const aspect = pageWidth / pageHeight;
   const maxW = window.innerWidth * 0.85;
-  const maxH = window.innerHeight - 120;
+  const maxH = window.innerHeight - 180;
   let previewW: number;
   let previewH: number;
-  // Always constrain by whichever dimension is tighter
   if (maxW / aspect <= maxH) {
     previewW = maxW;
     previewH = maxW / aspect;
@@ -51,14 +73,15 @@ export function PdfCropOverlay({
     previewW = maxH * aspect;
   }
 
-  // Render the actual PDF page to the canvas
+  // Render the actual PDF page to the canvas. Re-renders whenever the sample
+  // page changes (parity toggle) so the user sees real content for that side.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelled = false;
 
     const renderPage = async () => {
-      const page = await pdfDoc.getPage(pageNumber);
+      const page = await pdfDoc.getPage(samplePage);
       if (cancelled) return;
 
       const scale = previewW / pageWidth;
@@ -87,7 +110,7 @@ export function PdfCropOverlay({
       cancelled = true;
       renderTaskRef.current?.cancel();
     };
-  }, [pdfDoc, pageNumber, pageWidth, previewW]);
+  }, [pdfDoc, samplePage, pageWidth, previewW]);
 
   const handlePointerDown = useCallback((edge: DragEdge) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -112,7 +135,7 @@ export function PdfCropOverlay({
       }
       return next;
     });
-  }, [dragging]);
+  }, [dragging, setCrop]);
 
   const handlePointerUp = useCallback(() => {
     setDragging(null);
@@ -126,6 +149,15 @@ export function PdfCropOverlay({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
+  const handleApplyToAll = () => {
+    // Copy the currently-edited parity's crop to both sides.
+    onApply(crop, crop);
+  };
+
+  const handleApply = () => {
+    onApply(cropOdd, cropEven);
+  };
+
   const cropTopPx = crop.top * previewH;
   const cropBottomPx = crop.bottom * previewH;
   const cropLeftPx = crop.left * previewW;
@@ -135,11 +167,27 @@ export function PdfCropOverlay({
   const cropAreaWidth = previewW - cropLeftPx - cropRightPx;
   const cropAreaHeight = previewH - cropTopPx - cropBottomPx;
 
+  const anyCurrentCrop = hasCrop(currentCropOdd) || hasCrop(currentCropEven);
+
   return (
     <div className={styles.overlay} onClick={onCancel}>
       <div className={styles.content} onClick={e => e.stopPropagation()}>
+        <div className={styles.tabs}>
+          <button
+            className={`${styles.tab} ${parity === 'odd' ? styles.tabActive : ''}`}
+            onClick={() => setParity('odd')}
+          >
+            Odd pages
+          </button>
+          <button
+            className={`${styles.tab} ${parity === 'even' ? styles.tabActive : ''}`}
+            onClick={() => setParity('even')}
+          >
+            Even pages
+          </button>
+        </div>
         <div className={styles.hint}>
-          Drag the edges to set the crop area. Applies to all pages.
+          Drag the edges to set the crop for {parity} pages (page {samplePage} shown).
         </div>
         <div
           ref={pageRef}
@@ -148,10 +196,8 @@ export function PdfCropOverlay({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Actual PDF page rendered to canvas */}
           <canvas ref={canvasRef} className={styles.pageCanvas} />
 
-          {/* Dim regions over cropped-away areas */}
           <div className={styles.dimTop} style={{ height: cropTopPx }} />
           <div className={styles.dimBottom} style={{ height: cropBottomPx }} />
           <div
@@ -163,7 +209,6 @@ export function PdfCropOverlay({
             style={{ top: cropTopPx, width: cropRightPx, height: cropAreaHeight }}
           />
 
-          {/* Crop area outline */}
           <div
             className={styles.cropArea}
             style={{
@@ -174,7 +219,6 @@ export function PdfCropOverlay({
             }}
           />
 
-          {/* Draggable edge handles */}
           <div
             className={`${styles.handle} ${styles.handleTop}`}
             style={{ top: cropAreaTop - 6 }}
@@ -206,10 +250,13 @@ export function PdfCropOverlay({
         </div>
 
         <div className={styles.controls}>
-          <button className={styles.applyBtn} onClick={() => onApply(crop)}>
+          <button className={styles.applyBtn} onClick={handleApply}>
+            Apply
+          </button>
+          <button className={styles.applyAllBtn} onClick={handleApplyToAll}>
             Apply to All Pages
           </button>
-          {hasCrop(currentCrop) && (
+          {anyCurrentCrop && (
             <button className={styles.resetBtn} onClick={onReset}>
               Reset
             </button>
