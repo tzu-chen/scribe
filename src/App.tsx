@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { OpenBooksProvider } from './contexts/OpenBooksContext';
+import { KeybindingsProvider } from './contexts/KeybindingsContext';
 import { Layout } from './components/Layout/Layout';
 import { LibraryPage } from './pages/Library/LibraryPage';
 import { NotesPage } from './pages/Notes/NotesPage';
@@ -15,6 +16,7 @@ import './global.css';
 export default function App() {
   return (
     <ThemeProvider>
+      <KeybindingsProvider>
       <BrowserRouter>
         <OpenBooksProvider>
         <Layout>
@@ -33,6 +35,7 @@ export default function App() {
         </Layout>
         </OpenBooksProvider>
       </BrowserRouter>
+      </KeybindingsProvider>
     </ThemeProvider>
   );
 }

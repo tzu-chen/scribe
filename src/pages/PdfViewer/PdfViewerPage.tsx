@@ -21,6 +21,7 @@ import { PdfPostItNote } from '../../components/PdfViewer/PdfPostItNote';
 import { DjvuPageView } from '../../components/PdfViewer/DjvuPageView';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
+import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
 import { useOpenBooks } from '../../contexts/OpenBooksContext';
 import { BookTabs } from '../../components/BookTabs/BookTabs';
 import styles from './PdfViewerPage.module.css';
@@ -468,6 +469,14 @@ export function PdfViewerPage() {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setShowRightPanel(prev => !prev);
   }, []);
+
+  // Disable shortcuts while crop-mode dialog is open so its own controls
+  // (Esc/Enter and free-form input) aren't intercepted.
+  const shortcutsEnabled = !cropMode;
+  useKeyboardShortcut('pdfTocToggle', handleTocToggle, shortcutsEnabled);
+  useKeyboardShortcut('pdfFitWidthToggle', handleFitWidthToggle, shortcutsEnabled);
+  useKeyboardShortcut('pdfPanelToggle', handleRightPanelToggle, shortcutsEnabled);
+  useKeyboardShortcut('pdfImmersiveToggle', handleImmersiveToggle, shortcutsEnabled);
 
   const handlePanelScrollToPage = useCallback((page: number) => {
     docViewRef.current?.scrollToPage(page);

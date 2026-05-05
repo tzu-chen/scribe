@@ -59,14 +59,35 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md) 0 var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
 }
 
-.title {
-  font-size: 1rem;
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 13px;
   font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
   color: var(--color-text);
+}
+
+.tabActive {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
 }
 
 .close {
@@ -80,6 +101,7 @@
   border-radius: 50%;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
+  margin-bottom: var(--spacing-sm);
 }
 
 .close:hover {
@@ -254,6 +276,102 @@
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+.shortcutsHint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.shortcutList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.shortcutInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcutLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.shortcutScope {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.keyButton {
+  min-width: 80px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.keyButton:hover {
+  border-color: var(--color-primary);
+}
+
+.keyButtonRecording {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.shortcutsWarning {
+  margin: var(--spacing-md) 0 0 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 12px;
+  color: var(--color-text);
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+
+.shortcutActions {
+  margin-top: var(--spacing-md);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.resetButton {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.resetButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
 }
 
 @media (max-width: 600px) {

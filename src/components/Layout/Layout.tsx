@@ -1,6 +1,8 @@
-import { Link, useLocation } from 'react-router-dom';
-import { ThemeMenu } from '../ThemeMenu/ThemeMenu';
+import { useCallback } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { SettingsMenu } from '../SettingsMenu/SettingsMenu';
 import { useOpenBooks } from '../../contexts/OpenBooksContext';
+import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
 import scribeLogo from '../../scribe.svg';
 import styles from './Layout.module.css';
 
@@ -10,7 +12,12 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { tabs, lastActiveId } = useOpenBooks();
+
+  const goToLibrary = useCallback(() => navigate('/'), [navigate]);
+  useKeyboardShortcut('goToLibrary', goToLibrary);
+
   const isHome = location.pathname === '/';
   const isNotes = location.pathname === '/notes';
   const isFlowcharts = location.pathname === '/flowcharts';
@@ -79,7 +86,7 @@ export function Layout({ children }: LayoutProps) {
               Time
             </Link>
             <div className={styles.navSpacer} />
-            <ThemeMenu />
+            <SettingsMenu />
           </nav>
         </div>
       </header>
