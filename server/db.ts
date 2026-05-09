@@ -91,6 +91,7 @@ db.exec(`
     current_page INTEGER NOT NULL DEFAULT 1,
     two_page_view INTEGER NOT NULL DEFAULT 0,
     scroll_offset_top REAL NOT NULL DEFAULT 0,
+    show_toc INTEGER NOT NULL DEFAULT 0,
     crop_top REAL NOT NULL DEFAULT 0,
     crop_right REAL NOT NULL DEFAULT 0,
     crop_bottom REAL NOT NULL DEFAULT 0,
@@ -188,6 +189,12 @@ if (!vpColumnsAfter.some(c => c.name === 'crop_top_even')) {
       crop_bottom_even = crop_bottom,
       crop_left_even = crop_left;
   `);
+}
+
+// Migration: add show_toc column to viewer_prefs if missing
+const vpColumnsForToc = db.prepare("PRAGMA table_info(viewer_prefs)").all() as Array<{ name: string }>;
+if (!vpColumnsForToc.some(c => c.name === 'show_toc')) {
+  db.exec('ALTER TABLE viewer_prefs ADD COLUMN show_toc INTEGER NOT NULL DEFAULT 0');
 }
 
 // Migration: add folder_id column to attachments if missing

@@ -68,7 +68,7 @@ export function PdfViewerPage() {
   const [zoom, setZoom] = useState(savedPrefs?.zoom ?? 1.0);
   const [fitWidth, setFitWidth] = useState(savedPrefs?.fitWidth ?? false);
   const [twoPageView, setTwoPageView] = useState(savedPrefs?.twoPageView ?? false);
-  const [showToc, setShowToc] = useState(false);
+  const [showToc, setShowToc] = useState(savedPrefs?.showToc ?? false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -138,7 +138,7 @@ export function PdfViewerPage() {
       left: prefs?.cropLeftEven ?? prefs?.cropLeft ?? 0,
     });
     setCropMode(false);
-    setShowToc(false);
+    setShowToc(prefs?.showToc ?? false);
     setShowRightPanel(false);
     setEditingNoteId(null);
     setTextSelection(null);
@@ -237,6 +237,7 @@ export function PdfViewerPage() {
           setFitWidth(serverPrefs.fitWidth ?? false);
           setTwoPageView(serverPrefs.twoPageView ?? false);
           setCurrentPage(serverPrefs.currentPage ?? 1);
+          setShowToc(serverPrefs.showToc ?? false);
           setCrop({
             top: serverPrefs.cropTop ?? 0,
             right: serverPrefs.cropRight ?? 0,
@@ -299,13 +300,18 @@ export function PdfViewerPage() {
     scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
   }, [pdfDoc, djvuDoc, isDjvu, loading, attachmentId]);
 
-  // Once pageDimensions are available, initialize the fit-width reference width
-  // based on the saved/current page so restored fit-width prefs work correctly.
+  // Once pageDimensions are available for the current attachment, initialize
+  // the fit-width reference width to that doc's current-page width.
+  // Depending on the pageDimensions array reference (which is replaced when a
+  // new doc loads) ensures this re-runs on tab switches — otherwise the lock
+  // width would stay pinned to the previous tab's page width and produce the
+  // wrong fit-width scale for the new book.
   useEffect(() => {
     if (pageDimensions.length === 0 || !fitWidth) return;
+    if (loadedAttachmentIdRef.current !== attachmentId) return;
     fitWidthRefPageWidth.current = pageDimensions[currentPage - 1]?.width ?? pageWidth;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run when dimensions first load
-  }, [pageDimensions.length > 0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally re-runs only when dimensions or attachment change
+  }, [pageDimensions, attachmentId]);
 
   // Wrap onPageChange to also capture the precise scroll offset into a ref.
   // NOTE: Do NOT save scrollPositionToRestoreRef here — that ref is reserved
@@ -330,6 +336,7 @@ export function PdfViewerPage() {
       currentPage: pos.page,
       twoPageView,
       scrollOffsetTop: pos.offsetTop,
+      showToc,
       cropTop: crop.top,
       cropRight: crop.right,
       cropBottom: crop.bottom,
@@ -339,7 +346,7 @@ export function PdfViewerPage() {
       cropBottomEven: cropEven.bottom,
       cropLeftEven: cropEven.left,
     };
-  }, [zoom, fitWidth, currentPage, twoPageView, crop, cropEven]);
+  }, [zoom, fitWidth, currentPage, twoPageView, showToc, crop, cropEven]);
 
   // Debounced save of viewer preferences
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -360,7 +367,7 @@ export function PdfViewerPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView, buildPrefs]);
+  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView, showToc, buildPrefs]);
 
   // Save prefs on component unmount (navigating away from PDF view).
   // useLayoutEffect cleanup runs synchronously before React clears refs,

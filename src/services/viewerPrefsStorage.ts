@@ -4,6 +4,7 @@ export interface ViewerPrefs {
   currentPage: number;
   twoPageView?: boolean;
   scrollOffsetTop?: number;
+  showToc?: boolean;
   cropTop?: number;
   cropRight?: number;
   cropBottom?: number;
@@ -62,6 +63,7 @@ export const viewerPrefsStorage = {
         currentPage: data.currentPage,
         twoPageView: data.twoPageView ?? false,
         scrollOffsetTop: data.scrollOffsetTop ?? 0,
+        showToc: data.showToc ?? false,
         cropTop: oddT,
         cropRight: oddR,
         cropBottom: oddB,
@@ -90,6 +92,7 @@ export const viewerPrefsStorage = {
         currentPage: prefs.currentPage,
         twoPageView: prefs.twoPageView ?? false,
         scrollOffsetTop: prefs.scrollOffsetTop ?? 0,
+        showToc: prefs.showToc ?? false,
         cropTop: oddT,
         cropRight: oddR,
         cropBottom: oddB,

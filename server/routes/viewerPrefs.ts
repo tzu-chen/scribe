@@ -10,6 +10,7 @@ interface ViewerPrefsRow {
   current_page: number;
   two_page_view: number;
   scroll_offset_top: number;
+  show_toc: number;
   crop_top: number;
   crop_right: number;
   crop_bottom: number;
@@ -28,6 +29,7 @@ function rowToPrefs(row: ViewerPrefsRow) {
     currentPage: row.current_page,
     twoPageView: row.two_page_view === 1,
     scrollOffsetTop: row.scroll_offset_top,
+    showToc: row.show_toc === 1,
     cropTop: row.crop_top,
     cropRight: row.crop_right,
     cropBottom: row.crop_bottom,
@@ -63,6 +65,7 @@ router.put('/:attachmentId', (req, res) => {
     currentPage,
     twoPageView,
     scrollOffsetTop,
+    showToc,
     cropTop,
     cropRight,
     cropBottom,
@@ -77,6 +80,7 @@ router.put('/:attachmentId', (req, res) => {
     currentPage: number;
     twoPageView?: boolean;
     scrollOffsetTop?: number;
+    showToc?: boolean;
     cropTop?: number;
     cropRight?: number;
     cropBottom?: number;
@@ -102,14 +106,15 @@ router.put('/:attachmentId', (req, res) => {
   const oddL = cropLeft ?? 0;
 
   db.prepare(`
-    INSERT INTO viewer_prefs (attachment_id, zoom, fit_width, current_page, two_page_view, scroll_offset_top, crop_top, crop_right, crop_bottom, crop_left, crop_top_even, crop_right_even, crop_bottom_even, crop_left_even, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO viewer_prefs (attachment_id, zoom, fit_width, current_page, two_page_view, scroll_offset_top, show_toc, crop_top, crop_right, crop_bottom, crop_left, crop_top_even, crop_right_even, crop_bottom_even, crop_left_even, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(attachment_id) DO UPDATE SET
       zoom = excluded.zoom,
       fit_width = excluded.fit_width,
       current_page = excluded.current_page,
       two_page_view = excluded.two_page_view,
       scroll_offset_top = excluded.scroll_offset_top,
+      show_toc = excluded.show_toc,
       crop_top = excluded.crop_top,
       crop_right = excluded.crop_right,
       crop_bottom = excluded.crop_bottom,
@@ -126,6 +131,7 @@ router.put('/:attachmentId', (req, res) => {
     currentPage,
     twoPageView ? 1 : 0,
     scrollOffsetTop ?? 0,
+    showToc ? 1 : 0,
     oddT,
     oddR,
     oddB,
