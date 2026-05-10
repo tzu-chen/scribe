@@ -22,42 +22,39 @@
   justify-content: space-between;
 }
 
-.logo {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-}
-
-.logoIcon {
-  height: 1.5rem;
-  width: auto;
-}
-
-.logo:hover {
-  opacity: 0.8;
-}
-
 .nav {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: 2px;
+  width: 100%;
 }
 
 .navLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
   text-decoration: none;
+  transition: color 0.15s, background 0.15s;
 }
 
 .navLink:hover {
   color: var(--color-text);
+  background: var(--color-tag-bg);
   text-decoration: none;
 }
 
 .navLinkActive {
-  color: var(--color-text);
-  font-weight: 600;
+  color: var(--color-primary-text);
+  background: var(--color-primary);
+}
+
+.navLinkActive:hover {
+  color: var(--color-primary-text);
+  background: var(--color-primary-hover);
 }
 
 .navLinkDisabled {
@@ -67,6 +64,7 @@
 
 .navLinkDisabled:hover {
   color: var(--color-text-secondary);
+  background: transparent;
 }
 
 .navSpacer {
