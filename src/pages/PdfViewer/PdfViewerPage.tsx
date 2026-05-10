@@ -86,6 +86,10 @@ export function PdfViewerPage() {
     left: savedPrefs?.cropLeftEven ?? savedPrefs?.cropLeft ?? 0,
   });
   const [cropMode, setCropMode] = useState(false);
+  const [lockedOrientation, setLockedOrientation] = useState<'portrait' | 'landscape' | null>(null);
+  const [actualOrientation, setActualOrientation] = useState<'portrait' | 'landscape'>(
+    () => (typeof window !== 'undefined' && window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
+  );
 
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<{
@@ -177,6 +181,42 @@ export function PdfViewerPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [immersiveMode]);
+
+  // Track actual device orientation so we can compare against the locked value
+  useEffect(() => {
+    const update = () => {
+      setActualOrientation(window.innerWidth > window.innerHeight ? 'landscape' : 'portrait');
+    };
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+
+  const needsRotation = lockedOrientation !== null && lockedOrientation !== actualOrientation;
+
+  // While the device's orientation differs from the locked one, hide the
+  // Layout header and let the .page take over the full viewport (rotated).
+  useEffect(() => {
+    if (needsRotation) {
+      document.documentElement.setAttribute('data-orientation-rotated', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-orientation-rotated');
+    }
+    return () => {
+      document.documentElement.removeAttribute('data-orientation-rotated');
+    };
+  }, [needsRotation]);
+
+  const handleOrientationLockToggle = useCallback(() => {
+    setLockedOrientation(prev =>
+      prev === null
+        ? (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
+        : null
+    );
+  }, []);
 
   // Capture scroll position before sidebar/immersive resizes so layout
   // changes don't lose the user's place. The body's outer width doesn't
@@ -648,7 +688,7 @@ export function PdfViewerPage() {
     : null;
 
   return (
-    <div className={`${styles.page} ${immersiveMode ? styles.immersive : ''}`}>
+    <div className={`${styles.page} ${immersiveMode ? styles.immersive : ''} ${needsRotation ? styles.rotated : ''}`}>
       <PdfToolbar
         filename={filename}
         currentPage={currentPage}
@@ -664,6 +704,8 @@ export function PdfViewerPage() {
         immersiveMode={immersiveMode}
         cropActive={hasCrop(crop) || hasCrop(cropEven)}
         onCropToggle={handleCropModeToggle}
+        orientationLocked={lockedOrientation !== null}
+        onOrientationLockToggle={handleOrientationLockToggle}
         fileType={isDjvu ? 'djvu' : 'pdf'}
       />
       {!immersiveMode && <BookTabs activeId={attachmentId} />}

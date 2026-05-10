@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon } from '../Icons/Icons';
+import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon, OrientationLockIcon } from '../Icons/Icons';
 import { stripExtension } from '../../utils/filename';
 import styles from './PdfToolbar.module.css';
 
 const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
+
+const IS_TOUCH = typeof window !== 'undefined'
+  && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 interface Props {
   filename: string;
@@ -20,6 +23,8 @@ interface Props {
   immersiveMode?: boolean;
   cropActive?: boolean;
   onCropToggle?: () => void;
+  orientationLocked?: boolean;
+  onOrientationLockToggle?: () => void;
   fileType?: 'pdf' | 'djvu';
 }
 
@@ -38,6 +43,8 @@ export function PdfToolbar({
   immersiveMode,
   cropActive,
   onCropToggle,
+  orientationLocked,
+  onOrientationLockToggle,
   fileType,
 }: Props) {
   const [editingPage, setEditingPage] = useState(false);
@@ -161,6 +168,15 @@ export function PdfToolbar({
         >
           <CropIcon size={16} />
         </button>
+        {IS_TOUCH && onOrientationLockToggle && (
+          <button
+            className={`${styles.iconBtn} ${orientationLocked ? styles.iconBtnActive : ''}`}
+            onClick={onOrientationLockToggle}
+            title={orientationLocked ? 'Unlock orientation' : 'Lock current orientation'}
+          >
+            <OrientationLockIcon size={16} />
+          </button>
+        )}
         <span className={styles.divider} />
         <button
           className={styles.pageNavBtn}

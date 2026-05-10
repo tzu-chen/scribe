@@ -96,6 +96,11 @@ input {
   display: none !important;
 }
 
+/* Orientation lock — hide the app header so the rotated PDF page fills the viewport */
+[data-orientation-rotated="true"] header {
+  display: none !important;
+}
+
 /* Utility classes */
 .visually-hidden {
   position: absolute;

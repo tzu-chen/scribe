@@ -143,6 +143,16 @@ export function CropIcon({ size = 16, ...props }: IconProps) {
   );
 }
 
+export function OrientationLockIcon({ size = 16, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>
+      <rect x="6" y="2" width="12" height="20" rx="2" />
+      <path d="M10 12v-2a2 2 0 014 0v2" />
+      <rect x="9" y="12" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+
 export function SidebarLeftIcon({ size = 16, ...props }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...defaultProps} {...props}>

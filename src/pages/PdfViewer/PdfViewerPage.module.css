@@ -54,6 +54,21 @@
   height: 100vh;
 }
 
+/* Orientation lock: when the device's actual orientation differs from the
+ * locked one, render the page laid out in the locked orientation's aspect
+ * (swapping width/height) and rotate 90deg to fill the viewport. The Layout
+ * header is hidden globally via [data-orientation-rotated] in global.css. */
+.rotated {
+  position: fixed;
+  top: 0;
+  left: 100%;
+  width: 100vh;
+  height: 100vw;
+  transform-origin: top left;
+  transform: rotate(90deg);
+  z-index: 1000;
+}
+
 /* Hover zone in upper-right corner that reveals the immersive toggle */
 .immersiveZone {
   position: absolute;
