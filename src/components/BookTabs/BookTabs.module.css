@@ -5,6 +5,8 @@
   align-items: stretch;
   gap: 2px;
   padding: 0 var(--spacing-sm);
+  padding-left: max(var(--spacing-sm), env(safe-area-inset-left));
+  padding-right: max(var(--spacing-sm), env(safe-area-inset-right));
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;

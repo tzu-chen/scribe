@@ -23,7 +23,10 @@
   margin-bottom: var(--spacing-sm);
 }
 
-@media (max-width: 640px) {
+/* Drop the container's breathing-room padding on phones in either orientation
+ * (max-height catches landscape phones, where the screen is wide but short).
+ * Tablets keep the desktop padding since their landscape height is ≥ 600px. */
+@media (max-width: 640px), (max-height: 500px) {
   .container {
     padding: 0;
   }

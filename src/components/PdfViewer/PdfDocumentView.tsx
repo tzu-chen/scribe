@@ -20,6 +20,9 @@ interface Props {
   onSelectionCleared?: () => void;
   onHighlightClick?: (highlightId: string, anchorRect: DOMRect) => void;
   onPageChange: (page: number) => void;
+  /** Reports the inner content width of the scrollable container (excludes
+   * padding and scrollbar) — the actual horizontal space pages can occupy. */
+  onContainerResize?: (width: number) => void;
   /** Custom page renderer. When provided, replaces the default PdfPageView. */
   renderVisiblePage?: (pageNum: number, dims: { width: number; height: number }, scale: number, crop: CropBox | undefined, priority: boolean) => ReactNode;
 }
@@ -36,7 +39,7 @@ const BUFFER = ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 1 : 
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, cropEven, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, renderVisiblePage },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, cropEven, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, onContainerResize, renderVisiblePage },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -121,6 +124,21 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
         return null;
       },
     }), [scale]);
+
+    // Report the container's actual inner content width so the parent's
+    // fit-width math reflects mobile (padding: 0) vs desktop (padding: 16px)
+    // and the live scrollbar width — instead of subtracting a hardcoded 40px
+    // that produces phantom margins on mobile.
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container || !onContainerResize) return;
+      onContainerResize(container.clientWidth);
+      const ro = new ResizeObserver(() => {
+        if (containerRef.current) onContainerResize(containerRef.current.clientWidth);
+      });
+      ro.observe(container);
+      return () => ro.disconnect();
+    }, [onContainerResize]);
 
     // Track which pages are in view using IntersectionObserver
     useEffect(() => {

@@ -95,13 +95,17 @@ export function PdfViewerPage() {
 
   const docViewRef = useRef<PdfDocumentViewHandle>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Inner width of the scrollable PDF container, reported by PdfDocumentView.
+  // This already excludes container padding, the toc/right-panel sidebars,
+  // and any visible scrollbar — so it's the exact horizontal space available
+  // for pages, on both mobile and desktop.
+  const [pdfContainerWidth, setPdfContainerWidth] = useState(0);
   // Tracks which attachmentId the currently loaded blob/pdfDoc belongs to.
   // Without this, on a tab switch the scroll-to-saved-page effect runs while
   // pdfDoc still references the previous tab's document, marks the scroll as
   // "done" against the new attachmentId, and then no-ops when the actual
   // document loads — leaving the new tab stuck on page 1.
   const loadedAttachmentIdRef = useRef<string | null>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
   const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
   const prevEffectiveZoomRef = useRef<number>(0);
   // Locked page width used for fit-width zoom — captured at toggle time so
@@ -174,23 +178,18 @@ export function PdfViewerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [immersiveMode]);
 
-  // Track the document area width for fit-width calculation.
-  // The body div is conditionally rendered (only when !loading && pdfDoc),
-  // so we depend on both pdfDoc and loading to re-run the effect once the
-  // body div is actually in the DOM.  pdfDoc is set before loading becomes
-  // false (they're in separate React batches due to awaits in the hook),
-  // so depending on pdfDoc alone would fire too early.
+  // Capture scroll position before sidebar/immersive resizes so layout
+  // changes don't lose the user's place. The body's outer width doesn't
+  // change when sidebars toggle (they're flex children) but its inner
+  // layout does, which is what triggers ResizeObserver here.
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        // Don't capture scroll position during zoom-induced resizes — the
-        // position would be stale and feed back into the restoration loop.
-        if (!isZoomResizeRef.current) {
-          scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
-        }
-        setContainerWidth(entry.contentRect.width);
+    const ro = new ResizeObserver(() => {
+      // Don't capture scroll position during zoom-induced resizes — the
+      // position would be stale and feed back into the restoration loop.
+      if (!isZoomResizeRef.current) {
+        scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
       }
     });
     ro.observe(el);
@@ -560,6 +559,10 @@ export function PdfViewerPage() {
     docViewRef.current?.scrollToPage(page, destTop, 'instant');
   }, []);
 
+  const handlePdfContainerResize = useCallback((width: number) => {
+    setPdfContainerWidth(width);
+  }, []);
+
   // Keep currentPageRef in sync for use in the two-page toggle effect
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -577,13 +580,11 @@ export function PdfViewerPage() {
     });
   }, [twoPageView]);
 
-  // Compute fit-width scale using actual container width and PDF page width
-  const availableWidth = containerWidth > 0
-    ? containerWidth
-      - (showToc ? 280 : 0)
-      - (showRightPanel ? 300 : 0)
-      - 40
-    : 0;
+  // Compute fit-width scale using the PDF container's actual inner width.
+  // pdfContainerWidth comes from a ResizeObserver on the scrollable container
+  // and already accounts for sidebars (flex siblings), responsive padding
+  // (16px on desktop, 0 on mobile) and any visible scrollbar.
+  const availableWidth = pdfContainerWidth;
   // Use the locked page width captured at fit-width toggle time so
   // effectiveZoom doesn't change as the user scrolls across pages.
   const currentPageWidth = fitWidth ? fitWidthRefPageWidth.current : pageWidth;
@@ -697,6 +698,7 @@ export function PdfViewerPage() {
           onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}
           onHighlightClick={isDjvu ? undefined : handleHighlightClick}
           onPageChange={handlePageChange}
+          onContainerResize={handlePdfContainerResize}
           renderVisiblePage={isDjvu && djvuDoc ? (pageNum, dims, scale, cropBox, priority) => (
             <DjvuPageView
               djvuDoc={djvuDoc}

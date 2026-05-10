@@ -66,6 +66,7 @@
   align-items: flex-start;
   justify-content: flex-end;
   padding: 10px;
+  padding-right: max(10px, env(safe-area-inset-right));
   pointer-events: auto;
 }
 
@@ -106,6 +107,7 @@
   align-items: flex-start;
   justify-content: flex-start;
   padding: 10px;
+  padding-left: max(10px, env(safe-area-inset-left));
   pointer-events: auto;
 }
 
@@ -121,6 +123,8 @@
   align-items: flex-end;
   justify-content: flex-end;
   padding: 10px;
+  padding-right: max(10px, env(safe-area-inset-right));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
   pointer-events: auto;
 }
 
