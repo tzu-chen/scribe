@@ -127,14 +127,25 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
 
     // Report the container's actual inner content width so the parent's
     // fit-width math reflects mobile (padding: 0) vs desktop (padding: 16px)
-    // and the live scrollbar width — instead of subtracting a hardcoded 40px
-    // that produces phantom margins on mobile.
+    // and the live scrollbar width.
+    //
+    // clientWidth includes horizontal padding, so we subtract it to get the
+    // real space pages can occupy. Without this, fit-width sizes pages 32px
+    // too wide on tablet/desktop; flexbox silently shrinks the .page (whose
+    // inner content has a fixed marginLeft offset), and the lost width is
+    // clipped entirely from the right — visible as extra right-side cropping.
     useEffect(() => {
       const container = containerRef.current;
       if (!container || !onContainerResize) return;
-      onContainerResize(container.clientWidth);
+      const measure = (el: HTMLDivElement) => {
+        const cs = window.getComputedStyle(el);
+        const padL = parseFloat(cs.paddingLeft) || 0;
+        const padR = parseFloat(cs.paddingRight) || 0;
+        onContainerResize(el.clientWidth - padL - padR);
+      };
+      measure(container);
       const ro = new ResizeObserver(() => {
-        if (containerRef.current) onContainerResize(containerRef.current.clientWidth);
+        if (containerRef.current) measure(containerRef.current);
       });
       ro.observe(container);
       return () => ro.disconnect();

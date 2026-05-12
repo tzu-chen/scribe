@@ -5,6 +5,12 @@
   box-shadow: var(--shadow-sm);
   line-height: 0;
   overflow: hidden;
+  /* The .page is a flex item inside .pageWrapper. Without flex-shrink: 0,
+   * a page wider than the available row space (e.g. zoomed in past fit-width)
+   * silently shrinks while its inner content keeps its fixed marginLeft —
+   * the missing width clips entirely off the right edge. Disable shrinking
+   * so excess width produces a horizontal scrollbar instead. */
+  flex-shrink: 0;
 }
 
 .canvas {
