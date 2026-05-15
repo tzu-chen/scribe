@@ -66,6 +66,15 @@ export const attachmentStorage = {
     if (!res.ok) throw new Error(`Failed to rename attachment: ${res.status}`);
   },
 
+  async setTags(id: string, tagIds: string[]): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/tags`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tagIds }),
+    });
+    if (!res.ok) throw new Error(`Failed to update attachment tags: ${res.status}`);
+  },
+
   async moveToFolder(id: string, folderId: string | null): Promise<void> {
     const res = await fetch(`/api/attachments/${id}/folder`, {
       method: 'PATCH',

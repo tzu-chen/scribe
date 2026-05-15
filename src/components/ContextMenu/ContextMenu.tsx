@@ -5,6 +5,8 @@ export interface ContextMenuItem {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  checked?: boolean;
+  keepOpen?: boolean;
 }
 
 interface ContextMenuProps {
@@ -57,13 +59,18 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       {items.map((item) => (
         <button
           key={item.label}
-          className={`${styles.menuItem} ${item.danger ? styles.menuItemDanger : ''}`}
+          className={`${styles.menuItem} ${item.danger ? styles.menuItemDanger : ''} ${item.checked ? styles.menuItemChecked : ''}`}
           onClick={() => {
             item.onClick();
-            onClose();
+            if (!item.keepOpen) onClose();
           }}
         >
-          {item.label}
+          {item.checked !== undefined && (
+            <span className={styles.menuItemCheck} aria-hidden="true">
+              {item.checked ? '✓' : ''}
+            </span>
+          )}
+          <span className={styles.menuItemLabel}>{item.label}</span>
         </button>
       ))}
     </div>

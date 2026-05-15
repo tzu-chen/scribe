@@ -5,8 +5,10 @@ import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
 import type { ContextMenuItem } from '../../components/ContextMenu/ContextMenu';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { folderStorage } from '../../services/folderStorage';
+import { bookTagStorage } from '../../services/bookTagStorage';
 import type { AttachmentMeta } from '../../types/attachment';
 import type { Folder } from '../../types/folder';
+import type { BookTag } from '../../types/bookTag';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import { stripExtension } from '../../utils/filename';
 import styles from './LibraryPage.module.css';
@@ -14,6 +16,11 @@ import styles from './LibraryPage.module.css';
 type ViewMode = 'card' | 'list';
 type SortField = 'name' | 'uploaded' | 'lastOpened' | 'size';
 type SortDir = 'asc' | 'desc';
+
+type Selection =
+  | { kind: 'all' }
+  | { kind: 'folder'; id: string }
+  | { kind: 'tag'; id: string };
 
 const VIEW_MODE_KEY = 'scribe_library_view';
 
@@ -40,6 +47,7 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [tags, setTags] = useState<BookTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,8 +65,8 @@ export function LibraryPage() {
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  // Folder state
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  // Sidebar selection (mutually exclusive — only one filter active at a time)
+  const [selection, setSelection] = useState<Selection>({ kind: 'all' });
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
@@ -66,10 +74,20 @@ export function LibraryPage() {
   const newFolderInputRef = useRef<HTMLInputElement>(null);
   const renameFolderInputRef = useRef<HTMLInputElement>(null);
 
+  // Tag state
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [renamingTagId, setRenamingTagId] = useState<string | null>(null);
+  const [renameTagValue, setRenameTagValue] = useState('');
+  const newTagInputRef = useRef<HTMLInputElement>(null);
+  const renameTagInputRef = useRef<HTMLInputElement>(null);
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; book: AttachmentMeta } | null>(null);
   const [folderContextMenu, setFolderContextMenu] = useState<{ x: number; y: number; folder: Folder } | null>(null);
+  const [tagContextMenu, setTagContextMenu] = useState<{ x: number; y: number; tag: BookTag } | null>(null);
   const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
+  const [tagMenu, setTagMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
 
   const loadBooks = useCallback(async () => {
     try {
@@ -93,10 +111,20 @@ export function LibraryPage() {
     }
   }, []);
 
+  const loadTags = useCallback(async () => {
+    try {
+      const all = await bookTagStorage.getAll();
+      setTags(all);
+    } catch (err) {
+      console.error('Failed to load tags:', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
     loadFolders();
-  }, [loadBooks, loadFolders]);
+    loadTags();
+  }, [loadBooks, loadFolders, loadTags]);
 
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode);
@@ -122,17 +150,38 @@ export function LibraryPage() {
     }
   }, [renamingFolderId]);
 
+  useEffect(() => {
+    if (creatingTag && newTagInputRef.current) {
+      newTagInputRef.current.focus();
+    }
+  }, [creatingTag]);
+
+  useEffect(() => {
+    if (renamingTagId && renameTagInputRef.current) {
+      renameTagInputRef.current.focus();
+      renameTagInputRef.current.select();
+    }
+  }, [renamingTagId]);
+
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
+      const uploadFolderId = selection.kind === 'folder' ? selection.id : null;
+      const uploadedIds: string[] = [];
       for (const file of Array.from(files)) {
-        await attachmentStorage.add('', file, currentFolderId);
+        const created = await attachmentStorage.add('', file, uploadFolderId);
+        uploadedIds.push(created.id);
+      }
+      // If uploading while a tag is selected, tag the new uploads with that tag
+      // so they appear in the current view.
+      if (selection.kind === 'tag') {
+        await Promise.all(uploadedIds.map(id => attachmentStorage.setTags(id, [selection.id])));
       }
       await loadBooks();
       e.target.value = '';
     },
-    [loadBooks, currentFolderId],
+    [loadBooks, selection],
   );
 
   const handleOpen = useCallback(
@@ -268,10 +317,10 @@ export function LibraryPage() {
 
   const handleDeleteFolder = useCallback(async (folderId: string) => {
     await folderStorage.delete(folderId);
-    if (currentFolderId === folderId) setCurrentFolderId(null);
+    setSelection(prev => (prev.kind === 'folder' && prev.id === folderId ? { kind: 'all' } : prev));
     await loadFolders();
     await loadBooks();
-  }, [currentFolderId, loadFolders, loadBooks]);
+  }, [loadFolders, loadBooks]);
 
   const handleMoveToFolder = useCallback(async (bookIds: string[], folderId: string | null) => {
     await Promise.all(bookIds.map(id => attachmentStorage.moveToFolder(id, folderId)));
@@ -279,23 +328,89 @@ export function LibraryPage() {
     setMoveMenu(null);
   }, [loadBooks]);
 
+  // Tag handlers
+  const handleCreateTag = useCallback(async () => {
+    const trimmed = newTagName.trim();
+    if (!trimmed) {
+      setCreatingTag(false);
+      setNewTagName('');
+      return;
+    }
+    await bookTagStorage.create(trimmed);
+    await loadTags();
+    setCreatingTag(false);
+    setNewTagName('');
+  }, [newTagName, loadTags]);
+
+  const startRenameTag = useCallback((tag: BookTag) => {
+    setRenamingTagId(tag.id);
+    setRenameTagValue(tag.name);
+  }, []);
+
+  const commitRenameTag = useCallback(async () => {
+    if (!renamingTagId) return;
+    const trimmed = renameTagValue.trim();
+    if (trimmed && trimmed !== tags.find(t => t.id === renamingTagId)?.name) {
+      await bookTagStorage.rename(renamingTagId, trimmed);
+      await loadTags();
+    }
+    setRenamingTagId(null);
+    setRenameTagValue('');
+  }, [renamingTagId, renameTagValue, tags, loadTags]);
+
+  const cancelRenameTag = useCallback(() => {
+    setRenamingTagId(null);
+    setRenameTagValue('');
+  }, []);
+
+  const handleDeleteTag = useCallback(async (tagId: string) => {
+    await bookTagStorage.delete(tagId);
+    setSelection(prev => (prev.kind === 'tag' && prev.id === tagId ? { kind: 'all' } : prev));
+    await loadTags();
+    await loadBooks();
+  }, [loadTags, loadBooks]);
+
+  const handleToggleBookTag = useCallback(async (bookIds: string[], tagId: string) => {
+    // Determine whether to add or remove based on majority: if every selected
+    // book already has this tag, remove it; otherwise add it to those missing it.
+    const allHave = bookIds.every(bid => books.find(b => b.id === bid)?.tags?.includes(tagId));
+    await Promise.all(bookIds.map(async bid => {
+      const book = books.find(b => b.id === bid);
+      const current = book?.tags ?? [];
+      const next = allHave
+        ? current.filter(t => t !== tagId)
+        : current.includes(tagId) ? current : [...current, tagId];
+      await attachmentStorage.setTags(bid, next);
+    }));
+    await loadBooks();
+  }, [books, loadBooks]);
+
   // Context menu for books
   const openBookContextMenu = useCallback((e: React.MouseEvent, book: AttachmentMeta) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, book });
     setFolderContextMenu(null);
+    setTagContextMenu(null);
     setMoveMenu(null);
+    setTagMenu(null);
   }, []);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeFolderContextMenu = useCallback(() => setFolderContextMenu(null), []);
+  const closeTagContextMenu = useCallback(() => setTagContextMenu(null), []);
   const closeMoveMenu = useCallback(() => setMoveMenu(null), []);
+  const closeTagMenu = useCallback(() => setTagMenu(null), []);
 
-  // Filtered and sorted books
+  // Filtered and sorted books.
+  // Folders exclude books from "All"; tags do NOT — a tag is an overlay filter
+  // that shows matching books regardless of folder, and tagged books remain
+  // visible in All as long as they're not inside a folder.
   const filteredBooks = useMemo(() => {
     let result = books;
-    if (currentFolderId) {
-      result = result.filter(b => b.folderId === currentFolderId);
+    if (selection.kind === 'folder') {
+      result = result.filter(b => b.folderId === selection.id);
+    } else if (selection.kind === 'tag') {
+      result = result.filter(b => b.tags?.includes(selection.id));
     } else {
       result = result.filter(b => !b.folderId);
     }
@@ -305,7 +420,7 @@ export function LibraryPage() {
       );
     }
     return result;
-  }, [books, currentFolderId, searchQuery]);
+  }, [books, selection, searchQuery]);
 
   const sortedBooks = useMemo(() => {
     const sorted = [...filteredBooks].sort((a, b) => {
@@ -332,6 +447,29 @@ export function LibraryPage() {
   const allFilteredIds = sortedBooks.map(b => b.id);
   const allSelected = sortedBooks.length > 0 && selectedIds.size === sortedBooks.length && sortedBooks.every(b => selectedIds.has(b.id));
 
+  const tagsById = useMemo(() => {
+    const map = new Map<string, BookTag>();
+    for (const t of tags) map.set(t.id, t);
+    return map;
+  }, [tags]);
+
+  const renderTagChips = (book: AttachmentMeta) => {
+    if (!book.tags || book.tags.length === 0) return null;
+    return (
+      <div className={styles.tagChipRow}>
+        {book.tags.map(tid => {
+          const tag = tagsById.get(tid);
+          if (!tag) return null;
+          return (
+            <span key={tid} className={styles.tagChip}>
+              {tag.name}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Build context menu items for a book
   const bookContextMenuItems = useMemo((): ContextMenuItem[] => {
     if (!contextMenu) return [];
@@ -352,6 +490,12 @@ export function LibraryPage() {
         onClick: () => handleMoveToFolder([contextMenu.book.id], null),
       });
     }
+    items.push({
+      label: 'Edit tags...',
+      onClick: () => {
+        setTagMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: [contextMenu.book.id] });
+      },
+    });
     items.push({ label: 'Delete', onClick: () => handleDelete(contextMenu.book.id), danger: true });
     return items;
   }, [contextMenu, folders, startRename, handleMoveToFolder, handleDelete]);
@@ -366,6 +510,30 @@ export function LibraryPage() {
     items.push({ label: 'No folder', onClick: () => handleMoveToFolder(moveMenu.bookIds, null) });
     return items;
   }, [moveMenu, folders, handleMoveToFolder]);
+
+  // Build tag picker items: each tag toggles on click, menu stays open.
+  // For multi-book selection: the checked indicator is set when EVERY selected
+  // book has that tag (so click removes); otherwise click adds.
+  const tagMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!tagMenu) return [];
+    if (tags.length === 0) {
+      return [
+        {
+          label: 'No tags yet — create one in the sidebar',
+          onClick: () => {},
+        },
+      ];
+    }
+    return tags.map(tag => {
+      const allHave = tagMenu.bookIds.every(bid => books.find(b => b.id === bid)?.tags?.includes(tag.id));
+      return {
+        label: tag.name,
+        onClick: () => handleToggleBookTag(tagMenu.bookIds, tag.id),
+        checked: allHave,
+        keepOpen: true,
+      };
+    });
+  }, [tagMenu, tags, books, handleToggleBookTag]);
 
   if (loading) {
     return (
@@ -443,11 +611,11 @@ export function LibraryPage() {
       </div>
 
       <div className={styles.layout}>
-        {/* Folder sidebar */}
+        {/* Sidebar: All, folders, then tags */}
         <nav className={styles.sidebar}>
           <button
-            className={`${styles.sidebarItem} ${currentFolderId === null ? styles.sidebarItemActive : ''}`}
-            onClick={() => setCurrentFolderId(null)}
+            className={`${styles.sidebarItem} ${selection.kind === 'all' ? styles.sidebarItemActive : ''}`}
+            onClick={() => setSelection({ kind: 'all' })}
           >
             All
           </button>
@@ -467,13 +635,15 @@ export function LibraryPage() {
                 />
               ) : (
                 <button
-                  className={`${styles.sidebarItem} ${currentFolderId === folder.id ? styles.sidebarItemActive : ''}`}
-                  onClick={() => setCurrentFolderId(folder.id)}
+                  className={`${styles.sidebarItem} ${selection.kind === 'folder' && selection.id === folder.id ? styles.sidebarItemActive : ''}`}
+                  onClick={() => setSelection({ kind: 'folder', id: folder.id })}
                   onContextMenu={e => {
                     e.preventDefault();
                     setFolderContextMenu({ x: e.clientX, y: e.clientY, folder });
                     setContextMenu(null);
+                    setTagContextMenu(null);
                     setMoveMenu(null);
+                    setTagMenu(null);
                   }}
                 >
                   {folder.name}
@@ -505,6 +675,65 @@ export function LibraryPage() {
               + New Folder
             </button>
           )}
+
+          <div className={styles.sidebarSectionLabel}>Tags</div>
+          {tags.map(tag => (
+            <div key={tag.id}>
+              {renamingTagId === tag.id ? (
+                <input
+                  ref={renameTagInputRef}
+                  className={styles.sidebarRenameInput}
+                  value={renameTagValue}
+                  onChange={e => setRenameTagValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitRenameTag();
+                    if (e.key === 'Escape') cancelRenameTag();
+                  }}
+                  onBlur={commitRenameTag}
+                />
+              ) : (
+                <button
+                  className={`${styles.sidebarItem} ${selection.kind === 'tag' && selection.id === tag.id ? styles.sidebarItemActive : ''}`}
+                  onClick={() => setSelection({ kind: 'tag', id: tag.id })}
+                  onContextMenu={e => {
+                    e.preventDefault();
+                    setTagContextMenu({ x: e.clientX, y: e.clientY, tag });
+                    setContextMenu(null);
+                    setFolderContextMenu(null);
+                    setMoveMenu(null);
+                    setTagMenu(null);
+                  }}
+                >
+                  <span className={styles.sidebarTagDot} aria-hidden="true" />
+                  {tag.name}
+                </button>
+              )}
+            </div>
+          ))}
+          {creatingTag ? (
+            <input
+              ref={newTagInputRef}
+              className={styles.sidebarRenameInput}
+              value={newTagName}
+              placeholder="Tag name"
+              onChange={e => setNewTagName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCreateTag();
+                if (e.key === 'Escape') {
+                  setCreatingTag(false);
+                  setNewTagName('');
+                }
+              }}
+              onBlur={handleCreateTag}
+            />
+          ) : (
+            <button
+              className={styles.newFolderBtn}
+              onClick={() => setCreatingTag(true)}
+            >
+              + New Tag
+            </button>
+          )}
         </nav>
 
         {/* Main content */}
@@ -534,6 +763,12 @@ export function LibraryPage() {
                       Move to folder
                     </button>
                   )}
+                  <button
+                    className={styles.bulkMoveBtn}
+                    onClick={e => setTagMenu({ x: e.clientX, y: e.clientY, bookIds: Array.from(selectedIds) })}
+                  >
+                    Edit tags
+                  </button>
                   <button className={styles.bulkDeleteBtn} onClick={handleDeleteSelected}>
                     Delete selected
                   </button>
@@ -555,11 +790,18 @@ export function LibraryPage() {
                     Upload your first book to get started.
                   </p>
                 </>
-              ) : filteredBooks.length === 0 && currentFolderId && !searchQuery ? (
+              ) : filteredBooks.length === 0 && selection.kind === 'folder' && !searchQuery ? (
                 <>
                   <p className={styles.emptyTitle}>This folder is empty</p>
                   <p className={styles.emptyText}>
                     Right-click a book and choose &quot;Move to folder&quot; to add books here.
+                  </p>
+                </>
+              ) : filteredBooks.length === 0 && selection.kind === 'tag' && !searchQuery ? (
+                <>
+                  <p className={styles.emptyTitle}>No books with this tag</p>
+                  <p className={styles.emptyText}>
+                    Right-click a book and choose &quot;Edit tags...&quot; to assign this tag.
                   </p>
                 </>
               ) : (
@@ -615,6 +857,7 @@ export function LibraryPage() {
                   {book.subject && (
                     <div className={styles.cardSubject}>{book.subject}</div>
                   )}
+                  {renderTagChips(book)}
                 </article>
               ))}
             </div>
@@ -637,6 +880,7 @@ export function LibraryPage() {
                       Name{sortIndicator('name')}
                     </th>
                     <th className={styles.listHeaderCell}>Type</th>
+                    <th className={styles.listHeaderCell}>Tags</th>
                     <th className={styles.listHeaderCell} onClick={() => handleSort('size')}>
                       Size{sortIndicator('size')}
                     </th>
@@ -693,6 +937,7 @@ export function LibraryPage() {
                         )}
                       </td>
                       <td className={styles.listCell}>{getFileExtension(book.filename)}</td>
+                      <td className={styles.listCell}>{renderTagChips(book)}</td>
                       <td className={styles.listCell}>{formatFileSize(book.size)}</td>
                       <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
                       <td className={styles.listCell}>
@@ -728,12 +973,31 @@ export function LibraryPage() {
           onClose={closeFolderContextMenu}
         />
       )}
+      {tagContextMenu && (
+        <ContextMenu
+          x={tagContextMenu.x}
+          y={tagContextMenu.y}
+          items={[
+            { label: 'Rename', onClick: () => startRenameTag(tagContextMenu.tag) },
+            { label: 'Delete tag', onClick: () => handleDeleteTag(tagContextMenu.tag.id), danger: true },
+          ]}
+          onClose={closeTagContextMenu}
+        />
+      )}
       {moveMenu && (
         <ContextMenu
           x={moveMenu.x}
           y={moveMenu.y}
           items={moveMenuItems}
           onClose={closeMoveMenu}
+        />
+      )}
+      {tagMenu && (
+        <ContextMenu
+          x={tagMenu.x}
+          y={tagMenu.y}
+          items={tagMenuItems}
+          onClose={closeTagMenu}
         />
       )}
     </div>

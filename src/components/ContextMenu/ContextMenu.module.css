@@ -10,7 +10,9 @@
 }
 
 .menuItem {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: 0.8125rem;
@@ -20,6 +22,25 @@
   text-align: left;
   cursor: pointer;
   transition: background 0.1s;
+}
+
+.menuItemCheck {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.menuItemLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuItemChecked {
+  color: var(--color-text);
 }
 
 .menuItem:hover {

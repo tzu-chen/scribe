@@ -21,7 +21,22 @@ interface AttachmentRow {
   folder_id: string | null;
 }
 
-function rowToMeta(row: AttachmentRow) {
+function loadTagsMap(attachmentIds: string[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  if (attachmentIds.length === 0) return map;
+  const placeholders = attachmentIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT attachment_id, tag_id FROM attachment_tags WHERE attachment_id IN (${placeholders})`)
+    .all(...attachmentIds) as Array<{ attachment_id: string; tag_id: string }>;
+  for (const row of rows) {
+    const list = map.get(row.attachment_id) ?? [];
+    list.push(row.tag_id);
+    map.set(row.attachment_id, list);
+  }
+  return map;
+}
+
+function rowToMeta(row: AttachmentRow, tagIds: string[] = []) {
   return {
     id: row.id,
     subject: row.subject,
@@ -31,20 +46,23 @@ function rowToMeta(row: AttachmentRow) {
     createdAt: row.created_at,
     lastOpenedAt: row.last_opened_at ?? undefined,
     folderId: row.folder_id ?? undefined,
+    tags: tagIds,
   };
 }
 
 // GET /api/attachments
 router.get('/', (_req, res) => {
   const rows = db.prepare('SELECT * FROM attachments ORDER BY created_at DESC').all() as AttachmentRow[];
-  res.json(rows.map(rowToMeta));
+  const tagsMap = loadTagsMap(rows.map(r => r.id));
+  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [])));
 });
 
 // GET /api/attachments/by-subject?subject=X
 router.get('/by-subject', (req, res) => {
   const subject = req.query.subject as string;
   const rows = db.prepare('SELECT * FROM attachments WHERE subject = ?').all(subject) as AttachmentRow[];
-  res.json(rows.map(rowToMeta));
+  const tagsMap = loadTagsMap(rows.map(r => r.id));
+  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [])));
 });
 
 // GET /api/attachments/counts-by-subject
@@ -96,6 +114,7 @@ router.post('/', upload.single('file'), (req, res) => {
     size: file.size,
     createdAt: now,
     folderId: folderId ?? undefined,
+    tags: [],
   });
 });
 
@@ -141,6 +160,30 @@ router.patch('/:id/filename', (req, res) => {
 router.patch('/:id/last-opened', (req, res) => {
   const now = new Date().toISOString();
   db.prepare('UPDATE attachments SET last_opened_at = ? WHERE id = ?').run(now, req.params.id);
+  res.json({ ok: true });
+});
+
+// PUT /api/attachments/:id/tags — replace the set of tags on an attachment
+router.put('/:id/tags', (req, res) => {
+  const { tagIds } = req.body;
+  if (!Array.isArray(tagIds) || tagIds.some(id => typeof id !== 'string')) {
+    res.status(400).json({ error: 'tagIds must be an array of strings' });
+    return;
+  }
+  const attachmentId = req.params.id;
+  const existing = db.prepare('SELECT id FROM attachments WHERE id = ?').get(attachmentId);
+  if (!existing) {
+    res.status(404).json({ error: 'Attachment not found' });
+    return;
+  }
+  const txn = db.transaction((ids: string[]) => {
+    db.prepare('DELETE FROM attachment_tags WHERE attachment_id = ?').run(attachmentId);
+    const insert = db.prepare('INSERT OR IGNORE INTO attachment_tags (attachment_id, tag_id) VALUES (?, ?)');
+    for (const tagId of ids) {
+      insert.run(attachmentId, tagId);
+    }
+  });
+  txn(tagIds);
   res.json({ ok: true });
 });
 

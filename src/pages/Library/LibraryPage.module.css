@@ -158,6 +158,48 @@
   color: var(--color-text);
 }
 
+.sidebarSectionLabel {
+  margin-top: var(--spacing-md);
+  padding: 0 var(--spacing-md) var(--spacing-xs);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.sidebarTagDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+  margin-right: var(--spacing-sm);
+  vertical-align: middle;
+}
+
+.sidebarItemActive .sidebarTagDot {
+  background: var(--color-primary);
+}
+
+.tagChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+}
+
+.tagChip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-tag-bg);
+  color: var(--color-tag-text);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
 .content {
   flex: 1;
   min-width: 0;

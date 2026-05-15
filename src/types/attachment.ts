@@ -8,6 +8,7 @@ export interface Attachment {
   createdAt: string;
   lastOpenedAt?: string;
   folderId?: string;
+  tags?: string[];
 }
 
 export interface AttachmentMeta {
@@ -19,4 +20,5 @@ export interface AttachmentMeta {
   createdAt: string;
   lastOpenedAt?: string;
   folderId?: string;
+  tags?: string[];
 }
