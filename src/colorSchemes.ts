@@ -5,9 +5,9 @@ export interface ColorScheme {
   colors: Record<string, string>;
 }
 
-const defaultLight: ColorScheme = {
-  id: 'default-light',
-  name: 'Default Light',
+const light: ColorScheme = {
+  id: 'light',
+  name: 'Light',
   type: 'light',
   colors: {
     'color-bg': '#f8f9fa',
@@ -40,114 +40,9 @@ const defaultLight: ColorScheme = {
   },
 };
 
-const defaultDark: ColorScheme = {
-  id: 'default-dark',
-  name: 'Default Dark',
-  type: 'dark',
-  colors: {
-    'color-bg': '#1a1b1e',
-    'color-surface': '#25262b',
-    'color-border': '#373a40',
-    'color-border-light': '#2c2e33',
-    'color-text': '#e9ecef',
-    'color-text-secondary': '#909296',
-    'color-primary': '#5c7cfa',
-    'color-primary-hover': '#748ffc',
-    'color-primary-light': '#2b2d42',
-    'color-primary-text': '#ffffff',
-    'color-danger': '#ff6b6b',
-    'color-danger-hover': '#fa5252',
-    'color-danger-light': 'rgba(255, 107, 107, 0.12)',
-    'color-success': '#51cf66',
-    'color-warning': '#fcc419',
-    'color-tag-bg': '#373a40',
-    'color-tag-text': '#ced4da',
-    'color-draft-bg': '#3d3200',
-    'color-draft-text': '#fcc419',
-    'color-published-bg': '#1b3d24',
-    'color-published-text': '#69db7c',
-    'color-overlay-light': 'rgba(255, 255, 255, 0.1)',
-    'color-pdf-bg': '#25262b',
-    'pdf-highlight-blend': 'multiply',
-    'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.3)',
-    'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.4)',
-    'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.5)',
-  },
-};
-
-const solarizedLight: ColorScheme = {
-  id: 'solarized-light',
-  name: 'Solarized Light',
-  type: 'light',
-  colors: {
-    'color-bg': '#fdf6e3',
-    'color-surface': '#eee8d5',
-    'color-border': '#d3cbb7',
-    'color-border-light': '#e8e1cc',
-    'color-text': '#657b83',
-    'color-text-secondary': '#93a1a1',
-    'color-primary': '#268bd2',
-    'color-primary-hover': '#1a6fb5',
-    'color-primary-light': '#e8f1f8',
-    'color-primary-text': '#ffffff',
-    'color-danger': '#dc322f',
-    'color-danger-hover': '#b82725',
-    'color-danger-light': 'rgba(220, 50, 47, 0.08)',
-    'color-success': '#859900',
-    'color-warning': '#b58900',
-    'color-tag-bg': '#e8e1cc',
-    'color-tag-text': '#586e75',
-    'color-draft-bg': '#f5edc8',
-    'color-draft-text': '#b58900',
-    'color-published-bg': '#e6f0c8',
-    'color-published-text': '#6b8000',
-    'color-overlay-light': 'rgba(0, 0, 0, 0.1)',
-    'color-pdf-bg': '#e8e2cf',
-    'pdf-highlight-blend': 'multiply',
-    'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.08)',
-    'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.1)',
-    'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.12)',
-  },
-};
-
-const solarizedDark: ColorScheme = {
-  id: 'solarized-dark',
-  name: 'Solarized Dark',
-  type: 'dark',
-  colors: {
-    'color-bg': '#002b36',
-    'color-surface': '#073642',
-    'color-border': '#1a4a56',
-    'color-border-light': '#0d3e4a',
-    'color-text': '#839496',
-    'color-text-secondary': '#657b83',
-    'color-primary': '#268bd2',
-    'color-primary-hover': '#4aa3e0',
-    'color-primary-light': '#0a3d50',
-    'color-primary-text': '#ffffff',
-    'color-danger': '#dc322f',
-    'color-danger-hover': '#e6504d',
-    'color-danger-light': 'rgba(220, 50, 47, 0.15)',
-    'color-success': '#859900',
-    'color-warning': '#b58900',
-    'color-tag-bg': '#0d3e4a',
-    'color-tag-text': '#93a1a1',
-    'color-draft-bg': '#1a3200',
-    'color-draft-text': '#b58900',
-    'color-published-bg': '#0a3000',
-    'color-published-text': '#859900',
-    'color-overlay-light': 'rgba(255, 255, 255, 0.08)',
-    'color-pdf-bg': '#073642',
-    'pdf-highlight-blend': 'multiply',
-    'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.3)',
-    'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.4)',
-    'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.5)',
-  },
-};
-
-const nord: ColorScheme = {
-  id: 'nord',
-  name: 'Nord',
+const dark: ColorScheme = {
+  id: 'dark',
+  name: 'Dark',
   type: 'dark',
   colors: {
     'color-bg': '#2e3440',
@@ -180,126 +75,14 @@ const nord: ColorScheme = {
   },
 };
 
-const dracula: ColorScheme = {
-  id: 'dracula',
-  name: 'Dracula',
-  type: 'dark',
-  colors: {
-    'color-bg': '#282a36',
-    'color-surface': '#44475a',
-    'color-border': '#6272a4',
-    'color-border-light': '#383a4a',
-    'color-text': '#f8f8f2',
-    'color-text-secondary': '#bfbfb8',
-    'color-primary': '#bd93f9',
-    'color-primary-hover': '#caa5ff',
-    'color-primary-light': '#2e2842',
-    'color-primary-text': '#282a36',
-    'color-danger': '#ff5555',
-    'color-danger-hover': '#ff7777',
-    'color-danger-light': 'rgba(255, 85, 85, 0.15)',
-    'color-success': '#50fa7b',
-    'color-warning': '#f1fa8c',
-    'color-tag-bg': '#383a4a',
-    'color-tag-text': '#f8f8f2',
-    'color-draft-bg': '#3a3a20',
-    'color-draft-text': '#f1fa8c',
-    'color-published-bg': '#1a3a28',
-    'color-published-text': '#50fa7b',
-    'color-overlay-light': 'rgba(255, 255, 255, 0.08)',
-    'color-pdf-bg': '#44475a',
-    'pdf-highlight-blend': 'multiply',
-    'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.3)',
-    'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.4)',
-    'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.5)',
-  },
-};
+export const COLOR_SCHEMES: ColorScheme[] = [light, dark];
 
-const gruvboxLight: ColorScheme = {
-  id: 'gruvbox-light',
-  name: 'Gruvbox Light',
-  type: 'light',
-  colors: {
-    'color-bg': '#fbf1c7',
-    'color-surface': '#ebdbb2',
-    'color-border': '#d5c4a1',
-    'color-border-light': '#e0d5b5',
-    'color-text': '#3c3836',
-    'color-text-secondary': '#665c54',
-    'color-primary': '#458588',
-    'color-primary-hover': '#387273',
-    'color-primary-light': '#e8ede4',
-    'color-primary-text': '#ffffff',
-    'color-danger': '#cc241d',
-    'color-danger-hover': '#a81a14',
-    'color-danger-light': 'rgba(204, 36, 29, 0.08)',
-    'color-success': '#98971a',
-    'color-warning': '#d79921',
-    'color-tag-bg': '#e0d5b5',
-    'color-tag-text': '#504945',
-    'color-draft-bg': '#f2e5a2',
-    'color-draft-text': '#b57614',
-    'color-published-bg': '#dbe5b5',
-    'color-published-text': '#79740e',
-    'color-overlay-light': 'rgba(0, 0, 0, 0.1)',
-    'color-pdf-bg': '#e0d5b5',
-    'pdf-highlight-blend': 'multiply',
-    'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.08)',
-    'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.1)',
-    'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.12)',
-  },
-};
-
-const catppuccinLatte: ColorScheme = {
-  id: 'catppuccin-latte',
-  name: 'Catppuccin Latte',
-  type: 'light',
-  colors: {
-    'color-bg': '#eff1f5',
-    'color-surface': '#e6e9ef',
-    'color-border': '#ccd0da',
-    'color-border-light': '#dce0e8',
-    'color-text': '#4c4f69',
-    'color-text-secondary': '#6c6f85',
-    'color-primary': '#1e66f5',
-    'color-primary-hover': '#1558d8',
-    'color-primary-light': '#e0eafc',
-    'color-primary-text': '#ffffff',
-    'color-danger': '#d20f39',
-    'color-danger-hover': '#b50d32',
-    'color-danger-light': 'rgba(210, 15, 57, 0.08)',
-    'color-success': '#40a02b',
-    'color-warning': '#df8e1d',
-    'color-tag-bg': '#dce0e8',
-    'color-tag-text': '#5c5f77',
-    'color-draft-bg': '#faf0d0',
-    'color-draft-text': '#df8e1d',
-    'color-published-bg': '#d8f0d0',
-    'color-published-text': '#40a02b',
-    'color-overlay-light': 'rgba(0, 0, 0, 0.08)',
-    'color-pdf-bg': '#dce0e8',
-    'pdf-highlight-blend': 'multiply',
-    'shadow-sm': '0 1px 3px rgba(76, 79, 105, 0.06)',
-    'shadow-md': '0 4px 12px rgba(76, 79, 105, 0.1)',
-    'shadow-lg': '0 8px 24px rgba(76, 79, 105, 0.15)',
-  },
-};
-
-export const COLOR_SCHEMES: ColorScheme[] = [
-  defaultLight,
-  solarizedLight,
-  gruvboxLight,
-  catppuccinLatte,
-  defaultDark,
-  solarizedDark,
-  nord,
-  dracula,
-];
-
-export const DEFAULT_SCHEME_ID = 'default-light';
+export const DEFAULT_SCHEME_ID = 'light';
+export const DEFAULT_LIGHT_SCHEME_ID = 'light';
+export const DEFAULT_DARK_SCHEME_ID = 'dark';
 
 export function getSchemeById(id: string): ColorScheme {
-  return COLOR_SCHEMES.find(s => s.id === id) ?? defaultLight;
+  return COLOR_SCHEMES.find(s => s.id === id) ?? light;
 }
 
 export function applyColorScheme(scheme: ColorScheme): void {
