@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon, OrientationLockIcon } from '../Icons/Icons';
+import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon, DownloadIcon, OrientationLockIcon } from '../Icons/Icons';
 import { stripExtension } from '../../utils/filename';
 import styles from './PdfToolbar.module.css';
 
@@ -23,6 +23,8 @@ interface Props {
   immersiveMode?: boolean;
   cropActive?: boolean;
   onCropToggle?: () => void;
+  onExportCropped?: () => void;
+  exportingCropped?: boolean;
   orientationLocked?: boolean;
   onOrientationLockToggle?: () => void;
   fileType?: 'pdf' | 'djvu';
@@ -43,6 +45,8 @@ export function PdfToolbar({
   immersiveMode,
   cropActive,
   onCropToggle,
+  onExportCropped,
+  exportingCropped,
   orientationLocked,
   onOrientationLockToggle,
   fileType,
@@ -168,6 +172,16 @@ export function PdfToolbar({
         >
           <CropIcon size={16} />
         </button>
+        {onExportCropped && fileType !== 'djvu' && (
+          <button
+            className={styles.iconBtn}
+            onClick={onExportCropped}
+            disabled={exportingCropped}
+            title={cropActive ? 'Export PDF with current crop applied' : 'Export PDF'}
+          >
+            <DownloadIcon size={16} />
+          </button>
+        )}
         {IS_TOUCH && onOrientationLockToggle && (
           <button
             className={`${styles.iconBtn} ${orientationLocked ? styles.iconBtnActive : ''}`}

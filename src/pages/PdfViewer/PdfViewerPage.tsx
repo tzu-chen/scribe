@@ -27,6 +27,7 @@ import { BookTabs } from '../../components/BookTabs/BookTabs';
 import styles from './PdfViewerPage.module.css';
 
 import { v4 as uuidv4 } from 'uuid';
+import { exportCroppedPdf } from '../../utils/exportCroppedPdf';
 
 function isDjvuBlob(blob: Blob | null, filename: string): boolean {
   if (!blob) return false;
@@ -87,6 +88,7 @@ export function PdfViewerPage() {
   });
   const [cropMode, setCropMode] = useState(false);
   const [lockedOrientation, setLockedOrientation] = useState<'portrait' | 'landscape' | null>(null);
+  const [exportingCropped, setExportingCropped] = useState(false);
   const [actualOrientation, setActualOrientation] = useState<'portrait' | 'landscape'>(
     () => (typeof window !== 'undefined' && window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
   );
@@ -506,6 +508,19 @@ export function PdfViewerPage() {
     setCropMode(false);
   }, []);
 
+  const handleExportCropped = useCallback(async () => {
+    if (!blob || isDjvu || exportingCropped) return;
+    setExportingCropped(true);
+    try {
+      await exportCroppedPdf(blob, filename || 'document.pdf', crop, cropEven);
+    } catch (err) {
+      console.error('Failed to export cropped PDF:', err);
+      alert('Failed to export PDF. See console for details.');
+    } finally {
+      setExportingCropped(false);
+    }
+  }, [blob, isDjvu, exportingCropped, filename, crop, cropEven]);
+
   const handleTocToggle = useCallback(() => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setShowToc(prev => !prev);
@@ -704,6 +719,8 @@ export function PdfViewerPage() {
         immersiveMode={immersiveMode}
         cropActive={hasCrop(crop) || hasCrop(cropEven)}
         onCropToggle={handleCropModeToggle}
+        onExportCropped={isDjvu ? undefined : handleExportCropped}
+        exportingCropped={exportingCropped}
         orientationLocked={lockedOrientation !== null}
         onOrientationLockToggle={handleOrientationLockToggle}
         fileType={isDjvu ? 'djvu' : 'pdf'}
