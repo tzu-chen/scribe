@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { EditableOutlineItem } from '../../hooks/useCustomOutline';
+import type { ViewerPosition } from './positionMath';
 import styles from './PdfSidebar.module.css';
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   onReorderItems: (newTree: EditableOutlineItem[]) => void;
   onResetOutline: () => void;
   hasCustomOutline: boolean;
-  getScrollPosition: () => { page: number; offsetTop: number } | null;
+  getCurrentPosition: () => ViewerPosition | null;
 }
 
 type DropZone = 'before' | 'after' | 'into';
@@ -216,13 +217,13 @@ export function PdfSidebar({
   onReorderItems,
   onResetOutline,
   hasCustomOutline,
-  getScrollPosition,
+  getCurrentPosition,
 }: Props) {
   // --- Add item state ---
   const [adding, setAdding] = useState(false);
   const [addTitle, setAddTitle] = useState('');
   const addInputRef = useRef<HTMLInputElement>(null);
-  const addPositionRef = useRef<{ page: number; offsetTop: number } | null>(null);
+  const addPositionRef = useRef<ViewerPosition | null>(null);
 
   // --- Context menu state ---
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -265,10 +266,10 @@ export function PdfSidebar({
 
   // --- Add handlers ---
   const handleStartAdd = useCallback(() => {
-    addPositionRef.current = getScrollPosition();
+    addPositionRef.current = getCurrentPosition();
     setAddTitle('');
     setAdding(true);
-  }, [getScrollPosition]);
+  }, [getCurrentPosition]);
 
   const handleConfirmAdd = useCallback(() => {
     const title = addTitle.trim();
@@ -277,7 +278,7 @@ export function PdfSidebar({
       return;
     }
     const pos = addPositionRef.current;
-    onAddItem(title, pos?.page ?? 1, pos?.offsetTop ?? null);
+    onAddItem(title, pos?.pageIndex ?? 1, pos?.withinPageOffset ?? null);
     setAdding(false);
     setAddTitle('');
   }, [addTitle, onAddItem]);

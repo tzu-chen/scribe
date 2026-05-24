@@ -26,9 +26,14 @@ function rowToPrefs(row: ViewerPrefsRow) {
   return {
     zoom: row.zoom,
     fitWidth: row.fit_width === 1,
+    position: {
+      pageIndex: row.current_page,
+      withinPageOffset: row.scroll_offset_top,
+    },
+    // Mirror to legacy fields for older clients.
     currentPage: row.current_page,
-    twoPageView: row.two_page_view === 1,
     scrollOffsetTop: row.scroll_offset_top,
+    twoPageView: row.two_page_view === 1,
     showToc: row.show_toc === 1,
     cropTop: row.crop_top,
     cropRight: row.crop_right,
@@ -62,9 +67,10 @@ router.put('/:attachmentId', (req, res) => {
   const {
     zoom,
     fitWidth,
-    currentPage,
+    position,
+    currentPage: legacyCurrentPage,
+    scrollOffsetTop: legacyScrollOffsetTop,
     twoPageView,
-    scrollOffsetTop,
     showToc,
     cropTop,
     cropRight,
@@ -77,9 +83,10 @@ router.put('/:attachmentId', (req, res) => {
   } = req.body as {
     zoom: number;
     fitWidth: boolean;
-    currentPage: number;
-    twoPageView?: boolean;
+    position?: { pageIndex?: number; withinPageOffset?: number } | null;
+    currentPage?: number;
     scrollOffsetTop?: number;
+    twoPageView?: boolean;
     showToc?: boolean;
     cropTop?: number;
     cropRight?: number;
@@ -91,8 +98,11 @@ router.put('/:attachmentId', (req, res) => {
     cropLeftEven?: number;
   };
 
+  const currentPage = position?.pageIndex ?? legacyCurrentPage;
+  const scrollOffsetTop = position?.withinPageOffset ?? legacyScrollOffsetTop;
+
   if (typeof zoom !== 'number' || typeof currentPage !== 'number') {
-    res.status(400).json({ error: 'zoom and currentPage are required' });
+    res.status(400).json({ error: 'zoom and position.pageIndex are required' });
     return;
   }
 

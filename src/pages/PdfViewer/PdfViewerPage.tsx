@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
+import { viewerPrefsStorage, type ViewerPrefs, type ViewerPosition } from '../../services/viewerPrefsStorage';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
@@ -66,7 +66,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   const [twoPageView, setTwoPageView] = useState(savedPrefs?.twoPageView ?? false);
   const [showToc, setShowToc] = useState(savedPrefs?.showToc ?? false);
   const [showRightPanel, setShowRightPanel] = useState(false);
-  const [currentPage, setCurrentPage] = useState(savedPrefs?.currentPage ?? 1);
+  const [currentPage, setCurrentPage] = useState(savedPrefs?.position.pageIndex ?? 1);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [crop, setCrop] = useState<CropBox>({
@@ -95,18 +95,17 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   } | null>(null);
 
   const docViewRef = useRef<PdfDocumentViewHandle>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
   const [pdfContainerWidth, setPdfContainerWidth] = useState(0);
-  const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
-  const prevEffectiveZoomRef = useRef<number>(0);
   const fitWidthRefPageWidth = useRef<number>(pageWidth);
-  const isZoomResizeRef = useRef(false);
-  const prevTwoPageViewRef = useRef(twoPageView);
-  const currentPageRef = useRef(currentPage);
-  const lastScrollPosRef = useRef<{ page: number; offsetTop: number }>({
-    page: savedPrefs?.currentPage ?? 1,
-    offsetTop: savedPrefs?.scrollOffsetTop ?? 0,
-  });
+
+  // Position state: seeded from saved prefs, swapped only when an external
+  // source (server fetch) supplies a new value. Scroll-driven updates flow
+  // through positionRef + scheduleSave, NOT through this state — re-rendering
+  // PdfDocumentView on every scroll tick would defeat its scroll listener.
+  const [restorePosition, setRestorePosition] = useState<ViewerPosition>(
+    () => savedPrefs?.position ?? { pageIndex: 1, withinPageOffset: 0 }
+  );
+  const positionRef = useRef<ViewerPosition>(restorePosition);
 
   // Immersive mode: only the active instance writes the document attribute,
   // and removes it when becoming inactive (so a switch to a non-immersive tab
@@ -166,27 +165,6 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     );
   }, []);
 
-  // Capture scroll position before sidebar/immersive resizes so layout
-  // changes don't lose the user's place. Read from the continuously-tracked
-  // lastScrollPosRef instead of getScrollPosition() because this RO also
-  // fires on tab hide/show: at that moment effectiveZoom is mid-transition
-  // (still on the `zoom` fallback because the container's RO hasn't yet
-  // updated pdfContainerWidth), so a live measurement maps the preserved
-  // scrollTop through the wrong scale and returns a page far ahead — which
-  // then gets restored as the "real" position, jumping the user toward the
-  // end of the document.
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      if (!isZoomResizeRef.current) {
-        scrollPositionToRestoreRef.current = lastScrollPosRef.current;
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [pdfDoc, djvuDoc, loading]);
-
   // Sync server-side viewer prefs once on mount (the instance is per-tab,
   // so attachmentId is fixed). Local prefs are the source of truth; only
   // fall back to server when this device has never seen the book.
@@ -198,7 +176,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
       const serverPrefs = await viewerPrefsStorage.fetchFromServer(attachmentId);
       if (cancelled || !serverPrefs) return;
       const raw = localStorage.getItem('scribe_viewer_prefs');
-      let map: Record<string, typeof serverPrefs> = {};
+      let map: Record<string, ViewerPrefs> = {};
       if (raw) { try { map = JSON.parse(raw); } catch { /* start fresh */ } }
       map[attachmentId] = serverPrefs;
       localStorage.setItem('scribe_viewer_prefs', JSON.stringify(map));
@@ -206,8 +184,8 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
       setZoom(serverPrefs.zoom ?? 1.0);
       setFitWidth(serverPrefs.fitWidth ?? false);
       setTwoPageView(serverPrefs.twoPageView ?? false);
-      setCurrentPage(serverPrefs.currentPage ?? 1);
       setShowToc(serverPrefs.showToc ?? false);
+      setCurrentPage(serverPrefs.position.pageIndex);
       setCrop({
         top: serverPrefs.cropTop ?? 0,
         right: serverPrefs.cropRight ?? 0,
@@ -220,33 +198,12 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         bottom: serverPrefs.cropBottomEven ?? serverPrefs.cropBottom ?? 0,
         left: serverPrefs.cropLeftEven ?? serverPrefs.cropLeft ?? 0,
       });
-      lastScrollPosRef.current = {
-        page: serverPrefs.currentPage ?? 1,
-        offsetTop: serverPrefs.scrollOffsetTop ?? 0,
-      };
+      positionRef.current = serverPrefs.position;
+      // New object reference triggers PdfDocumentView's one-shot restore effect.
+      setRestorePosition({ ...serverPrefs.position });
     })();
     return () => { cancelled = true; };
   }, [attachmentId]);
-
-  // Scroll to saved page once the PDF is loaded — only once per instance.
-  const scrolledForAttachmentRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const docReady = isDjvu ? !!djvuDoc : !!pdfDoc;
-    if (!docReady || loading || scrolledForAttachmentRef.current === attachmentId) return;
-    const prefs = viewerPrefsStorage.get(attachmentId);
-    const hasPosition = prefs && (prefs.currentPage > 1 || (prefs.scrollOffsetTop && prefs.scrollOffsetTop > 0));
-    if (hasPosition) {
-      requestAnimationFrame(() => {
-        docViewRef.current?.scrollToPage(
-          prefs.currentPage,
-          prefs.scrollOffsetTop ?? null,
-          'instant',
-        );
-      });
-    }
-    scrolledForAttachmentRef.current = attachmentId;
-  }, [pdfDoc, djvuDoc, isDjvu, loading, attachmentId]);
 
   useEffect(() => {
     if (pageDimensions.length === 0 || !fitWidth) return;
@@ -256,58 +213,53 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
-    const pos = docViewRef.current?.getScrollPosition();
-    if (pos) lastScrollPosRef.current = pos;
   }, []);
 
-  // Updated by PdfDocumentView on every scroll while visible. Hidden tabs
-  // can't be measured via getBoundingClientRect (display:none collapses
-  // rects to zero), so buildPrefs must read from this cache rather than
-  // calling getScrollPosition() directly — otherwise tab deactivation and
-  // pending debounced saves would persist { page: 1, offsetTop: 0 }.
-  const handleScrollPositionChange = useCallback((pos: { page: number; offsetTop: number }) => {
-    lastScrollPosRef.current = pos;
+  const handlePositionChange = useCallback((pos: ViewerPosition) => {
+    positionRef.current = pos;
+    scheduleSaveRef.current?.();
   }, []);
 
-  const buildPrefs = useCallback(() => {
-    const pos = lastScrollPosRef.current;
-    return {
-      zoom,
-      fitWidth,
-      currentPage: pos.page,
-      twoPageView,
-      scrollOffsetTop: pos.offsetTop,
-      showToc,
-      cropTop: crop.top,
-      cropRight: crop.right,
-      cropBottom: crop.bottom,
-      cropLeft: crop.left,
-      cropTopEven: cropEven.top,
-      cropRightEven: cropEven.right,
-      cropBottomEven: cropEven.bottom,
-      cropLeftEven: cropEven.left,
-    };
-  }, [zoom, fitWidth, twoPageView, showToc, crop, cropEven]);
+  const buildPrefs = useCallback((): ViewerPrefs => ({
+    zoom,
+    fitWidth,
+    position: positionRef.current,
+    twoPageView,
+    showToc,
+    cropTop: crop.top,
+    cropRight: crop.right,
+    cropBottom: crop.bottom,
+    cropLeft: crop.left,
+    cropTopEven: cropEven.top,
+    cropRightEven: cropEven.right,
+    cropBottomEven: cropEven.bottom,
+    cropLeftEven: cropEven.left,
+  }), [zoom, fitWidth, twoPageView, showToc, crop, cropEven]);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const scheduleSaveRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    if (!scrolledForAttachmentRef.current) return;
-
+  const scheduleSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-
     saveTimeoutRef.current = setTimeout(() => {
       viewerPrefsStorage.save(attachmentId, buildPrefs());
     }, 1000);
+  }, [attachmentId, buildPrefs]);
 
+  scheduleSaveRef.current = scheduleSave;
+
+  // Persist viewer state changes (debounced). Position changes flow through
+  // handlePositionChange → scheduleSave directly; this effect catches the rest.
+  useEffect(() => {
+    scheduleSave();
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [attachmentId, zoom, fitWidth, currentPage, twoPageView, showToc, buildPrefs]);
+  }, [scheduleSave]);
 
   // Save prefs on unmount (tab closed via closeBook).
   useLayoutEffect(() => {
@@ -341,16 +293,15 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
 
   // Save when this tab is deactivated (user switched to another book/route).
   // Catches the case where the unmount handler doesn't run because the tab
-  // remains mounted in the persistent host.
+  // remains mounted in the persistent host. positionRef holds the last
+  // user-driven scroll position, so this works even though the tab is hidden.
   useEffect(() => {
     if (isActive) return;
-    if (!scrolledForAttachmentRef.current) return;
     viewerPrefsStorage.save(attachmentId, buildPrefs());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only fires on the isActive→false edge
   }, [isActive]);
 
   const handleImmersiveToggle = useCallback(() => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setImmersiveMode(prev => !prev);
   }, []);
 
@@ -373,13 +324,11 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   }, [subject, attachmentId, currentPage, saveNote]);
 
   const handleZoomChange = useCallback((newZoom: number) => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(false);
     setZoom(newZoom);
   }, []);
 
   const handleFitWidthToggle = useCallback(() => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setFitWidth(prev => {
       const next = !prev;
       if (next) {
@@ -398,14 +347,12 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   }, []);
 
   const handleCropApply = useCallback((newCropOdd: CropBox, newCropEven: CropBox) => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setCrop(newCropOdd);
     setCropEven(newCropEven);
     setCropMode(false);
   }, []);
 
   const handleCropReset = useCallback(() => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setCrop(NO_CROP);
     setCropEven(NO_CROP);
     setCropMode(false);
@@ -429,12 +376,10 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   }, [doc.blob, isDjvu, exportingCropped, filename, crop, cropEven]);
 
   const handleTocToggle = useCallback(() => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setShowToc(prev => !prev);
   }, []);
 
   const handleRightPanelToggle = useCallback(() => {
-    scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
     setShowRightPanel(prev => !prev);
   }, []);
 
@@ -524,19 +469,10 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     setPdfContainerWidth(width);
   }, []);
 
-  useEffect(() => {
-    currentPageRef.current = currentPage;
-  }, [currentPage]);
-
-  useEffect(() => {
-    if (prevTwoPageViewRef.current === twoPageView) return;
-    prevTwoPageViewRef.current = twoPageView;
-    if (!scrolledForAttachmentRef.current) return;
-    const page = currentPageRef.current;
-    requestAnimationFrame(() => {
-      docViewRef.current?.scrollToPage(page, null, 'instant');
-    });
-  }, [twoPageView]);
+  const getCurrentPosition = useCallback(
+    () => docViewRef.current?.getPosition() ?? positionRef.current,
+    [],
+  );
 
   const availableWidth = pdfContainerWidth;
   const currentPageWidth = fitWidth ? fitWidthRefPageWidth.current : pageWidth;
@@ -547,21 +483,6 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   const croppedPageWidth = currentPageWidth * minHorizCropFactor;
   const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / fitWidthPageSpan) : zoom;
-
-  useLayoutEffect(() => {
-    if (prevEffectiveZoomRef.current === effectiveZoom) return;
-    prevEffectiveZoomRef.current = effectiveZoom;
-    if (!scrolledForAttachmentRef.current) return;
-    const pos = scrollPositionToRestoreRef.current;
-    scrollPositionToRestoreRef.current = null;
-    if (pos) {
-      isZoomResizeRef.current = true;
-      docViewRef.current?.scrollToPage(pos.page, pos.offsetTop, 'instant');
-      requestAnimationFrame(() => {
-        isZoomResizeRef.current = false;
-      });
-    }
-  }, [effectiveZoom]);
 
   const errorMessage = docError;
 
@@ -616,7 +537,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         fileType={isDjvu ? 'djvu' : 'pdf'}
       />
       {!immersiveMode && <BookTabs activeId={attachmentId} />}
-      <div ref={bodyRef} className={styles.body}>
+      <div className={styles.body}>
         {showToc && (
           <PdfSidebar
             outline={customOutline.outline}
@@ -627,7 +548,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
             onReorderItems={customOutline.reorderItems}
             onResetOutline={customOutline.resetToOriginal}
             hasCustomOutline={customOutline.hasCustomOutline}
-            getScrollPosition={() => docViewRef.current?.getScrollPosition() ?? null}
+            getCurrentPosition={getCurrentPosition}
           />
         )}
         <div className={styles.pdfArea}>
@@ -647,7 +568,8 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
           onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}
           onHighlightClick={isDjvu ? undefined : handleHighlightClick}
           onPageChange={handlePageChange}
-          onScrollPositionChange={handleScrollPositionChange}
+          restorePosition={restorePosition}
+          onPositionChange={handlePositionChange}
           onContainerResize={handlePdfContainerResize}
           renderVisiblePage={isDjvu && djvuDoc ? (pageNum, dims, scale, cropBox, priority) => (
             <DjvuPageView
