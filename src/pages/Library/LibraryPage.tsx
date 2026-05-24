@@ -52,6 +52,7 @@ export function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY);
@@ -129,6 +130,24 @@ export function LibraryPage() {
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
+      const input = searchInputRef.current;
+      if (!input) return;
+      e.preventDefault();
+      input.focus();
+      input.select();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (renamingId && renameInputRef.current) {
@@ -617,7 +636,7 @@ export function LibraryPage() {
             className={`${styles.sidebarItem} ${selection.kind === 'all' ? styles.sidebarItemActive : ''}`}
             onClick={() => setSelection({ kind: 'all' })}
           >
-            All
+            Default
           </button>
           {folders.map(folder => (
             <div key={folder.id}>
@@ -740,7 +759,7 @@ export function LibraryPage() {
         <div className={styles.content}>
           {books.length > 0 && (
             <div className={styles.searchRow}>
-              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+              <SearchBar ref={searchInputRef} value={searchQuery} onChange={setSearchQuery} />
             </div>
           )}
 

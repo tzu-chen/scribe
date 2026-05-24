@@ -5,9 +5,10 @@ interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-export function SearchBar({ value, onChange, placeholder = 'Search notes...' }: SearchBarProps) {
+export function SearchBar({ value, onChange, placeholder = '', ref }: SearchBarProps) {
   return (
     <div className={styles.container}>
       <svg
@@ -25,6 +26,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search notes...' }: 
         <path d="m21 21-4.35-4.35" />
       </svg>
       <input
+        ref={ref}
         type="text"
         className={styles.input}
         value={value}
