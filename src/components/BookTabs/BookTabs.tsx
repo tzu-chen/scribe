@@ -8,7 +8,7 @@ interface BookTabsProps {
 }
 
 export function BookTabs({ activeId }: BookTabsProps) {
-  const { tabs, closeBook } = useOpenBooks();
+  const { tabs, closeBook, prefetchTab } = useOpenBooks();
   const navigate = useNavigate();
 
   if (tabs.length <= 1) return null;
@@ -42,6 +42,8 @@ export function BookTabs({ activeId }: BookTabsProps) {
             aria-selected={isActive}
             className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
             onClick={() => handleSelect(tab.id)}
+            onMouseEnter={() => prefetchTab(tab.id)}
+            onFocus={() => prefetchTab(tab.id)}
             onAuxClick={(e) => {
               if (e.button === 1) handleClose(e, tab.id);
             }}

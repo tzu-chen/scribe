@@ -1,0 +1,27 @@
+.host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.host[hidden] {
+  display: none;
+}
+
+/* Each tab instance takes the full host area. Inactive ones get hidden via
+ * the HTML hidden attribute (sets display: none), which preserves the inner
+ * scroll position of overflow:auto containers across show/hide in Chromium,
+ * Firefox, and Safari. */
+.tabInstance {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.tabInstance[hidden] {
+  display: none;
+}

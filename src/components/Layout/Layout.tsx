@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SettingsMenu } from '../SettingsMenu/SettingsMenu';
 import { useOpenBooks } from '../../contexts/OpenBooksContext';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
+import { PersistentPdfHost } from '../PdfViewer/PersistentPdfHost';
 import {
   LibraryIcon,
   NotesIcon,
@@ -109,7 +110,13 @@ export function Layout({ children }: LayoutProps) {
           </nav>
         </div>
       </header>
-      <main className={useFullWidth ? styles.mainFullWidth : styles.main}>{children}</main>
+      <PersistentPdfHost />
+      <main
+        className={useFullWidth ? styles.mainFullWidth : styles.main}
+        hidden={isPdfViewer}
+      >
+        {children}
+      </main>
     </div>
   );
 }

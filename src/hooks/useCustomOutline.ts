@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { outlineStorage, type FlatOutlineItem } from '../services/outlineStorage';
-import type { OutlineItem } from './usePdfDocument';
+import type { OutlineItem } from '../services/documentLoader';
 
 export interface EditableOutlineItem {
   id: string;

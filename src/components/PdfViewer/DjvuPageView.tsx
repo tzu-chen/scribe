@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DjvuDocument } from '../../hooks/useDjvuDocument';
+import type { DjvuDocument } from '../../services/documentLoader';
 import type { CropBox } from '../../types/crop';
 import styles from './DjvuPageView.module.css';
 

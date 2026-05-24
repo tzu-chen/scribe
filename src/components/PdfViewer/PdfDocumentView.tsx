@@ -20,6 +20,11 @@ interface Props {
   onSelectionCleared?: () => void;
   onHighlightClick?: (highlightId: string, anchorRect: DOMRect) => void;
   onPageChange: (page: number) => void;
+  /** Fires on every user scroll with the current { page, offsetTop } so the
+   *  parent can keep a hidden-tab-safe cache. The DOM's scroll position survives
+   *  display:none, but getBoundingClientRect() does not — so the parent must
+   *  cache while visible to save accurate prefs on tab deactivation. */
+  onScrollPositionChange?: (pos: { page: number; offsetTop: number }) => void;
   /** Reports the inner content width of the scrollable container (excludes
    * padding and scrollbar) — the actual horizontal space pages can occupy. */
   onContainerResize?: (width: number) => void;
@@ -39,7 +44,7 @@ const BUFFER = ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 1 : 
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, cropEven, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, onContainerResize, renderVisiblePage },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, cropEven, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, onScrollPositionChange, onContainerResize, renderVisiblePage },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -124,6 +129,39 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
         return null;
       },
     }), [scale]);
+
+    // Continuously cache scroll position while the tab is visible. Hidden
+    // tabs (display:none) can't be measured via getBoundingClientRect, so
+    // the parent reads the last cached value when saving prefs.
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container || !onScrollPositionChange) return;
+      let rafId: number | null = null;
+      const compute = () => {
+        rafId = null;
+        const containerRect = container.getBoundingClientRect();
+        if (containerRect.width === 0 && containerRect.height === 0) return;
+        const wrappers = container.querySelectorAll('[data-page-wrapper]');
+        for (const wrapper of wrappers) {
+          const rect = wrapper.getBoundingClientRect();
+          if (rect.bottom >= containerRect.top) {
+            const pageNum = Number((wrapper as HTMLElement).dataset.pageWrapper);
+            const scrolledIntoPage = Math.max(0, containerRect.top - rect.top);
+            onScrollPositionChange({ page: pageNum, offsetTop: scrolledIntoPage / scale });
+            return;
+          }
+        }
+      };
+      const onScroll = () => {
+        if (rafId !== null) return;
+        rafId = requestAnimationFrame(compute);
+      };
+      container.addEventListener('scroll', onScroll, { passive: true });
+      return () => {
+        container.removeEventListener('scroll', onScroll);
+        if (rafId !== null) cancelAnimationFrame(rafId);
+      };
+    }, [onScrollPositionChange, scale]);
 
     // Report the container's actual inner content width so the parent's
     // fit-width math reflects mobile (padding: 0) vs desktop (padding: 16px)

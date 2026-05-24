@@ -1,9 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { attachmentStorage } from '../../services/attachmentStorage';
-import { viewerPrefsStorage, type ViewerPrefs } from '../../services/viewerPrefsStorage';
-import { usePdfDocument } from '../../hooks/usePdfDocument';
-import { useDjvuDocument } from '../../hooks/useDjvuDocument';
+import { useNavigate } from 'react-router-dom';
+import { viewerPrefsStorage } from '../../services/viewerPrefsStorage';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
@@ -22,49 +19,47 @@ import { DjvuPageView } from '../../components/PdfViewer/DjvuPageView';
 import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
-import { useOpenBooks } from '../../contexts/OpenBooksContext';
+import { useTabDocument } from '../../contexts/OpenBooksContext';
 import { BookTabs } from '../../components/BookTabs/BookTabs';
 import styles from './PdfViewerPage.module.css';
 
 import { v4 as uuidv4 } from 'uuid';
 import { exportCroppedPdf } from '../../utils/exportCroppedPdf';
 
-function isDjvuBlob(blob: Blob | null, filename: string): boolean {
-  if (!blob) return false;
-  return blob.type === 'image/vnd.djvu'
-    || blob.type === 'image/x-djvu'
-    || filename.toLowerCase().endsWith('.djvu');
+export interface PdfViewerInstanceProps {
+  attachmentId: string;
+  filename: string;
+  /** The subject from the URL when this tab was last activated. Inactive
+   *  instances cache the last value so the right panel filter and new-note
+   *  default stay stable across deactivation. */
+  subject: string;
+  /** True iff this is the tab currently being viewed. Inactive instances skip
+   *  global side effects (reading time, doc-level attrs, keyboard shortcuts). */
+  isActive: boolean;
 }
 
-export function PdfViewerPage() {
-  const { attachmentId } = useParams<{ attachmentId: string }>();
-  const [searchParams] = useSearchParams();
+export function PdfViewerInstance({ attachmentId, filename, subject: subjectFromHost, isActive }: PdfViewerInstanceProps) {
   const navigate = useNavigate();
-  const subject = searchParams.get('subject') || '';
 
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [filename, setFilename] = useState('');
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useReadingTimeTracker(attachmentId, filename);
-
-  const { openBook } = useOpenBooks();
+  // Subject is captured at activation time so inactive tabs don't lose theirs
+  // when the URL changes (e.g., switching to another tab strips the param).
+  const [subject, setSubject] = useState(subjectFromHost);
   useEffect(() => {
-    if (attachmentId && filename) openBook(attachmentId, filename);
-  }, [attachmentId, filename, openBook]);
+    if (isActive) setSubject(subjectFromHost);
+  }, [isActive, subjectFromHost]);
 
-  const isDjvu = isDjvuBlob(blob, filename);
-  const pdfResult = usePdfDocument(isDjvu ? null : blob);
-  const djvuResult = useDjvuDocument(isDjvu ? blob : null);
-  const { numPages, pageWidth, pageHeight, pageDimensions, outline, loading, error: docError } =
-    isDjvu ? djvuResult : pdfResult;
-  const pdfDoc = pdfResult.pdfDoc;
-  const djvuDoc = djvuResult.djvuDoc;
-  const annotations = usePdfAnnotations(attachmentId || '');
+  // Reading time only accrues while this tab is visible.
+  useReadingTimeTracker(isActive ? attachmentId : undefined, filename);
+
+  const doc = useTabDocument(attachmentId);
+  const { isDjvu, pdfDoc, djvuDoc, numPages, pageWidth, pageHeight, pageDimensions, outline } = doc;
+  const docError = doc.error;
+  const loading = doc.status === 'idle' || doc.status === 'loading';
+  const annotations = usePdfAnnotations(attachmentId);
   const customOutline = useCustomOutline(attachmentId, outline);
   const { notes, saveNote } = useNotes();
 
-  const savedPrefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
+  const savedPrefs = viewerPrefsStorage.get(attachmentId);
 
   const [zoom, setZoom] = useState(savedPrefs?.zoom ?? 1.0);
   const [fitWidth, setFitWidth] = useState(savedPrefs?.fitWidth ?? false);
@@ -101,69 +96,23 @@ export function PdfViewerPage() {
 
   const docViewRef = useRef<PdfDocumentViewHandle>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  // Inner width of the scrollable PDF container, reported by PdfDocumentView.
-  // This already excludes container padding, the toc/right-panel sidebars,
-  // and any visible scrollbar — so it's the exact horizontal space available
-  // for pages, on both mobile and desktop.
   const [pdfContainerWidth, setPdfContainerWidth] = useState(0);
-  // Tracks which attachmentId the currently loaded blob/pdfDoc belongs to.
-  // Without this, on a tab switch the scroll-to-saved-page effect runs while
-  // pdfDoc still references the previous tab's document, marks the scroll as
-  // "done" against the new attachmentId, and then no-ops when the actual
-  // document loads — leaving the new tab stuck on page 1.
-  const loadedAttachmentIdRef = useRef<string | null>(null);
   const scrollPositionToRestoreRef = useRef<{ page: number; offsetTop: number } | null>(null);
   const prevEffectiveZoomRef = useRef<number>(0);
-  // Locked page width used for fit-width zoom — captured at toggle time so
-  // effectiveZoom doesn't change as the user scrolls across pages.
   const fitWidthRefPageWidth = useRef<number>(pageWidth);
-  // Flag to suppress ResizeObserver scroll-position saves during zoom-induced resizes
   const isZoomResizeRef = useRef(false);
   const prevTwoPageViewRef = useRef(twoPageView);
   const currentPageRef = useRef(currentPage);
-  // Cached scroll position, updated on page changes — used as fallback when
-  // docViewRef is unavailable (e.g. during unmount).
   const lastScrollPosRef = useRef<{ page: number; offsetTop: number }>({
     page: savedPrefs?.currentPage ?? 1,
     offsetTop: savedPrefs?.scrollOffsetTop ?? 0,
   });
 
-  // Reset all viewer state when switching attachments
+  // Immersive mode: only the active instance writes the document attribute,
+  // and removes it when becoming inactive (so a switch to a non-immersive tab
+  // re-shows the layout header).
   useEffect(() => {
-    const prefs = attachmentId ? viewerPrefsStorage.get(attachmentId) : null;
-    setZoom(prefs?.zoom ?? 1.0);
-    setFitWidth(prefs?.fitWidth ?? false);
-    setTwoPageView(prefs?.twoPageView ?? false);
-    setCurrentPage(prefs?.currentPage ?? 1);
-    setCrop({
-      top: prefs?.cropTop ?? 0,
-      right: prefs?.cropRight ?? 0,
-      bottom: prefs?.cropBottom ?? 0,
-      left: prefs?.cropLeft ?? 0,
-    });
-    setCropEven({
-      top: prefs?.cropTopEven ?? prefs?.cropTop ?? 0,
-      right: prefs?.cropRightEven ?? prefs?.cropRight ?? 0,
-      bottom: prefs?.cropBottomEven ?? prefs?.cropBottom ?? 0,
-      left: prefs?.cropLeftEven ?? prefs?.cropLeft ?? 0,
-    });
-    setCropMode(false);
-    setShowToc(prefs?.showToc ?? false);
-    setShowRightPanel(false);
-    setEditingNoteId(null);
-    setTextSelection(null);
-    setActiveHighlight(null);
-    scrolledForAttachmentRef.current = null;
-    lastScrollPosRef.current = {
-      page: prefs?.currentPage ?? 1,
-      offsetTop: prefs?.scrollOffsetTop ?? 0,
-    };
-    prevEffectiveZoomRef.current = 0;
-    // fitWidthRefPageWidth will be set once pageDimensions are available
-  }, [attachmentId]);
-
-  // Sync immersive mode with document attribute (hides Layout header via global CSS)
-  useEffect(() => {
+    if (!isActive) return;
     if (immersiveMode) {
       document.documentElement.setAttribute('data-immersive', 'true');
     } else {
@@ -172,19 +121,17 @@ export function PdfViewerPage() {
     return () => {
       document.documentElement.removeAttribute('data-immersive');
     };
-  }, [immersiveMode]);
+  }, [immersiveMode, isActive]);
 
-  // Escape key exits immersive mode
   useEffect(() => {
-    if (!immersiveMode) return;
+    if (!isActive || !immersiveMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setImmersiveMode(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [immersiveMode]);
+  }, [immersiveMode, isActive]);
 
-  // Track actual device orientation so we can compare against the locked value
   useEffect(() => {
     const update = () => {
       setActualOrientation(window.innerWidth > window.innerHeight ? 'landscape' : 'portrait');
@@ -199,9 +146,8 @@ export function PdfViewerPage() {
 
   const needsRotation = lockedOrientation !== null && lockedOrientation !== actualOrientation;
 
-  // While the device's orientation differs from the locked one, hide the
-  // Layout header and let the .page take over the full viewport (rotated).
   useEffect(() => {
+    if (!isActive) return;
     if (needsRotation) {
       document.documentElement.setAttribute('data-orientation-rotated', 'true');
     } else {
@@ -210,7 +156,7 @@ export function PdfViewerPage() {
     return () => {
       document.documentElement.removeAttribute('data-orientation-rotated');
     };
-  }, [needsRotation]);
+  }, [needsRotation, isActive]);
 
   const handleOrientationLockToggle = useCallback(() => {
     setLockedOrientation(prev =>
@@ -221,112 +167,73 @@ export function PdfViewerPage() {
   }, []);
 
   // Capture scroll position before sidebar/immersive resizes so layout
-  // changes don't lose the user's place. The body's outer width doesn't
-  // change when sidebars toggle (they're flex children) but its inner
-  // layout does, which is what triggers ResizeObserver here.
+  // changes don't lose the user's place. Read from the continuously-tracked
+  // lastScrollPosRef instead of getScrollPosition() because this RO also
+  // fires on tab hide/show: at that moment effectiveZoom is mid-transition
+  // (still on the `zoom` fallback because the container's RO hasn't yet
+  // updated pdfContainerWidth), so a live measurement maps the preserved
+  // scrollTop through the wrong scale and returns a page far ahead — which
+  // then gets restored as the "real" position, jumping the user toward the
+  // end of the document.
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      // Don't capture scroll position during zoom-induced resizes — the
-      // position would be stale and feed back into the restoration loop.
       if (!isZoomResizeRef.current) {
-        scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
+        scrollPositionToRestoreRef.current = lastScrollPosRef.current;
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, [pdfDoc, djvuDoc, loading]);
 
-  // Load the attachment blob and sync server-side viewer prefs
+  // Sync server-side viewer prefs once on mount (the instance is per-tab,
+  // so attachmentId is fixed). Local prefs are the source of truth; only
+  // fall back to server when this device has never seen the book.
   useEffect(() => {
-    if (!attachmentId) return;
-    setBlob(null);
-    setLoadError(null);
-    loadedAttachmentIdRef.current = null;
+    const localPrefs = viewerPrefsStorage.get(attachmentId);
+    if (localPrefs) return;
     let cancelled = false;
+    (async () => {
+      const serverPrefs = await viewerPrefsStorage.fetchFromServer(attachmentId);
+      if (cancelled || !serverPrefs) return;
+      const raw = localStorage.getItem('scribe_viewer_prefs');
+      let map: Record<string, typeof serverPrefs> = {};
+      if (raw) { try { map = JSON.parse(raw); } catch { /* start fresh */ } }
+      map[attachmentId] = serverPrefs;
+      localStorage.setItem('scribe_viewer_prefs', JSON.stringify(map));
 
-    const load = async () => {
-      try {
-        // Local prefs are the source of truth on this device — they're updated
-        // continuously and survive tab switches. Only fall back to the server
-        // when this device has never seen the book (true cross-device sync),
-        // otherwise an in-flight server PUT can race a tab switch and the
-        // fetched data clobbers the just-saved local position.
-        const localPrefs = viewerPrefsStorage.get(attachmentId);
-        const [b, serverPrefs] = await Promise.all([
-          attachmentStorage.getBlob(attachmentId),
-          localPrefs ? Promise.resolve(null) : viewerPrefsStorage.fetchFromServer(attachmentId),
-        ]);
-        if (cancelled) return;
-        if (!b) {
-          setLoadError('Attachment not found.');
-          return;
-        }
-
-        if (serverPrefs) {
-          viewerPrefsStorage.get(attachmentId); // ensure localStorage is read
-          // Write server prefs to localStorage cache (skip the server save
-          // since data already came from the server)
-          const raw = localStorage.getItem('scribe_viewer_prefs');
-          let map: Record<string, ViewerPrefs> = {};
-          if (raw) { try { map = JSON.parse(raw); } catch { /* start fresh */ } }
-          map[attachmentId] = serverPrefs;
-          localStorage.setItem('scribe_viewer_prefs', JSON.stringify(map));
-
-          setZoom(serverPrefs.zoom ?? 1.0);
-          setFitWidth(serverPrefs.fitWidth ?? false);
-          setTwoPageView(serverPrefs.twoPageView ?? false);
-          setCurrentPage(serverPrefs.currentPage ?? 1);
-          setShowToc(serverPrefs.showToc ?? false);
-          setCrop({
-            top: serverPrefs.cropTop ?? 0,
-            right: serverPrefs.cropRight ?? 0,
-            bottom: serverPrefs.cropBottom ?? 0,
-            left: serverPrefs.cropLeft ?? 0,
-          });
-          setCropEven({
-            top: serverPrefs.cropTopEven ?? serverPrefs.cropTop ?? 0,
-            right: serverPrefs.cropRightEven ?? serverPrefs.cropRight ?? 0,
-            bottom: serverPrefs.cropBottomEven ?? serverPrefs.cropBottom ?? 0,
-            left: serverPrefs.cropLeftEven ?? serverPrefs.cropLeft ?? 0,
-          });
-          lastScrollPosRef.current = {
-            page: serverPrefs.currentPage ?? 1,
-            offsetTop: serverPrefs.scrollOffsetTop ?? 0,
-          };
-        }
-
-        loadedAttachmentIdRef.current = attachmentId;
-        setBlob(b);
-
-        // Mark as recently opened so Library "last opened" stays current
-        attachmentStorage.markOpened(attachmentId).catch(() => {});
-
-        // Get filename from metadata
-        const allMeta = await attachmentStorage.getAll();
-        const meta = allMeta.find(f => f.id === attachmentId);
-        if (meta) setFilename(meta.filename);
-      } catch {
-        if (!cancelled) setLoadError('Failed to load attachment.');
-      }
-    };
-
-    load();
+      setZoom(serverPrefs.zoom ?? 1.0);
+      setFitWidth(serverPrefs.fitWidth ?? false);
+      setTwoPageView(serverPrefs.twoPageView ?? false);
+      setCurrentPage(serverPrefs.currentPage ?? 1);
+      setShowToc(serverPrefs.showToc ?? false);
+      setCrop({
+        top: serverPrefs.cropTop ?? 0,
+        right: serverPrefs.cropRight ?? 0,
+        bottom: serverPrefs.cropBottom ?? 0,
+        left: serverPrefs.cropLeft ?? 0,
+      });
+      setCropEven({
+        top: serverPrefs.cropTopEven ?? serverPrefs.cropTop ?? 0,
+        right: serverPrefs.cropRightEven ?? serverPrefs.cropRight ?? 0,
+        bottom: serverPrefs.cropBottomEven ?? serverPrefs.cropBottom ?? 0,
+        left: serverPrefs.cropLeftEven ?? serverPrefs.cropLeft ?? 0,
+      });
+      lastScrollPosRef.current = {
+        page: serverPrefs.currentPage ?? 1,
+        offsetTop: serverPrefs.scrollOffsetTop ?? 0,
+      };
+    })();
     return () => { cancelled = true; };
-  }, [attachmentId, subject]);
+  }, [attachmentId]);
 
-  // Scroll to saved page once the PDF is loaded.
-  // Tracks which attachment we already scrolled for to avoid repeating.
+  // Scroll to saved page once the PDF is loaded — only once per instance.
   const scrolledForAttachmentRef = useRef<string | null>(null);
 
   useEffect(() => {
     const docReady = isDjvu ? !!djvuDoc : !!pdfDoc;
-    if (!docReady || loading || !attachmentId || scrolledForAttachmentRef.current === attachmentId) return;
-    // Guard against the previous tab's pdfDoc still being live in this render
-    // — only scroll once the loaded document actually corresponds to attachmentId.
-    if (loadedAttachmentIdRef.current !== attachmentId) return;
-    // Read prefs directly to avoid stale closure
+    if (!docReady || loading || scrolledForAttachmentRef.current === attachmentId) return;
     const prefs = viewerPrefsStorage.get(attachmentId);
     const hasPosition = prefs && (prefs.currentPage > 1 || (prefs.scrollOffsetTop && prefs.scrollOffsetTop > 0));
     if (hasPosition) {
@@ -338,39 +245,32 @@ export function PdfViewerPage() {
         );
       });
     }
-    scrolledForAttachmentRef.current = attachmentId; // eslint-disable-line react-hooks/immutability
+    scrolledForAttachmentRef.current = attachmentId;
   }, [pdfDoc, djvuDoc, isDjvu, loading, attachmentId]);
 
-  // Once pageDimensions are available for the current attachment, initialize
-  // the fit-width reference width to that doc's current-page width.
-  // Depending on the pageDimensions array reference (which is replaced when a
-  // new doc loads) ensures this re-runs on tab switches — otherwise the lock
-  // width would stay pinned to the previous tab's page width and produce the
-  // wrong fit-width scale for the new book.
   useEffect(() => {
     if (pageDimensions.length === 0 || !fitWidth) return;
-    if (loadedAttachmentIdRef.current !== attachmentId) return;
     fitWidthRefPageWidth.current = pageDimensions[currentPage - 1]?.width ?? pageWidth;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally re-runs only when dimensions or attachment change
-  }, [pageDimensions, attachmentId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally re-runs only when dimensions change
+  }, [pageDimensions]);
 
-  // Wrap onPageChange to also capture the precise scroll offset into a ref.
-  // NOTE: Do NOT save scrollPositionToRestoreRef here — that ref is reserved
-  // for explicit user actions (panel toggles, zoom changes, etc.).  Saving it
-  // on every scroll-triggered page change creates an infinite loop when
-  // fit-width is on and adjacent pages have different widths: page change →
-  // effectiveZoom change → scroll restore → different page detected → repeat.
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
     const pos = docViewRef.current?.getScrollPosition();
     if (pos) lastScrollPosRef.current = pos;
   }, []);
 
-  // Helper to build current prefs including precise scroll offset
+  // Updated by PdfDocumentView on every scroll while visible. Hidden tabs
+  // can't be measured via getBoundingClientRect (display:none collapses
+  // rects to zero), so buildPrefs must read from this cache rather than
+  // calling getScrollPosition() directly — otherwise tab deactivation and
+  // pending debounced saves would persist { page: 1, offsetTop: 0 }.
+  const handleScrollPositionChange = useCallback((pos: { page: number; offsetTop: number }) => {
+    lastScrollPosRef.current = pos;
+  }, []);
+
   const buildPrefs = useCallback(() => {
-    // Try live DOM first; fall back to cached position (needed during unmount
-    // when React has already cleared the imperative handle ref).
-    const pos = docViewRef.current?.getScrollPosition() ?? lastScrollPosRef.current;
+    const pos = lastScrollPosRef.current;
     return {
       zoom,
       fitWidth,
@@ -387,13 +287,12 @@ export function PdfViewerPage() {
       cropBottomEven: cropEven.bottom,
       cropLeftEven: cropEven.left,
     };
-  }, [zoom, fitWidth, currentPage, twoPageView, showToc, crop, cropEven]);
+  }, [zoom, fitWidth, twoPageView, showToc, crop, cropEven]);
 
-  // Debounced save of viewer preferences
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    if (!attachmentId || !scrolledForAttachmentRef.current) return;
+    if (!scrolledForAttachmentRef.current) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -410,19 +309,17 @@ export function PdfViewerPage() {
     };
   }, [attachmentId, zoom, fitWidth, currentPage, twoPageView, showToc, buildPrefs]);
 
-  // Save prefs on component unmount (navigating away from PDF view).
-  // useLayoutEffect cleanup runs synchronously before React clears refs,
-  // so docViewRef.current is still available for getScrollPosition().
+  // Save prefs on unmount (tab closed via closeBook).
   useLayoutEffect(() => {
-    if (!attachmentId) return;
     return () => {
       viewerPrefsStorage.save(attachmentId, buildPrefs());
     };
   }, [attachmentId, buildPrefs]);
 
-  // Immediate save on tab close or tab hide (mobile may not fire beforeunload)
+  // Immediate save on window unload / tab hide — only registered for the
+  // active instance so we don't issue N parallel saves for N open books.
   useEffect(() => {
-    if (!attachmentId) return;
+    if (!isActive) return;
 
     const handleBeforeUnload = () => {
       viewerPrefsStorage.save(attachmentId, buildPrefs());
@@ -440,7 +337,17 @@ export function PdfViewerPage() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [attachmentId, buildPrefs]);
+  }, [attachmentId, buildPrefs, isActive]);
+
+  // Save when this tab is deactivated (user switched to another book/route).
+  // Catches the case where the unmount handler doesn't run because the tab
+  // remains mounted in the persistent host.
+  useEffect(() => {
+    if (isActive) return;
+    if (!scrolledForAttachmentRef.current) return;
+    viewerPrefsStorage.save(attachmentId, buildPrefs());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only fires on the isActive→false edge
+  }, [isActive]);
 
   const handleImmersiveToggle = useCallback(() => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
@@ -509,17 +416,17 @@ export function PdfViewerPage() {
   }, []);
 
   const handleExportCropped = useCallback(async () => {
-    if (!blob || isDjvu || exportingCropped) return;
+    if (!doc.blob || isDjvu || exportingCropped) return;
     setExportingCropped(true);
     try {
-      await exportCroppedPdf(blob, filename || 'document.pdf', crop, cropEven);
+      await exportCroppedPdf(doc.blob, filename || 'document.pdf', crop, cropEven);
     } catch (err) {
       console.error('Failed to export cropped PDF:', err);
       alert('Failed to export PDF. See console for details.');
     } finally {
       setExportingCropped(false);
     }
-  }, [blob, isDjvu, exportingCropped, filename, crop, cropEven]);
+  }, [doc.blob, isDjvu, exportingCropped, filename, crop, cropEven]);
 
   const handleTocToggle = useCallback(() => {
     scrollPositionToRestoreRef.current = docViewRef.current?.getScrollPosition() ?? null;
@@ -531,9 +438,9 @@ export function PdfViewerPage() {
     setShowRightPanel(prev => !prev);
   }, []);
 
-  // Disable shortcuts while crop-mode dialog is open so its own controls
-  // (Esc/Enter and free-form input) aren't intercepted.
-  const shortcutsEnabled = !cropMode;
+  // Keyboard shortcuts: only the active instance binds, so inactive tabs don't
+  // race the active one for the same keys.
+  const shortcutsEnabled = isActive && !cropMode;
   useKeyboardShortcut('pdfTocToggle', handleTocToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfFitWidthToggle', handleFitWidthToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfPanelToggle', handleRightPanelToggle, shortcutsEnabled);
@@ -594,7 +501,6 @@ export function PdfViewerPage() {
     );
     window.getSelection()?.removeAllRanges();
     setTextSelection(null);
-    // Open comment popover for the new highlight
     setActiveHighlight({
       highlightId: hl.id,
       anchorRect: new DOMRect(
@@ -618,13 +524,10 @@ export function PdfViewerPage() {
     setPdfContainerWidth(width);
   }, []);
 
-  // Keep currentPageRef in sync for use in the two-page toggle effect
   useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
-  // When twoPageView toggles, restore scroll position to the current page so
-  // the user stays on the same content after the layout reflows.
   useEffect(() => {
     if (prevTwoPageViewRef.current === twoPageView) return;
     prevTwoPageViewRef.current = twoPageView;
@@ -635,38 +538,23 @@ export function PdfViewerPage() {
     });
   }, [twoPageView]);
 
-  // Compute fit-width scale using the PDF container's actual inner width.
-  // pdfContainerWidth comes from a ResizeObserver on the scrollable container
-  // and already accounts for sidebars (flex siblings), responsive padding
-  // (16px on desktop, 0 on mobile) and any visible scrollbar.
   const availableWidth = pdfContainerWidth;
-  // Use the locked page width captured at fit-width toggle time so
-  // effectiveZoom doesn't change as the user scrolls across pages.
   const currentPageWidth = fitWidth ? fitWidthRefPageWidth.current : pageWidth;
-  // Use the widest of the two crops so the fit-width scale accommodates whichever
-  // page parity needs the most horizontal space — otherwise the narrower-cropped
-  // pages would overflow.
   const minHorizCropFactor = Math.min(
     1 - crop.left - crop.right,
     1 - cropEven.left - cropEven.right,
   );
   const croppedPageWidth = currentPageWidth * minHorizCropFactor;
-  // In two-page view, two pages sit side by side with an 8px gap between them.
   const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
   const effectiveZoom = fitWidth && availableWidth > 0 ? Math.max(0.5, availableWidth / fitWidthPageSpan) : zoom;
 
-  // When effectiveZoom changes, restore the scroll position that was saved before the change.
-  // useLayoutEffect fires after DOM mutations but before the browser paints, preventing a visible jump.
   useLayoutEffect(() => {
     if (prevEffectiveZoomRef.current === effectiveZoom) return;
     prevEffectiveZoomRef.current = effectiveZoom;
-    // Don't interfere with the initial page scroll restoration
     if (!scrolledForAttachmentRef.current) return;
     const pos = scrollPositionToRestoreRef.current;
     scrollPositionToRestoreRef.current = null;
     if (pos) {
-      // Suppress ResizeObserver scroll-position saves while zoom-induced
-      // layout changes propagate, to prevent a stale-position feedback loop.
       isZoomResizeRef.current = true;
       docViewRef.current?.scrollToPage(pos.page, pos.offsetTop, 'instant');
       requestAnimationFrame(() => {
@@ -675,11 +563,12 @@ export function PdfViewerPage() {
     }
   }, [effectiveZoom]);
 
-  const errorMessage = loadError || docError;
+  const errorMessage = docError;
 
   if (errorMessage) {
     return (
       <div className={styles.page}>
+        <BookTabs activeId={attachmentId} />
         <div className={styles.errorContainer}>
           <p className={styles.error}>{errorMessage}</p>
         </div>
@@ -691,6 +580,7 @@ export function PdfViewerPage() {
   if (loading || !docReady) {
     return (
       <div className={styles.page}>
+        <BookTabs activeId={attachmentId} />
         <div className={styles.loadingContainer}>
           <p className={styles.loading}>Loading{isDjvu ? ' DjVu' : ' PDF'}...</p>
         </div>
@@ -757,6 +647,7 @@ export function PdfViewerPage() {
           onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}
           onHighlightClick={isDjvu ? undefined : handleHighlightClick}
           onPageChange={handlePageChange}
+          onScrollPositionChange={handleScrollPositionChange}
           onContainerResize={handlePdfContainerResize}
           renderVisiblePage={isDjvu && djvuDoc ? (pageNum, dims, scale, cropBox, priority) => (
             <DjvuPageView
@@ -797,7 +688,7 @@ export function PdfViewerPage() {
             <SidebarRightIcon size={18} />
           </button>
         </div>
-        {editingNoteId && (
+        {isActive && editingNoteId && (
           <PdfPostItNote
             noteId={editingNoteId}
             notes={notes}
@@ -820,7 +711,7 @@ export function PdfViewerPage() {
         )}
       </div>
 
-      {!isDjvu && cropMode && (
+      {isActive && !isDjvu && cropMode && (
         <PdfCropOverlay
           pdfDoc={pdfDoc!}
           pageNumber={currentPage}
@@ -835,7 +726,7 @@ export function PdfViewerPage() {
         />
       )}
 
-      {!isDjvu && textSelection && (
+      {isActive && !isDjvu && textSelection && (
         <PdfSelectionToolbar
           position={textSelection.anchorPosition}
           onHighlight={handleHighlight}
@@ -843,7 +734,7 @@ export function PdfViewerPage() {
         />
       )}
 
-      {!isDjvu && activeHl && activeHighlight && (
+      {isActive && !isDjvu && activeHl && activeHighlight && (
         <PdfCommentPopover
           highlight={activeHl}
           comments={annotations.comments[activeHl.id] || []}
@@ -860,4 +751,11 @@ export function PdfViewerPage() {
       )}
     </div>
   );
+}
+
+// Route placeholder. The actual viewer instances are mounted persistently by
+// PersistentPdfHost inside Layout, so the /pdf/:attachmentId route only needs
+// a no-op element to register as matched.
+export function PdfViewerPage() {
+  return null;
 }
