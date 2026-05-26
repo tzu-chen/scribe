@@ -86,6 +86,21 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     const onPositionChangeRef = useRef(onPositionChange);
     onPositionChangeRef.current = onPositionChange;
 
+    // Mirror scale / layoutModel / constants into refs, written during render.
+    // The scroll listener reads from these (not its closure) so it always uses
+    // the latest mapping. Without this, a rapid TOC toggle in fit-width races:
+    // the layout effect synchronously sets scrollTop with the new scale, the
+    // browser queues a scroll event, but the listener still attached at that
+    // moment was registered with the previous scale closure — interpreting the
+    // freshly-set scrollTop through the old mapping corrupts positionRef, and
+    // the next layout-effect re-application lands on the wrong page.
+    const scaleRef = useRef(scale);
+    scaleRef.current = scale;
+    const layoutModelRef = useRef(layoutModel);
+    layoutModelRef.current = layoutModel;
+    const constantsRef = useRef(constants);
+    constantsRef.current = constants;
+
     useImperativeHandle(ref, () => ({
       scrollToPage(page: number, offsetTop?: number | null, behavior: ScrollBehavior = 'smooth') {
         const container = containerRef.current;
@@ -127,6 +142,8 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     // overflow:auto container becomes visible again if the preserved scrollTop
     // exceeds the (possibly stale) maxScroll and gets clamped — reading that
     // clamped value at a mid-transition scale closure would corrupt positionRef.
+    // Registered once and reads scale/layoutModel/constants from refs so it
+    // can't be the stale-closure source of corruption during scale changes.
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
@@ -136,7 +153,12 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
         rafId = requestAnimationFrame(() => {
           rafId = null;
           if (container.clientHeight === 0) return;
-          const pos = scrollTopToPosition(container.scrollTop, scale, layoutModel, constants);
+          const pos = scrollTopToPosition(
+            container.scrollTop,
+            scaleRef.current,
+            layoutModelRef.current,
+            constantsRef.current,
+          );
           positionRef.current = pos;
           onPositionChangeRef.current?.(pos);
         });
@@ -146,7 +168,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
         container.removeEventListener('scroll', onScroll);
         if (rafId !== null) cancelAnimationFrame(rafId);
       };
-    }, [scale, layoutModel, constants]);
+    }, []);
 
     // Re-apply current position whenever the (scale, layoutModel, constants)
     // mapping changes. Replaces the parent's old "save scrollTop, restore after

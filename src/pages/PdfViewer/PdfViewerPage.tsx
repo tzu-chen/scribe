@@ -391,13 +391,84 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   useKeyboardShortcut('pdfPanelToggle', handleRightPanelToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfImmersiveToggle', handleImmersiveToggle, shortcutsEnabled);
 
-  const handlePanelScrollToPage = useCallback((page: number) => {
-    docViewRef.current?.scrollToPage(page);
+  // Browser-style back/forward history for in-PDF jumps (TOC clicks, page
+  // input, prev/next, right-panel jumps). Manual scrolling does not push
+  // entries; only deliberate jumps do. ArrowLeft walks back, ArrowRight
+  // walks forward — matches the paperpile-navigate viewer.
+  const jumpHistoryRef = useRef<ViewerPosition[]>([]);
+  const jumpIndexRef = useRef(-1);
+
+  // Center-screen overlay showing the destination page during a jump. Gives
+  // a clear visual cue while the smooth-scroll is still in flight (and on
+  // 'instant' jumps too, since the page indicator update can lag the IO).
+  // Key the rendered element by hintNonce so back-to-back jumps to the same
+  // page restart the fade-in animation instead of being a no-op.
+  const [jumpHint, setJumpHint] = useState<number | null>(null);
+  const [hintNonce, setHintNonce] = useState(0);
+  const jumpHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showJumpHint = useCallback((page: number) => {
+    setJumpHint(page);
+    setHintNonce(n => n + 1);
+    if (jumpHintTimerRef.current !== null) {
+      clearTimeout(jumpHintTimerRef.current);
+    }
+    jumpHintTimerRef.current = setTimeout(() => {
+      setJumpHint(null);
+      jumpHintTimerRef.current = null;
+    }, 900);
   }, []);
 
-  const handleToolbarPageJump = useCallback((page: number) => {
-    docViewRef.current?.scrollToPage(page, null, 'instant');
+  useEffect(() => () => {
+    if (jumpHintTimerRef.current !== null) {
+      clearTimeout(jumpHintTimerRef.current);
+    }
   }, []);
+
+  const recordJump = useCallback((target: ViewerPosition) => {
+    const current = docViewRef.current?.getPosition() ?? positionRef.current;
+    const samePos = (a: ViewerPosition, b: ViewerPosition) =>
+      a.pageIndex === b.pageIndex && Math.abs(a.withinPageOffset - b.withinPageOffset) < 1;
+    const history = jumpHistoryRef.current.slice(0, jumpIndexRef.current + 1);
+    if (history.length === 0 || !samePos(history[history.length - 1], current)) {
+      history.push({ pageIndex: current.pageIndex, withinPageOffset: current.withinPageOffset });
+    }
+    if (!samePos(history[history.length - 1], target)) {
+      history.push(target);
+    }
+    jumpHistoryRef.current = history;
+    jumpIndexRef.current = history.length - 1;
+  }, []);
+
+  const jumpBack = useCallback((): boolean => {
+    if (jumpIndexRef.current <= 0) return false;
+    jumpIndexRef.current -= 1;
+    const target = jumpHistoryRef.current[jumpIndexRef.current];
+    showJumpHint(target.pageIndex);
+    docViewRef.current?.scrollToPage(target.pageIndex, target.withinPageOffset, 'instant');
+    return true;
+  }, [showJumpHint]);
+
+  const jumpForward = useCallback((): boolean => {
+    if (jumpIndexRef.current >= jumpHistoryRef.current.length - 1) return false;
+    jumpIndexRef.current += 1;
+    const target = jumpHistoryRef.current[jumpIndexRef.current];
+    showJumpHint(target.pageIndex);
+    docViewRef.current?.scrollToPage(target.pageIndex, target.withinPageOffset, 'instant');
+    return true;
+  }, [showJumpHint]);
+
+  const handlePanelScrollToPage = useCallback((page: number) => {
+    recordJump({ pageIndex: page, withinPageOffset: 0 });
+    showJumpHint(page);
+    docViewRef.current?.scrollToPage(page);
+  }, [recordJump, showJumpHint]);
+
+  const handleToolbarPageJump = useCallback((page: number) => {
+    recordJump({ pageIndex: page, withinPageOffset: 0 });
+    showJumpHint(page);
+    docViewRef.current?.scrollToPage(page, null, 'instant');
+  }, [recordJump, showJumpHint]);
 
   const handleNavigateToNote = useCallback((noteId: string) => {
     navigate(`/note/${noteId}`);
@@ -462,8 +533,32 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   }, []);
 
   const handleTocNavigate = useCallback((page: number, destTop: number | null) => {
+    recordJump({ pageIndex: page, withinPageOffset: destTop ?? 0 });
+    showJumpHint(page);
     docViewRef.current?.scrollToPage(page, destTop, 'instant');
-  }, []);
+  }, [recordJump, showJumpHint]);
+
+  // Arrow keys walk the jump-history stack. Only the active instance binds so
+  // arrow presses while a different tab is foregrounded don't fight for the key.
+  useEffect(() => {
+    if (!isActive) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (target.isContentEditable) return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (jumpBack()) e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        if (jumpForward()) e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, jumpBack, jumpForward]);
 
   const handlePdfContainerResize = useCallback((width: number) => {
     setPdfContainerWidth(width);
@@ -617,6 +712,12 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
             saveNote={saveNote}
             onClose={handleCloseEditor}
           />
+        )}
+        {jumpHint !== null && (
+          <div key={`hint-${jumpHint}-${hintNonce}`} className={styles.jumpHint} aria-hidden="true">
+            <span className={styles.jumpHintPage}>{jumpHint}</span>
+            <span className={styles.jumpHintTotal}>/ {numPages}</span>
+          </div>
         )}
         </div>
         {showRightPanel && (

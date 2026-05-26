@@ -185,3 +185,42 @@
 .immersive .panelZone:hover .floatingToggleActive {
   opacity: 1;
 }
+
+/* Center-screen page-number hint shown briefly during a jump (TOC click,
+ * page input, prev/next, panel scroll, arrow-key back/forward). */
+.jumpHint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 16px 28px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  z-index: 300;
+  animation: jumpHintFade 900ms ease-out forwards;
+}
+
+.jumpHintPage {
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.jumpHintTotal {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+}
+
+@keyframes jumpHintFade {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
