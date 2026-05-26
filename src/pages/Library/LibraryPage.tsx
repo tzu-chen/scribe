@@ -14,7 +14,7 @@ import { stripExtension } from '../../utils/filename';
 import styles from './LibraryPage.module.css';
 
 type ViewMode = 'card' | 'list';
-type SortField = 'name' | 'uploaded' | 'lastOpened' | 'size';
+type SortField = 'name' | 'uploaded' | 'lastOpened';
 type SortDir = 'asc' | 'desc';
 
 type Selection =
@@ -24,10 +24,14 @@ type Selection =
 
 const VIEW_MODE_KEY = 'scribe_library_view';
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+const TAG_COLOR_PALETTE = [
+  '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',
+  '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
+  '#06b6d4', '#a855f7', '#facc15', '#f43f5e', '#22c55e',
+];
+
+function randomTagColor(): string {
+  return TAG_COLOR_PALETTE[Math.floor(Math.random() * TAG_COLOR_PALETTE.length)];
 }
 
 function formatDate(iso: string): string {
@@ -60,8 +64,13 @@ export function LibraryPage() {
   });
   const [sortField, setSortField] = useState<SortField>('lastOpened');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Selection state (always-on, no select mode)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectMode, setSelectMode] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [anchorId, setAnchorId] = useState<string | null>(null);
+  const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -88,7 +97,6 @@ export function LibraryPage() {
   const [folderContextMenu, setFolderContextMenu] = useState<{ x: number; y: number; folder: Folder } | null>(null);
   const [tagContextMenu, setTagContextMenu] = useState<{ x: number; y: number; tag: BookTag } | null>(null);
   const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
-  const [tagMenu, setTagMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
 
   const loadBooks = useCallback(async () => {
     try {
@@ -131,6 +139,7 @@ export function LibraryPage() {
     localStorage.setItem(VIEW_MODE_KEY, viewMode);
   }, [viewMode]);
 
+  // '/' focuses the search input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -192,8 +201,6 @@ export function LibraryPage() {
         const created = await attachmentStorage.add('', file, uploadFolderId);
         uploadedIds.push(created.id);
       }
-      // If uploading while a tag is selected, tag the new uploads with that tag
-      // so they appear in the current view.
       if (selection.kind === 'tag') {
         await Promise.all(uploadedIds.map(id => attachmentStorage.setTags(id, [selection.id])));
       }
@@ -224,48 +231,24 @@ export function LibraryPage() {
   );
 
   const handleDelete = useCallback(
-    async (id: string) => {
-      await attachmentStorage.delete(id);
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const msg = ids.length === 1
+        ? 'Delete 1 book? This cannot be undone.'
+        : `Delete ${ids.length} books? This cannot be undone.`;
+      if (!confirm(msg)) return;
+      await Promise.all(ids.map(id => attachmentStorage.delete(id)));
       setSelectedIds(prev => {
         const next = new Set(prev);
-        next.delete(id);
+        for (const id of ids) next.delete(id);
         return next;
       });
+      setActiveId(prev => (prev && ids.includes(prev) ? null : prev));
+      setAnchorId(prev => (prev && ids.includes(prev) ? null : prev));
       await loadBooks();
     },
     [loadBooks],
   );
-
-  const handleDeleteSelected = useCallback(async () => {
-    const ids = Array.from(selectedIds);
-    await Promise.all(ids.map(id => attachmentStorage.delete(id)));
-    setSelectedIds(new Set());
-    await loadBooks();
-  }, [selectedIds, loadBooks]);
-
-  const handleToggleSelect = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const handleSelectAll = useCallback((ids: string[]) => {
-    setSelectedIds(new Set(ids));
-  }, []);
-
-  const handleDeselectAll = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
-
-  const toggleSelectMode = useCallback(() => {
-    setSelectMode(prev => {
-      if (prev) setSelectedIds(new Set());
-      return !prev;
-    });
-  }, []);
 
   const startRename = useCallback((book: AttachmentMeta) => {
     setRenamingId(book.id);
@@ -355,7 +338,7 @@ export function LibraryPage() {
       setNewTagName('');
       return;
     }
-    await bookTagStorage.create(trimmed);
+    await bookTagStorage.create(trimmed, randomTagColor());
     await loadTags();
     setCreatingTag(false);
     setNewTagName('');
@@ -389,9 +372,9 @@ export function LibraryPage() {
     await loadBooks();
   }, [loadTags, loadBooks]);
 
+  // Apply a tag to a set of books: if every book already has the tag, remove
+  // it; otherwise add it to those missing it.
   const handleToggleBookTag = useCallback(async (bookIds: string[], tagId: string) => {
-    // Determine whether to add or remove based on majority: if every selected
-    // book already has this tag, remove it; otherwise add it to those missing it.
     const allHave = bookIds.every(bid => books.find(b => b.id === bid)?.tags?.includes(tagId));
     await Promise.all(bookIds.map(async bid => {
       const book = books.find(b => b.id === bid);
@@ -404,6 +387,20 @@ export function LibraryPage() {
     await loadBooks();
   }, [books, loadBooks]);
 
+  const handleShuffleTagColors = useCallback(async () => {
+    if (tags.length === 0) return;
+    await Promise.all(tags.map(t => bookTagStorage.update(t.id, { color: randomTagColor() })));
+    await loadTags();
+  }, [tags, loadTags]);
+
+  const handleRemoveBookTag = useCallback(async (bookId: string, tagId: string) => {
+    const book = books.find(b => b.id === bookId);
+    if (!book) return;
+    const next = (book.tags ?? []).filter(t => t !== tagId);
+    await attachmentStorage.setTags(bookId, next);
+    await loadBooks();
+  }, [books, loadBooks]);
+
   // Context menu for books
   const openBookContextMenu = useCallback((e: React.MouseEvent, book: AttachmentMeta) => {
     e.preventDefault();
@@ -411,14 +408,12 @@ export function LibraryPage() {
     setFolderContextMenu(null);
     setTagContextMenu(null);
     setMoveMenu(null);
-    setTagMenu(null);
   }, []);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeFolderContextMenu = useCallback(() => setFolderContextMenu(null), []);
   const closeTagContextMenu = useCallback(() => setTagContextMenu(null), []);
   const closeMoveMenu = useCallback(() => setMoveMenu(null), []);
-  const closeTagMenu = useCallback(() => setTagMenu(null), []);
 
   // Filtered and sorted books.
   // Folders exclude books from "All"; tags do NOT — a tag is an overlay filter
@@ -454,17 +449,18 @@ export function LibraryPage() {
         case 'lastOpened':
           cmp = (a.lastOpenedAt ?? '').localeCompare(b.lastOpenedAt ?? '');
           break;
-        case 'size':
-          cmp = a.size - b.size;
-          break;
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return sorted;
   }, [filteredBooks, sortField, sortDir]);
 
-  const allFilteredIds = sortedBooks.map(b => b.id);
-  const allSelected = sortedBooks.length > 0 && selectedIds.size === sortedBooks.length && sortedBooks.every(b => selectedIds.has(b.id));
+  // Clear selection state when the visible set changes meaningfully.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setActiveId(null);
+    setAnchorId(null);
+  }, [selection, searchQuery]);
 
   const tagsById = useMemo(() => {
     const map = new Map<string, BookTag>();
@@ -472,54 +468,190 @@ export function LibraryPage() {
     return map;
   }, [tags]);
 
+  // Selection helpers
+  const rangeBetween = useCallback((fromId: string, toId: string): Set<string> => {
+    const fromIdx = sortedBooks.findIndex(b => b.id === fromId);
+    const toIdx = sortedBooks.findIndex(b => b.id === toId);
+    if (fromIdx === -1 || toIdx === -1) return new Set([toId]);
+    const [lo, hi] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
+    const range = new Set<string>();
+    for (let i = lo; i <= hi; i++) range.add(sortedBooks[i].id);
+    return range;
+  }, [sortedBooks]);
+
+  const scrollIntoView = useCallback((id: string) => {
+    const el = cardRefs.current.get(id);
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, []);
+
+  const handleCardClick = useCallback((book: AttachmentMeta, e: React.MouseEvent) => {
+    // Ignore clicks bubbled from interactive children
+    const target = e.target as HTMLElement;
+    if (target.closest('input, button, select, textarea')) return;
+
+    if (e.shiftKey && anchorId !== null) {
+      setSelectedIds(rangeBetween(anchorId, book.id));
+      setActiveId(book.id);
+    } else if (e.ctrlKey || e.metaKey) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(book.id)) next.delete(book.id);
+        else next.add(book.id);
+        return next;
+      });
+      setActiveId(book.id);
+      setAnchorId(book.id);
+    } else {
+      setSelectedIds(new Set([book.id]));
+      setActiveId(book.id);
+      setAnchorId(book.id);
+    }
+  }, [anchorId, rangeBetween]);
+
+  const handleCardDoubleClick = useCallback((book: AttachmentMeta, e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('input, button, select, textarea')) return;
+    handleOpen(book);
+  }, [handleOpen]);
+
+  // Keyboard navigation: arrow keys to move, shift to extend, enter to open,
+  // delete/backspace to delete, escape to clear.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
+      if (sortedBooks.length === 0) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        let newActiveId: string;
+        if (activeId === null) {
+          newActiveId = sortedBooks[0].id;
+        } else {
+          const currentIdx = sortedBooks.findIndex(b => b.id === activeId);
+          if (currentIdx === -1) {
+            newActiveId = sortedBooks[0].id;
+          } else {
+            const delta = e.key === 'ArrowDown' ? 1 : -1;
+            const nextIdx = Math.max(0, Math.min(sortedBooks.length - 1, currentIdx + delta));
+            newActiveId = sortedBooks[nextIdx].id;
+          }
+        }
+        if (e.shiftKey && anchorId !== null) {
+          setSelectedIds(rangeBetween(anchorId, newActiveId));
+          setActiveId(newActiveId);
+        } else {
+          setSelectedIds(new Set([newActiveId]));
+          setActiveId(newActiveId);
+          setAnchorId(newActiveId);
+        }
+        scrollIntoView(newActiveId);
+      } else if (e.key === 'Enter') {
+        if (selectedIds.size === 1) {
+          const id = Array.from(selectedIds)[0];
+          const book = books.find(b => b.id === id);
+          if (book) {
+            e.preventDefault();
+            handleOpen(book);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+          setActiveId(null);
+          setAnchorId(null);
+        }
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedIds.size === 0) return;
+        e.preventDefault();
+        handleDelete(Array.from(selectedIds));
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [sortedBooks, activeId, anchorId, selectedIds, books, handleOpen, handleDelete, rangeBetween, scrollIntoView]);
+
+  // Sidebar tag click: apply to selection if any, otherwise filter.
+  const handleSidebarTagClick = useCallback(async (tag: BookTag) => {
+    if (selectedIds.size > 0) {
+      await handleToggleBookTag(Array.from(selectedIds), tag.id);
+      return;
+    }
+    setSelection(prev =>
+      prev.kind === 'tag' && prev.id === tag.id ? { kind: 'all' } : { kind: 'tag', id: tag.id },
+    );
+  }, [selectedIds, handleToggleBookTag]);
+
   const renderTagChips = (book: AttachmentMeta) => {
     if (!book.tags || book.tags.length === 0) return null;
     return (
-      <div className={styles.tagChipRow}>
+      <span className={styles.tagChipRow}>
         {book.tags.map(tid => {
           const tag = tagsById.get(tid);
           if (!tag) return null;
           return (
-            <span key={tid} className={styles.tagChip}>
+            <span
+              key={tid}
+              className={styles.tagChip}
+              style={tag.color ? { backgroundColor: tag.color, color: '#fff' } : undefined}
+              onClick={e => e.stopPropagation()}
+              onDoubleClick={e => e.stopPropagation()}
+            >
               {tag.name}
+              <button
+                type="button"
+                className={styles.tagChipRemove}
+                title={`Remove "${tag.name}"`}
+                aria-label={`Remove ${tag.name}`}
+                onClick={e => { e.stopPropagation(); handleRemoveBookTag(book.id, tid); }}
+                onDoubleClick={e => e.stopPropagation()}
+              >
+                ×
+              </button>
             </span>
           );
         })}
-      </div>
+      </span>
     );
   };
 
-  // Build context menu items for a book
+  // Right-click context menu acts on the selection when the right-clicked
+  // book is part of the selection; otherwise it acts on just that book.
   const bookContextMenuItems = useMemo((): ContextMenuItem[] => {
     if (!contextMenu) return [];
-    const items: ContextMenuItem[] = [
-      { label: 'Rename', onClick: () => startRename(contextMenu.book) },
-    ];
+    const targetIds = selectedIds.has(contextMenu.book.id)
+      ? Array.from(selectedIds)
+      : [contextMenu.book.id];
+    const items: ContextMenuItem[] = [];
+    if (targetIds.length === 1) {
+      items.push({ label: 'Rename', onClick: () => startRename(contextMenu.book) });
+    }
     if (folders.length > 0) {
       items.push({
         label: 'Move to folder...',
         onClick: () => {
-          setMoveMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: [contextMenu.book.id] });
+          setMoveMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: targetIds });
         },
       });
     }
-    if (contextMenu.book.folderId) {
+    if (targetIds.length === 1 && contextMenu.book.folderId) {
       items.push({
         label: 'Remove from folder',
         onClick: () => handleMoveToFolder([contextMenu.book.id], null),
       });
     }
     items.push({
-      label: 'Edit tags...',
-      onClick: () => {
-        setTagMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: [contextMenu.book.id] });
-      },
+      label: targetIds.length === 1 ? 'Delete' : `Delete ${targetIds.length}`,
+      onClick: () => handleDelete(targetIds),
+      danger: true,
     });
-    items.push({ label: 'Delete', onClick: () => handleDelete(contextMenu.book.id), danger: true });
     return items;
-  }, [contextMenu, folders, startRename, handleMoveToFolder, handleDelete]);
+  }, [contextMenu, selectedIds, folders, startRename, handleMoveToFolder, handleDelete]);
 
-  // Build move menu items
+  // Move menu items
   const moveMenuItems = useMemo((): ContextMenuItem[] => {
     if (!moveMenu) return [];
     const items: ContextMenuItem[] = folders.map(f => ({
@@ -529,30 +661,6 @@ export function LibraryPage() {
     items.push({ label: 'No folder', onClick: () => handleMoveToFolder(moveMenu.bookIds, null) });
     return items;
   }, [moveMenu, folders, handleMoveToFolder]);
-
-  // Build tag picker items: each tag toggles on click, menu stays open.
-  // For multi-book selection: the checked indicator is set when EVERY selected
-  // book has that tag (so click removes); otherwise click adds.
-  const tagMenuItems = useMemo((): ContextMenuItem[] => {
-    if (!tagMenu) return [];
-    if (tags.length === 0) {
-      return [
-        {
-          label: 'No tags yet — create one in the sidebar',
-          onClick: () => {},
-        },
-      ];
-    }
-    return tags.map(tag => {
-      const allHave = tagMenu.bookIds.every(bid => books.find(b => b.id === bid)?.tags?.includes(tag.id));
-      return {
-        label: tag.name,
-        onClick: () => handleToggleBookTag(tagMenu.bookIds, tag.id),
-        checked: allHave,
-        keepOpen: true,
-      };
-    });
-  }, [tagMenu, tags, books, handleToggleBookTag]);
 
   if (loading) {
     return (
@@ -580,6 +688,11 @@ export function LibraryPage() {
     if (sortField !== field) return null;
     return <span className={styles.sortArrow}>{sortDir === 'asc' ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}</span>;
   };
+
+  const sidebarTagTooltip = (tag: BookTag) =>
+    selectedIds.size > 0
+      ? `Apply "${tag.name}" to ${selectedIds.size} selected book(s)`
+      : `Filter by ${tag.name}`;
 
   return (
     <div className={styles.page}>
@@ -662,7 +775,6 @@ export function LibraryPage() {
                     setContextMenu(null);
                     setTagContextMenu(null);
                     setMoveMenu(null);
-                    setTagMenu(null);
                   }}
                 >
                   {folder.name}
@@ -695,7 +807,20 @@ export function LibraryPage() {
             </button>
           )}
 
-          <div className={styles.sidebarSectionLabel}>Tags</div>
+          <div className={styles.sidebarSectionHeader}>
+            <span className={styles.sidebarSectionLabel}>Tags</span>
+            {tags.length > 0 && (
+              <button
+                type="button"
+                className={styles.sidebarHelpBtn}
+                onClick={handleShuffleTagColors}
+                title="Shuffle all tag colors"
+                aria-label="Shuffle all tag colors"
+              >
+                ⤭
+              </button>
+            )}
+          </div>
           {tags.map(tag => (
             <div key={tag.id}>
               {renamingTagId === tag.id ? (
@@ -713,17 +838,21 @@ export function LibraryPage() {
               ) : (
                 <button
                   className={`${styles.sidebarItem} ${selection.kind === 'tag' && selection.id === tag.id ? styles.sidebarItemActive : ''}`}
-                  onClick={() => setSelection({ kind: 'tag', id: tag.id })}
+                  onClick={() => handleSidebarTagClick(tag)}
                   onContextMenu={e => {
                     e.preventDefault();
                     setTagContextMenu({ x: e.clientX, y: e.clientY, tag });
                     setContextMenu(null);
                     setFolderContextMenu(null);
                     setMoveMenu(null);
-                    setTagMenu(null);
                   }}
+                  title={sidebarTagTooltip(tag)}
                 >
-                  <span className={styles.sidebarTagDot} aria-hidden="true" />
+                  <span
+                    className={styles.sidebarTagDot}
+                    style={tag.color ? { backgroundColor: tag.color } : undefined}
+                    aria-hidden="true"
+                  />
                   {tag.name}
                 </button>
               )}
@@ -760,41 +889,10 @@ export function LibraryPage() {
           {books.length > 0 && (
             <div className={styles.searchRow}>
               <SearchBar ref={searchInputRef} value={searchQuery} onChange={setSearchQuery} />
-            </div>
-          )}
-
-          {books.length > 0 && (
-            <div className={styles.toolbarRow}>
-              <button
-                className={`${styles.selectToggleBtn} ${selectMode ? styles.selectToggleActive : ''}`}
-                onClick={toggleSelectMode}
-              >
-                {selectMode ? 'Cancel' : 'Select'}
-              </button>
-              {selectMode && selectedIds.size > 0 && (
-                <>
-                  <span className={styles.bulkCount}>{selectedIds.size} selected</span>
-                  {folders.length > 0 && (
-                    <button
-                      className={styles.bulkMoveBtn}
-                      onClick={e => setMoveMenu({ x: e.clientX, y: e.clientY, bookIds: Array.from(selectedIds) })}
-                    >
-                      Move to folder
-                    </button>
-                  )}
-                  <button
-                    className={styles.bulkMoveBtn}
-                    onClick={e => setTagMenu({ x: e.clientX, y: e.clientY, bookIds: Array.from(selectedIds) })}
-                  >
-                    Edit tags
-                  </button>
-                  <button className={styles.bulkDeleteBtn} onClick={handleDeleteSelected}>
-                    Delete selected
-                  </button>
-                  <button className={styles.bulkDeselectBtn} onClick={handleDeselectAll}>
-                    Deselect all
-                  </button>
-                </>
+              {selectedIds.size > 0 && (
+                <span className={styles.selectionCount}>
+                  {selectedIds.size} selected
+                </span>
               )}
             </div>
           )}
@@ -820,7 +918,7 @@ export function LibraryPage() {
                 <>
                   <p className={styles.emptyTitle}>No books with this tag</p>
                   <p className={styles.emptyText}>
-                    Right-click a book and choose &quot;Edit tags...&quot; to assign this tag.
+                    Select books and click the tag in the sidebar to apply it.
                   </p>
                 </>
               ) : (
@@ -833,76 +931,72 @@ export function LibraryPage() {
               )}
             </div>
           ) : viewMode === 'card' ? (
-            <div className={styles.grid}>
-              {sortedBooks.map(book => (
-                <article
-                  key={book.id}
-                  className={`${styles.card} ${selectMode && selectedIds.has(book.id) ? styles.cardSelected : ''}`}
-                  onClick={e => {
-                    if (selectMode) {
-                      handleToggleSelect(book.id);
-                    } else {
-                      handleOpen(book, e.ctrlKey || e.metaKey);
-                    }
-                  }}
-                  onAuxClick={e => {
-                    if (e.button === 1 && !selectMode) handleOpen(book, true);
-                  }}
-                  onContextMenu={e => openBookContextMenu(e, book)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !selectMode) handleOpen(book);
-                  }}
-                >
-                  {selectMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(book.id)}
-                      onChange={() => handleToggleSelect(book.id)}
-                      className={styles.cardCheckbox}
-                      onClick={e => e.stopPropagation()}
-                    />
-                  )}
-                  <div className={styles.cardTitle}>{stripExtension(book.filename)}</div>
-                  <div className={styles.cardMeta}>
-                    <span className={styles.cardSize}>
-                      {formatFileSize(book.size)}
-                    </span>
-                    <span className={styles.cardDate}>
-                      {formatDate(book.createdAt)}
-                    </span>
-                  </div>
-                  {book.subject && (
-                    <div className={styles.cardSubject}>{book.subject}</div>
-                  )}
-                  {renderTagChips(book)}
-                </article>
-              ))}
+            <div className={styles.cardList}>
+              {sortedBooks.map(book => {
+                const isSelected = selectedIds.has(book.id);
+                const isActive = activeId === book.id;
+                return (
+                  <article
+                    key={book.id}
+                    ref={el => {
+                      if (el) cardRefs.current.set(book.id, el);
+                      else cardRefs.current.delete(book.id);
+                    }}
+                    className={`${styles.card} ${isSelected ? styles.cardSelected : ''} ${isActive ? styles.cardActive : ''}`}
+                    onClick={e => handleCardClick(book, e)}
+                    onDoubleClick={e => handleCardDoubleClick(book, e)}
+                    onAuxClick={e => {
+                      if (e.button === 1) handleOpen(book, true);
+                    }}
+                    onContextMenu={e => openBookContextMenu(e, book)}
+                  >
+                    <div className={styles.cardTitle}>
+                      {renamingId === book.id ? (
+                        <input
+                          ref={renameInputRef}
+                          className={styles.renameInput}
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitRename();
+                            if (e.key === 'Escape') cancelRename();
+                          }}
+                          onBlur={commitRename}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      ) : (
+                        stripExtension(book.filename)
+                      )}
+                    </div>
+                    <div className={styles.cardMeta}>
+                      {book.subject && (
+                        <span className={styles.cardSubject}>{book.subject}</span>
+                      )}
+                      {renderTagChips(book)}
+                      <span className={styles.cardDates}>
+                        <span title="Last opened">
+                          {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
+                        </span>
+                        <span className={styles.cardDatesSep} aria-hidden="true" />
+                        <span title="Added">
+                          {formatDate(book.createdAt)}
+                        </span>
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className={styles.listContainer}>
               <table className={styles.listTable}>
                 <thead>
                   <tr className={styles.listHeaderRow}>
-                    {selectMode && (
-                      <th className={styles.listCheckboxCol}>
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          onChange={() => allSelected ? handleDeselectAll() : handleSelectAll(allFilteredIds)}
-                          className={styles.checkbox}
-                        />
-                      </th>
-                    )}
                     <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>
                       Name{sortIndicator('name')}
                     </th>
                     <th className={styles.listHeaderCell}>Type</th>
                     <th className={styles.listHeaderCell}>Tags</th>
-                    <th className={styles.listHeaderCell} onClick={() => handleSort('size')}>
-                      Size{sortIndicator('size')}
-                    </th>
                     <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>
                       Uploaded{sortIndicator('uploaded')}
                     </th>
@@ -912,58 +1006,51 @@ export function LibraryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedBooks.map(book => (
-                    <tr
-                      key={book.id}
-                      className={`${styles.listRow} ${selectedIds.has(book.id) ? styles.listRowSelected : ''}`}
-                      onContextMenu={e => openBookContextMenu(e, book)}
-                    >
-                      {selectMode && (
-                        <td className={styles.listCheckboxCol}>
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(book.id)}
-                            onChange={() => handleToggleSelect(book.id)}
-                            className={styles.checkbox}
-                          />
-                        </td>
-                      )}
-                      <td
-                        className={styles.listNameCell}
-                        onClick={e => {
-                          if (selectMode) {
-                            handleToggleSelect(book.id);
-                          } else if (renamingId !== book.id) {
-                            handleOpen(book, e.ctrlKey || e.metaKey);
-                          }
+                  {sortedBooks.map(book => {
+                    const isSelected = selectedIds.has(book.id);
+                    const isActive = activeId === book.id;
+                    return (
+                      <tr
+                        key={book.id}
+                        ref={el => {
+                          if (el) cardRefs.current.set(book.id, el);
+                          else cardRefs.current.delete(book.id);
                         }}
+                        className={`${styles.listRow} ${isSelected ? styles.listRowSelected : ''} ${isActive ? styles.listRowActive : ''}`}
+                        onClick={e => handleCardClick(book, e)}
+                        onDoubleClick={e => handleCardDoubleClick(book, e)}
+                        onAuxClick={e => {
+                          if (e.button === 1) handleOpen(book, true);
+                        }}
+                        onContextMenu={e => openBookContextMenu(e, book)}
                       >
-                        {renamingId === book.id ? (
-                          <input
-                            ref={renameInputRef}
-                            className={styles.renameInput}
-                            value={renameValue}
-                            onChange={e => setRenameValue(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') commitRename();
-                              if (e.key === 'Escape') cancelRename();
-                            }}
-                            onBlur={commitRename}
-                            onClick={e => e.stopPropagation()}
-                          />
-                        ) : (
-                          <span className={styles.listFileName}>{stripExtension(book.filename)}</span>
-                        )}
-                      </td>
-                      <td className={styles.listCell}>{getFileExtension(book.filename)}</td>
-                      <td className={styles.listCell}>{renderTagChips(book)}</td>
-                      <td className={styles.listCell}>{formatFileSize(book.size)}</td>
-                      <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
-                      <td className={styles.listCell}>
-                        {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className={styles.listNameCell}>
+                          {renamingId === book.id ? (
+                            <input
+                              ref={renameInputRef}
+                              className={styles.renameInput}
+                              value={renameValue}
+                              onChange={e => setRenameValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') commitRename();
+                                if (e.key === 'Escape') cancelRename();
+                              }}
+                              onBlur={commitRename}
+                              onClick={e => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className={styles.listFileName}>{stripExtension(book.filename)}</span>
+                          )}
+                        </td>
+                        <td className={styles.listCell}>{getFileExtension(book.filename)}</td>
+                        <td className={styles.listCell}>{renderTagChips(book)}</td>
+                        <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
+                        <td className={styles.listCell}>
+                          {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1009,14 +1096,6 @@ export function LibraryPage() {
           y={moveMenu.y}
           items={moveMenuItems}
           onClose={closeMoveMenu}
-        />
-      )}
-      {tagMenu && (
-        <ContextMenu
-          x={tagMenu.x}
-          y={tagMenu.y}
-          items={tagMenuItems}
-          onClose={closeTagMenu}
         />
       )}
     </div>

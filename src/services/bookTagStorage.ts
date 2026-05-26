@@ -26,6 +26,15 @@ export const bookTagStorage = {
     if (!res.ok) throw new Error(`Failed to rename book tag: ${res.status}`);
   },
 
+  async update(id: string, patch: { name?: string; color?: string | null }): Promise<void> {
+    const res = await fetch(`/api/book-tags/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error(`Failed to update book tag: ${res.status}`);
+  },
+
   async delete(id: string): Promise<void> {
     const res = await fetch(`/api/book-tags/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Failed to delete book tag: ${res.status}`);
