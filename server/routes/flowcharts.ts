@@ -170,6 +170,19 @@ router.get('/nodes/search', (req, res) => {
   res.json(rows.map(rowToFlowchartNode));
 });
 
+// GET /nodes/all — every node across every flowchart, with flowchart name
+router.get('/nodes/all', (_req, res) => {
+  const rows = db.prepare(`
+    SELECT fn.*, f.name AS flowchart_name
+    FROM flowchart_nodes fn
+    JOIN flowcharts f ON f.id = fn.flowchart_id
+  `).all() as Array<FlowchartNodeRow & { flowchart_name: string }>;
+  res.json(rows.map(row => ({
+    ...rowToFlowchartNode(row),
+    flowchartName: row.flowchart_name,
+  })));
+});
+
 // GET /nodes/:flowchartId/:nodeKey — single node lookup
 router.get('/nodes/:flowchartId/:nodeKey', (req, res) => {
   const row = db.prepare(

@@ -88,3 +88,8 @@ export interface FlowchartNodeRecord {
   topics?: string;
   stageKey?: string;
 }
+
+/** Node record joined with the parent flowchart's display name. */
+export interface FlowchartNodeWithFlowchart extends FlowchartNodeRecord {
+  flowchartName: string;
+}

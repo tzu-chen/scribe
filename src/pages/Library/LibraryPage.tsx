@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
 import type { ContextMenuItem } from '../../components/ContextMenu/ContextMenu';
+import { AssignPopup } from '../../components/AssignPopup/AssignPopup';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { folderStorage } from '../../services/folderStorage';
 import { bookTagStorage } from '../../services/bookTagStorage';
+import { flowchartStorage } from '../../services/flowchartStorage';
 import type { AttachmentMeta } from '../../types/attachment';
 import type { Folder } from '../../types/folder';
 import type { BookTag } from '../../types/bookTag';
+import type { FlowchartNodeWithFlowchart } from '../../types/flowchart';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import { stripExtension } from '../../utils/filename';
 import styles from './LibraryPage.module.css';
@@ -42,16 +45,12 @@ function formatDate(iso: string): string {
   });
 }
 
-function getFileExtension(filename: string): string {
-  const dot = filename.lastIndexOf('.');
-  return dot >= 0 ? filename.slice(dot + 1).toUpperCase() : '—';
-}
-
 export function LibraryPage() {
   const navigate = useNavigate();
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<BookTag[]>([]);
+  const [nodes, setNodes] = useState<FlowchartNodeWithFlowchart[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,6 +96,7 @@ export function LibraryPage() {
   const [folderContextMenu, setFolderContextMenu] = useState<{ x: number; y: number; folder: Folder } | null>(null);
   const [tagContextMenu, setTagContextMenu] = useState<{ x: number; y: number; tag: BookTag } | null>(null);
   const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
 
   const loadBooks = useCallback(async () => {
     try {
@@ -129,11 +129,21 @@ export function LibraryPage() {
     }
   }, []);
 
+  const loadNodes = useCallback(async () => {
+    try {
+      const all = await flowchartStorage.getAllNodes();
+      setNodes(all);
+    } catch (err) {
+      console.error('Failed to load flowchart nodes:', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
     loadFolders();
     loadTags();
-  }, [loadBooks, loadFolders, loadTags]);
+    loadNodes();
+  }, [loadBooks, loadFolders, loadTags, loadNodes]);
 
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode);
@@ -468,6 +478,40 @@ export function LibraryPage() {
     return map;
   }, [tags]);
 
+  // Books link to flowchart nodes via `subject` (= node title). The same title
+  // may appear in multiple flowcharts, so a book can belong to several nodes.
+  const nodesBySubject = useMemo(() => {
+    const map = new Map<string, FlowchartNodeWithFlowchart[]>();
+    for (const node of nodes) {
+      const list = map.get(node.title) ?? [];
+      list.push(node);
+      map.set(node.title, list);
+    }
+    return map;
+  }, [nodes]);
+
+  const renderNodeChips = (book: AttachmentMeta) => {
+    if (!book.subject) return null;
+    const matches = nodesBySubject.get(book.subject);
+    if (!matches || matches.length === 0) return null;
+    return (
+      <span className={styles.nodeChipRow}>
+        {matches.map(node => (
+          <span
+            key={`${node.flowchartId}:${node.nodeKey}`}
+            className={styles.nodeChip}
+          >
+            <span className={styles.nodeChipLabel}>{node.title}</span>
+            <span className={styles.nodeChipTooltip} role="tooltip">
+              <span className={styles.nodeChipTooltipFlowchart}>{node.flowchartName}</span>
+              <span className={styles.nodeChipTooltipNode}>{node.title}</span>
+            </span>
+          </span>
+        ))}
+      </span>
+    );
+  };
+
   // Selection helpers
   const rangeBetween = useCallback((fromId: string, toId: string): Set<string> => {
     const fromIdx = sortedBooks.findIndex(b => b.id === fromId);
@@ -568,6 +612,10 @@ export function LibraryPage() {
         if (selectedIds.size === 0) return;
         e.preventDefault();
         handleDelete(Array.from(selectedIds));
+      } else if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (selectedIds.size === 0) return;
+        e.preventDefault();
+        setShowAssign(true);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -995,8 +1043,8 @@ export function LibraryPage() {
                     <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>
                       Name{sortIndicator('name')}
                     </th>
-                    <th className={styles.listHeaderCell}>Type</th>
                     <th className={styles.listHeaderCell}>Tags</th>
+                    <th className={styles.listHeaderCell}>Nodes</th>
                     <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>
                       Uploaded{sortIndicator('uploaded')}
                     </th>
@@ -1042,8 +1090,8 @@ export function LibraryPage() {
                             <span className={styles.listFileName}>{stripExtension(book.filename)}</span>
                           )}
                         </td>
-                        <td className={styles.listCell}>{getFileExtension(book.filename)}</td>
                         <td className={styles.listCell}>{renderTagChips(book)}</td>
+                        <td className={styles.listNodesCell}>{renderNodeChips(book)}</td>
                         <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
                         <td className={styles.listCell}>
                           {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
@@ -1096,6 +1144,17 @@ export function LibraryPage() {
           y={moveMenu.y}
           items={moveMenuItems}
           onClose={closeMoveMenu}
+        />
+      )}
+      {showAssign && selectedIds.size > 0 && (
+        <AssignPopup
+          selectedBookIds={selectedIds}
+          books={books}
+          folders={folders}
+          tags={tags}
+          nodes={nodes}
+          onClose={() => setShowAssign(false)}
+          onApplied={loadBooks}
         />
       )}
     </div>

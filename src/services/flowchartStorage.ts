@@ -1,4 +1,4 @@
-import type { Flowchart, FlowchartSummary, FlowchartSpec, FlowchartNodeRecord } from '../types/flowchart';
+import type { Flowchart, FlowchartSummary, FlowchartSpec, FlowchartNodeRecord, FlowchartNodeWithFlowchart } from '../types/flowchart';
 
 export const flowchartStorage = {
   async getAll(): Promise<FlowchartSummary[]> {
@@ -57,6 +57,12 @@ export const flowchartStorage = {
   async searchNodes(title: string): Promise<FlowchartNodeRecord[]> {
     const res = await fetch(`/api/flowcharts/nodes/search?title=${encodeURIComponent(title)}`);
     if (!res.ok) throw new Error(`Failed to search nodes: ${res.status}`);
+    return res.json();
+  },
+
+  async getAllNodes(): Promise<FlowchartNodeWithFlowchart[]> {
+    const res = await fetch('/api/flowcharts/nodes/all');
+    if (!res.ok) throw new Error(`Failed to fetch all nodes: ${res.status}`);
     return res.json();
   },
 
