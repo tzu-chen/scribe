@@ -478,36 +478,25 @@ export function LibraryPage() {
     return map;
   }, [tags]);
 
-  // Books link to flowchart nodes via `subject` (= node title). The same title
-  // may appear in multiple flowcharts, so a book can belong to several nodes.
-  const nodesBySubject = useMemo(() => {
-    const map = new Map<string, FlowchartNodeWithFlowchart[]>();
-    for (const node of nodes) {
-      const list = map.get(node.title) ?? [];
-      list.push(node);
-      map.set(node.title, list);
-    }
-    return map;
-  }, [nodes]);
-
+  // Books link to flowchart nodes through `book.nodeAttachments`. To keep list
+  // rows one line regardless of how many nodes a book is attached to, render a
+  // single "N nodes" chip with a hover tooltip listing each.
   const renderNodeChips = (book: AttachmentMeta) => {
-    if (!book.subject) return null;
-    const matches = nodesBySubject.get(book.subject);
-    if (!matches || matches.length === 0) return null;
+    const links = book.nodeAttachments ?? [];
+    if (links.length === 0) return null;
     return (
-      <span className={styles.nodeChipRow}>
-        {matches.map(node => (
-          <span
-            key={`${node.flowchartId}:${node.nodeKey}`}
-            className={styles.nodeChip}
-          >
-            <span className={styles.nodeChipLabel}>{node.title}</span>
-            <span className={styles.nodeChipTooltip} role="tooltip">
-              <span className={styles.nodeChipTooltipFlowchart}>{node.flowchartName}</span>
-              <span className={styles.nodeChipTooltipNode}>{node.title}</span>
+      <span className={styles.nodeChip}>
+        <span className={styles.nodeChipLabel}>
+          {links.length} {links.length === 1 ? 'node' : 'nodes'}
+        </span>
+        <span className={styles.nodeChipTooltip} role="tooltip">
+          {links.map(link => (
+            <span key={`${link.flowchartId}:${link.nodeKey}`} className={styles.nodeChipTooltipRow}>
+              <span className={styles.nodeChipTooltipNode}>{link.title}</span>
+              <span className={styles.nodeChipTooltipFlowchart}>{link.flowchartName}</span>
             </span>
-          </span>
-        ))}
+          ))}
+        </span>
       </span>
     );
   };
@@ -1017,9 +1006,7 @@ export function LibraryPage() {
                       )}
                     </div>
                     <div className={styles.cardMeta}>
-                      {book.subject && (
-                        <span className={styles.cardSubject}>{book.subject}</span>
-                      )}
+                      {renderNodeChips(book)}
                       {renderTagChips(book)}
                       <span className={styles.cardDates}>
                         <span title="Last opened">

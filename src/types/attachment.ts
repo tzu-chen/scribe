@@ -1,3 +1,10 @@
+export interface NodeAttachmentLink {
+  flowchartId: string;
+  nodeKey: string;
+  title: string;
+  flowchartName: string;
+}
+
 export interface Attachment {
   id: string;
   subject: string;
@@ -9,6 +16,7 @@ export interface Attachment {
   lastOpenedAt?: string;
   folderId?: string;
   tags?: string[];
+  nodeAttachments?: NodeAttachmentLink[];
 }
 
 export interface AttachmentMeta {
@@ -21,4 +29,5 @@ export interface AttachmentMeta {
   lastOpenedAt?: string;
   folderId?: string;
   tags?: string[];
+  nodeAttachments?: NodeAttachmentLink[];
 }

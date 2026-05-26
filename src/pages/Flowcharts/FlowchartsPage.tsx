@@ -141,8 +141,8 @@ function NodeActionPanel({ nodeId, nodeTitle, flowchartId, flowchartName, onClos
       setNotes(linked);
     });
 
-    // Attachments by subject
-    attachmentStorage.getBySubject(nodeTitle).then(setAttachments).catch(() => setAttachments([]));
+    // Attachments via the m2m attachment_nodes table
+    attachmentStorage.getByNode(flowchartId, nodeId).then(setAttachments).catch(() => setAttachments([]));
 
     // Questions
     questionStorage.getByNode(nodeId, flowchartId).then(setQuestions).catch(() => setQuestions([]));
@@ -157,14 +157,14 @@ function NodeActionPanel({ nodeId, nodeTitle, flowchartId, flowchartName, onClos
   };
 
   const handleBookSelected = async (book: AttachmentMeta) => {
-    await attachmentStorage.updateSubject(book.id, nodeTitle);
-    const updated = await attachmentStorage.getBySubject(nodeTitle);
+    await attachmentStorage.attachNode(book.id, flowchartId, nodeId);
+    const updated = await attachmentStorage.getByNode(flowchartId, nodeId);
     setAttachments(updated);
     setShowBookPicker(false);
   };
 
   const handleRemoveAttachment = async (fileId: string) => {
-    await attachmentStorage.updateSubject(fileId, '');
+    await attachmentStorage.detachNode(fileId, flowchartId, nodeId);
     setAttachments((prev) => prev.filter((f) => f.id !== fileId));
   };
 
@@ -397,7 +397,7 @@ export function FlowchartsPage() {
     if (!activeId) return;
 
     Promise.all([
-      attachmentStorage.getCountsBySubject(),
+      attachmentStorage.getCountsByNode(activeId),
       questionStorage.getCountsByNode(activeId),
     ]).then(([attachCounts, qCounts]) => {
       setNodeCounts({ attachments: attachCounts, questions: qCounts });
@@ -407,7 +407,7 @@ export function FlowchartsPage() {
   const refreshCounts = useCallback(() => {
     if (!activeId) return;
     Promise.all([
-      attachmentStorage.getCountsBySubject(),
+      attachmentStorage.getCountsByNode(activeId),
       questionStorage.getCountsByNode(activeId),
     ]).then(([attachCounts, qCounts]) => {
       setNodeCounts({ attachments: attachCounts, questions: qCounts });
@@ -463,7 +463,7 @@ export function FlowchartsPage() {
         setSelectedNode({ id: nodeId, title: nodeTitle });
         if (anchorRect) {
           setPopup({ type: 'attachments', nodeId, nodeTitle, anchorRect });
-          attachmentStorage.getBySubject(nodeTitle).then(setPopupAttachments).catch(() => setPopupAttachments([]));
+          attachmentStorage.getByNode(activeFlowchart.id, nodeId).then(setPopupAttachments).catch(() => setPopupAttachments([]));
         }
         break;
       case 'add-question':
@@ -479,11 +479,11 @@ export function FlowchartsPage() {
   }, [activeFlowchart, navigate]);
 
   const handleBookSelected = useCallback(async (book: AttachmentMeta) => {
-    if (!selectedNode) return;
-    await attachmentStorage.updateSubject(book.id, selectedNode.title);
+    if (!selectedNode || !activeFlowchart) return;
+    await attachmentStorage.attachNode(book.id, activeFlowchart.id, selectedNode.id);
     setShowBookPicker(false);
     refreshCounts();
-  }, [selectedNode, refreshCounts]);
+  }, [selectedNode, activeFlowchart, refreshCounts]);
 
   const closePopup = useCallback(() => {
     setPopup(null);
@@ -528,10 +528,11 @@ export function FlowchartsPage() {
   }, []);
 
   const handlePopupRemoveAttachment = useCallback(async (fileId: string) => {
-    await attachmentStorage.updateSubject(fileId, '');
+    if (!popup || !activeFlowchart) return;
+    await attachmentStorage.detachNode(fileId, activeFlowchart.id, popup.nodeId);
     setPopupAttachments((prev) => prev.filter((f) => f.id !== fileId));
     refreshCounts();
-  }, [refreshCounts]);
+  }, [popup, activeFlowchart, refreshCounts]);
 
   const handlePopupAttach = useCallback(() => {
     setPopup(null);

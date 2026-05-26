@@ -36,7 +36,46 @@ function loadTagsMap(attachmentIds: string[]): Map<string, string[]> {
   return map;
 }
 
-function rowToMeta(row: AttachmentRow, tagIds: string[] = []) {
+interface NodeAttachmentLink {
+  flowchartId: string;
+  nodeKey: string;
+  title: string;
+  flowchartName: string;
+}
+
+function loadNodeAttachmentsMap(attachmentIds: string[]): Map<string, NodeAttachmentLink[]> {
+  const map = new Map<string, NodeAttachmentLink[]>();
+  if (attachmentIds.length === 0) return map;
+  const placeholders = attachmentIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(`
+      SELECT an.attachment_id, an.flowchart_id, an.node_key, fn.title, f.name AS flowchart_name
+      FROM attachment_nodes an
+      LEFT JOIN flowchart_nodes fn ON fn.flowchart_id = an.flowchart_id AND fn.node_key = an.node_key
+      LEFT JOIN flowcharts f ON f.id = an.flowchart_id
+      WHERE an.attachment_id IN (${placeholders})
+    `)
+    .all(...attachmentIds) as Array<{
+      attachment_id: string;
+      flowchart_id: string;
+      node_key: string;
+      title: string | null;
+      flowchart_name: string | null;
+    }>;
+  for (const row of rows) {
+    const list = map.get(row.attachment_id) ?? [];
+    list.push({
+      flowchartId: row.flowchart_id,
+      nodeKey: row.node_key,
+      title: row.title ?? row.node_key,
+      flowchartName: row.flowchart_name ?? '',
+    });
+    map.set(row.attachment_id, list);
+  }
+  return map;
+}
+
+function rowToMeta(row: AttachmentRow, tagIds: string[] = [], nodeAttachments: NodeAttachmentLink[] = []) {
   return {
     id: row.id,
     subject: row.subject,
@@ -47,30 +86,56 @@ function rowToMeta(row: AttachmentRow, tagIds: string[] = []) {
     lastOpenedAt: row.last_opened_at ?? undefined,
     folderId: row.folder_id ?? undefined,
     tags: tagIds,
+    nodeAttachments,
   };
 }
 
 // GET /api/attachments
 router.get('/', (_req, res) => {
   const rows = db.prepare('SELECT * FROM attachments ORDER BY created_at DESC').all() as AttachmentRow[];
-  const tagsMap = loadTagsMap(rows.map(r => r.id));
-  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [])));
+  const ids = rows.map(r => r.id);
+  const tagsMap = loadTagsMap(ids);
+  const nodesMap = loadNodeAttachmentsMap(ids);
+  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [], nodesMap.get(r.id) ?? [])));
 });
 
-// GET /api/attachments/by-subject?subject=X
-router.get('/by-subject', (req, res) => {
-  const subject = req.query.subject as string;
-  const rows = db.prepare('SELECT * FROM attachments WHERE subject = ?').all(subject) as AttachmentRow[];
-  const tagsMap = loadTagsMap(rows.map(r => r.id));
-  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [])));
+// GET /api/attachments/by-node?flowchartId=X&nodeKey=Y
+router.get('/by-node', (req, res) => {
+  const flowchartId = req.query.flowchartId as string;
+  const nodeKey = req.query.nodeKey as string;
+  if (!flowchartId || !nodeKey) {
+    res.status(400).json({ error: 'flowchartId and nodeKey are required' });
+    return;
+  }
+  const rows = db.prepare(`
+    SELECT a.* FROM attachments a
+    JOIN attachment_nodes an ON an.attachment_id = a.id
+    WHERE an.flowchart_id = ? AND an.node_key = ?
+    ORDER BY a.created_at DESC
+  `).all(flowchartId, nodeKey) as AttachmentRow[];
+  const ids = rows.map(r => r.id);
+  const tagsMap = loadTagsMap(ids);
+  const nodesMap = loadNodeAttachmentsMap(ids);
+  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [], nodesMap.get(r.id) ?? [])));
 });
 
-// GET /api/attachments/counts-by-subject
-router.get('/counts-by-subject', (_req, res) => {
-  const rows = db.prepare('SELECT subject, COUNT(*) as count FROM attachments GROUP BY subject').all() as Array<{ subject: string; count: number }>;
+// GET /api/attachments/counts-by-node?flowchartId=X
+// Returns counts keyed by node_key (stable across renames, unlike titles).
+router.get('/counts-by-node', (req, res) => {
+  const flowchartId = req.query.flowchartId as string | undefined;
+  let rows: Array<{ node_key: string; count: number }>;
+  if (flowchartId) {
+    rows = db.prepare(
+      'SELECT node_key, COUNT(*) as count FROM attachment_nodes WHERE flowchart_id = ? GROUP BY node_key'
+    ).all(flowchartId) as Array<{ node_key: string; count: number }>;
+  } else {
+    rows = db.prepare(
+      'SELECT node_key, COUNT(*) as count FROM attachment_nodes GROUP BY node_key'
+    ).all() as Array<{ node_key: string; count: number }>;
+  }
   const counts: Record<string, number> = {};
   for (const row of rows) {
-    counts[row.subject] = row.count;
+    counts[row.node_key] = row.count;
   }
   res.json(counts);
 });
@@ -143,6 +208,33 @@ router.patch('/:id/subject', (req, res) => {
   const { subject } = req.body;
   db.prepare('UPDATE attachments SET subject = ? WHERE id = ?').run(subject, req.params.id);
   res.json({ ok: true });
+});
+
+// POST /api/attachments/:id/nodes — attach to a flowchart node (additive)
+router.post('/:id/nodes', (req, res) => {
+  const { flowchartId, nodeKey } = req.body ?? {};
+  if (typeof flowchartId !== 'string' || typeof nodeKey !== 'string' || !flowchartId || !nodeKey) {
+    res.status(400).json({ error: 'flowchartId and nodeKey are required' });
+    return;
+  }
+  const attachmentId = req.params.id;
+  const existing = db.prepare('SELECT id FROM attachments WHERE id = ?').get(attachmentId);
+  if (!existing) {
+    res.status(404).json({ error: 'Attachment not found' });
+    return;
+  }
+  db.prepare(
+    'INSERT OR IGNORE INTO attachment_nodes (attachment_id, flowchart_id, node_key) VALUES (?, ?, ?)'
+  ).run(attachmentId, flowchartId, nodeKey);
+  res.json({ ok: true });
+});
+
+// DELETE /api/attachments/:id/nodes/:flowchartId/:nodeKey — detach from one node
+router.delete('/:id/nodes/:flowchartId/:nodeKey', (req, res) => {
+  db.prepare(
+    'DELETE FROM attachment_nodes WHERE attachment_id = ? AND flowchart_id = ? AND node_key = ?'
+  ).run(req.params.id, req.params.flowchartId, req.params.nodeKey);
+  res.status(204).end();
 });
 
 // PATCH /api/attachments/:id/filename

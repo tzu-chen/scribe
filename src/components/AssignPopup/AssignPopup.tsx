@@ -62,7 +62,11 @@ export function AssignPopup({
     });
 
     const nodeItems: Item[] = nodes.map(n => {
-      const count = selectedBooks.filter(b => b.subject === n.title).length;
+      const count = selectedBooks.filter(b =>
+        (b.nodeAttachments ?? []).some(
+          link => link.flowchartId === n.flowchartId && link.nodeKey === n.nodeKey,
+        ),
+      ).length;
       return {
         kind: 'node',
         key: `node:${n.flowchartId}:${n.nodeKey}`,
@@ -123,7 +127,17 @@ export function AssignPopup({
           }),
         );
       } else {
-        await Promise.all(ids.map(id => attachmentStorage.updateSubject(id, item.title)));
+        // Node attach is additive: only POST for books not already linked.
+        await Promise.all(
+          ids.map(async id => {
+            const book = books.find(b => b.id === id);
+            const linked = (book?.nodeAttachments ?? []).some(
+              link => link.flowchartId === item.flowchartId && link.nodeKey === item.nodeKey,
+            );
+            if (linked) return;
+            await attachmentStorage.attachNode(id, item.flowchartId, item.nodeKey);
+          }),
+        );
       }
       await onApplied();
       onClose();

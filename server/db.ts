@@ -157,6 +157,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_attachment_tags_attachment ON attachment_tags(attachment_id);
   CREATE INDEX IF NOT EXISTS idx_attachment_tags_tag ON attachment_tags(tag_id);
 
+  CREATE TABLE IF NOT EXISTS attachment_nodes (
+    attachment_id TEXT NOT NULL,
+    flowchart_id TEXT NOT NULL,
+    node_key TEXT NOT NULL,
+    PRIMARY KEY (attachment_id, flowchart_id, node_key),
+    FOREIGN KEY (attachment_id) REFERENCES attachments(id) ON DELETE CASCADE,
+    FOREIGN KEY (flowchart_id) REFERENCES flowcharts(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_attachment_nodes_attachment ON attachment_nodes(attachment_id);
+  CREATE INDEX IF NOT EXISTS idx_attachment_nodes_node ON attachment_nodes(flowchart_id, node_key);
+
   CREATE TABLE IF NOT EXISTS questions (
     id TEXT PRIMARY KEY,
     text TEXT NOT NULL,
@@ -232,5 +243,25 @@ if (!noteColumns.some(c => c.name === 'attachment_id')) {
   `);
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_notes_attachment ON notes(attachment_id)');
+
+// Migration: backfill attachment_nodes from existing attachments.subject by
+// matching subject to flowchart_nodes.title. Only runs once.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schema_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`);
+const backfilled = db.prepare("SELECT value FROM schema_meta WHERE key = 'attachment_nodes_backfilled'").get() as { value: string } | undefined;
+if (!backfilled) {
+  db.exec(`
+    INSERT OR IGNORE INTO attachment_nodes (attachment_id, flowchart_id, node_key)
+    SELECT a.id, fn.flowchart_id, fn.node_key
+    FROM attachments a
+    JOIN flowchart_nodes fn ON fn.title = a.subject
+    WHERE a.subject IS NOT NULL AND a.subject <> '';
+  `);
+  db.prepare("INSERT INTO schema_meta (key, value) VALUES ('attachment_nodes_backfilled', ?)").run(new Date().toISOString());
+}
 
 export { db, ATTACHMENTS_DIR };
