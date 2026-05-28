@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +46,7 @@ db.exec(`
     type TEXT NOT NULL,
     size INTEGER NOT NULL,
     file_path TEXT NOT NULL,
+    sha256 TEXT,
     created_at TEXT NOT NULL,
     last_opened_at TEXT,
     folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL
@@ -233,6 +235,30 @@ if (!attColumns.some(c => c.name === 'folder_id')) {
 
 // Create index after migration ensures folder_id column exists
 db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_folder ON attachments(folder_id)');
+
+// Migration: add sha256 column to attachments, then backfill from files on disk.
+const attColumnsForSha = db.prepare("PRAGMA table_info(attachments)").all() as Array<{ name: string }>;
+if (!attColumnsForSha.some(c => c.name === 'sha256')) {
+  db.exec('ALTER TABLE attachments ADD COLUMN sha256 TEXT');
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_sha256 ON attachments(sha256)');
+
+const rowsNeedingHash = db.prepare(
+  "SELECT id, file_path FROM attachments WHERE sha256 IS NULL OR sha256 = ''"
+).all() as Array<{ id: string; file_path: string }>;
+if (rowsNeedingHash.length > 0) {
+  const updateHash = db.prepare('UPDATE attachments SET sha256 = ? WHERE id = ?');
+  for (const row of rowsNeedingHash) {
+    const filePath = path.join(ATTACHMENTS_DIR, row.file_path);
+    if (!fs.existsSync(filePath)) continue;
+    try {
+      const hash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+      updateHash.run(hash, row.id);
+    } catch (err) {
+      console.error(`Failed to hash attachment ${row.id} (${filePath}):`, err);
+    }
+  }
+}
 
 // Migration: add attachment_id and page columns to notes if missing
 const noteColumns = db.prepare("PRAGMA table_info(notes)").all() as Array<{ name: string }>;

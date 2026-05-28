@@ -1,5 +1,14 @@
 import type { AttachmentMeta } from '../types/attachment';
 
+export class DuplicateAttachmentError extends Error {
+  existing: AttachmentMeta;
+  constructor(existing: AttachmentMeta) {
+    super(`Duplicate attachment: ${existing.filename}`);
+    this.name = 'DuplicateAttachmentError';
+    this.existing = existing;
+  }
+}
+
 export const attachmentStorage = {
   async getByNode(flowchartId: string, nodeKey: string): Promise<AttachmentMeta[]> {
     const params = new URLSearchParams({ flowchartId, nodeKey });
@@ -43,6 +52,10 @@ export const attachmentStorage = {
       method: 'POST',
       body: formData,
     });
+    if (res.status === 409) {
+      const body = await res.json().catch(() => ({}));
+      if (body?.duplicate) throw new DuplicateAttachmentError(body.duplicate);
+    }
     if (!res.ok) throw new Error(`Failed to upload attachment: ${res.status}`);
     return res.json();
   },

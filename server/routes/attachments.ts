@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db, ATTACHMENTS_DIR } from '../db.ts';
@@ -148,6 +149,22 @@ router.post('/', upload.single('file'), (req, res) => {
     return;
   }
 
+  // Hash the upload before persisting so we can reject duplicates.
+  const sha256 = crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex');
+  const existing = db.prepare(
+    'SELECT * FROM attachments WHERE sha256 = ? LIMIT 1'
+  ).get(sha256) as AttachmentRow | undefined;
+  if (existing) {
+    fs.unlinkSync(file.path);
+    const tagIds = loadTagsMap([existing.id]).get(existing.id) ?? [];
+    const nodes = loadNodeAttachmentsMap([existing.id]).get(existing.id) ?? [];
+    res.status(409).json({
+      error: 'Duplicate file',
+      duplicate: rowToMeta(existing, tagIds, nodes),
+    });
+    return;
+  }
+
   const id = uuidv4();
   const ext = path.extname(file.originalname);
   const storedFilename = `${id}${ext}`;
@@ -167,9 +184,9 @@ router.post('/', upload.single('file'), (req, res) => {
   const now = new Date().toISOString();
 
   db.prepare(`
-    INSERT INTO attachments (id, subject, filename, type, size, file_path, created_at, folder_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, subject, file.originalname, mimeType, file.size, storedFilename, now, folderId);
+    INSERT INTO attachments (id, subject, filename, type, size, file_path, sha256, created_at, folder_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, subject, file.originalname, mimeType, file.size, storedFilename, sha256, now, folderId);
 
   res.json({
     id,

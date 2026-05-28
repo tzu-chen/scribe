@@ -4,7 +4,7 @@ import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
 import type { ContextMenuItem } from '../../components/ContextMenu/ContextMenu';
 import { AssignPopup } from '../../components/AssignPopup/AssignPopup';
-import { attachmentStorage } from '../../services/attachmentStorage';
+import { attachmentStorage, DuplicateAttachmentError } from '../../services/attachmentStorage';
 import { folderStorage } from '../../services/folderStorage';
 import { bookTagStorage } from '../../services/bookTagStorage';
 import { flowchartStorage } from '../../services/flowchartStorage';
@@ -207,15 +207,33 @@ export function LibraryPage() {
       if (!files || files.length === 0) return;
       const uploadFolderId = selection.kind === 'folder' ? selection.id : null;
       const uploadedIds: string[] = [];
+      const duplicates: Array<{ filename: string; existing: string }> = [];
       for (const file of Array.from(files)) {
-        const created = await attachmentStorage.add('', file, uploadFolderId);
-        uploadedIds.push(created.id);
+        try {
+          const created = await attachmentStorage.add('', file, uploadFolderId);
+          uploadedIds.push(created.id);
+        } catch (err) {
+          if (err instanceof DuplicateAttachmentError) {
+            duplicates.push({ filename: file.name, existing: err.existing.filename });
+          } else {
+            throw err;
+          }
+        }
       }
       if (selection.kind === 'tag') {
         await Promise.all(uploadedIds.map(id => attachmentStorage.setTags(id, [selection.id])));
       }
       await loadBooks();
       e.target.value = '';
+      if (duplicates.length > 0) {
+        const lines = duplicates.map(d =>
+          d.filename === d.existing ? `• ${d.filename}` : `• ${d.filename} (already in library as "${d.existing}")`,
+        );
+        const header = duplicates.length === 1
+          ? 'Skipped 1 duplicate:'
+          : `Skipped ${duplicates.length} duplicates:`;
+        alert(`${header}\n\n${lines.join('\n')}`);
+      }
     },
     [loadBooks, selection],
   );
