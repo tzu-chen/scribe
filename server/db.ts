@@ -5,7 +5,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '..', 'data');
+// When SUITE_DATA_ROOT is set, share "$SUITE_DATA_ROOT/scribe"; otherwise fall
+// back to the original in-repo location, copied verbatim.
+const DATA_DIR = process.env.SUITE_DATA_ROOT
+  ? path.join(process.env.SUITE_DATA_ROOT, 'scribe')
+  : path.resolve(__dirname, '..', 'data');
+console.log(`[scribe] data dir: ${DATA_DIR}`);
 const ATTACHMENTS_DIR = path.join(DATA_DIR, 'attachments');
 const DB_PATH = path.join(DATA_DIR, 'scribe.db');
 

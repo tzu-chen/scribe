@@ -17,7 +17,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '..', '..', 'data', 'scribe.db');
+const DB_PATH = process.env.SUITE_DATA_ROOT
+  ? path.join(process.env.SUITE_DATA_ROOT, 'scribe', 'scribe.db')
+  : path.resolve(__dirname, '..', '..', 'data', 'scribe.db');
 
 const db = new Database(DB_PATH);
 

@@ -35,7 +35,7 @@ npm run start        # Start Express server in production (serves built client f
 
 In development, `npm run dev` runs both processes via `concurrently`:
 - **Vite dev server** — serves the React app with HMR
-- **Express server** — runs on port 3001 (configurable via `PORT` env var)
+- **Express server** — runs on port 3001 (configurable via `PORT` env var). Also honors `SUITE_DATA_ROOT`: when set, data lives at `$SUITE_DATA_ROOT/scribe/` (`scribe.db`, `attachments/`); when unset it falls back **byte-for-byte** to the legacy in-repo `data/` (resolved in `server/db.ts`). Part of the suite data-centralization scheme.
 - Vite proxies `/api/*` requests to the Express server (configured in `vite.config.ts`)
 
 In production, the Express server serves the built React app from `dist/` and handles all API requests on a single port.
