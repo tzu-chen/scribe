@@ -68,9 +68,11 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       end: Math.min(numPages, 1 + BUFFER * 2),
     });
 
+    // Rebuilt on scale changes too: the model stores per-page floored heights
+    // in scaled pixels so it matches the DOM exactly (an O(numPages) pass).
     const layoutModel = useMemo(
-      () => buildLayoutModel(pageDimensions, twoPageView, crop, cropEven),
-      [pageDimensions, twoPageView, crop, cropEven],
+      () => buildLayoutModel(pageDimensions, scale, twoPageView, crop, cropEven),
+      [pageDimensions, scale, twoPageView, crop, cropEven],
     );
 
     // CSS-driven layout constants. Read from computed style so mobile (padding:0)

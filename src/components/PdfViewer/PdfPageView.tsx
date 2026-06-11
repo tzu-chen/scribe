@@ -120,12 +120,14 @@ export function PdfPageView({
       try {
         await renderTask.promise;
       } catch (err) {
-        // Only return silently on cancellation; log real errors
+        // Cancellation is routine: it only happens when a successor render (or
+        // unmount) is on the way, so the canvas won't stay blank. Real errors
+        // propagate to the caller, which logs and retries — abandoning them
+        // here would leave a permanently blank page.
         if (err instanceof Error && err.name === 'RenderingCancelledException') {
           return;
         }
-        console.error(`Failed to render page ${pageNumber}:`, err);
-        return;
+        throw err;
       }
 
       if (cancelled) return;
@@ -154,18 +156,38 @@ export function PdfPageView({
       }
     };
 
+    // Any rejection here (getPage failure, a synchronous page.render() throw,
+    // or a real render error rethrown above) would otherwise leave the canvas
+    // blank with nothing scheduled to repaint it. Log and retry once; pages
+    // late in a document render slowest (cold fonts/images in the worker) and
+    // are the most exposed to transient failures right after a long jump.
+    let retryTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    const startRender = (attempt: number) => {
+      renderPage().catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof Error && err.name === 'RenderingCancelledException') return;
+        console.error(`Failed to render page ${pageNumber} (attempt ${attempt}):`, err);
+        if (attempt === 1) {
+          retryTimeoutId = setTimeout(() => {
+            if (!cancelled) startRender(2);
+          }, 250);
+        }
+      });
+    };
+
     // Debounce render to batch rapid scale/visibility changes during fast
     // scroll or zoom gestures, preventing excessive concurrent canvas allocations.
     // Skip debounce for priority renders (deliberate navigation via TOC, page
     // input, or prev/next buttons) so the target page appears immediately.
     const delay = priorityRef.current ? 0 : RENDER_DEBOUNCE_MS;
     const timeoutId = setTimeout(() => {
-      if (!cancelled) renderPage();
+      if (!cancelled) startRender(1);
     }, delay);
 
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
+      clearTimeout(retryTimeoutId);
       renderTaskRef.current?.cancel();
       textLayerInstanceRef.current?.cancel();
       // Release canvas memory explicitly so WebKit frees the backing buffer

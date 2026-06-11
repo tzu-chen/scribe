@@ -15,9 +15,11 @@ export interface LayoutConstants {
 }
 
 export interface LayoutModel {
-  /** pageTops[i] (1-indexed) = unscaled vertical offset from the start of pages
-   *  to the top of page i. Index 0 is unused. In two-page mode, paired pages
-   *  share the same offset. */
+  /** pageTops[i] (1-indexed) = vertical offset in scaled CSS pixels from the
+   *  start of pages to the top of page i (margins excluded). Index 0 is
+   *  unused. In two-page mode, paired pages share the same offset. Built from
+   *  per-page floored heights so it matches the DOM exactly — see
+   *  pageEffectiveHeight. */
   pageTops: number[];
   /** marginsBeforePage[i] = number of inter-page margin gaps that precede page i.
    *  Margins do not scale, so they're applied separately at math time. */
@@ -33,6 +35,7 @@ export const DEFAULT_LAYOUT_CONSTANTS: LayoutConstants = {
 function pageEffectiveHeight(
   pageIndex: number,
   pageDimensions: { width: number; height: number }[],
+  scale: number,
   crop: CropBox | undefined,
   cropEven: CropBox | undefined,
 ): number {
@@ -42,11 +45,17 @@ function pageEffectiveHeight(
   const cropT = cropBox?.top ?? 0;
   const cropB = cropBox?.bottom ?? 0;
   const factor = Math.max(0, 1 - cropT - cropB);
-  return dim.height * factor;
+  // Floor per page to match the DOM: placeholders and rendered pages both set
+  // Math.floor(height * factor * scale) as their CSS height. Summing exact
+  // heights and scaling afterwards instead would drift from the real layout by
+  // the fractional remainder of every page — several hundred px near the end
+  // of a long book at fractional (fit-width) zooms, sending jumps off-target.
+  return Math.floor(dim.height * factor * scale);
 }
 
 export function buildLayoutModel(
   pageDimensions: { width: number; height: number }[],
+  scale: number,
   twoPageView: boolean,
   crop?: CropBox,
   cropEven?: CropBox,
@@ -59,7 +68,7 @@ export function buildLayoutModel(
     return { pageTops, marginsBeforePage, numPages };
   }
 
-  const heightAt = (i: number) => pageEffectiveHeight(i, pageDimensions, crop, cropEven);
+  const heightAt = (i: number) => pageEffectiveHeight(i, pageDimensions, scale, crop, cropEven);
 
   if (!twoPageView || numPages === 1) {
     let acc = 0;
@@ -105,7 +114,7 @@ export function positionToScrollTop(
   const withinPageOffset = Math.max(0, position.withinPageOffset);
   return (
     constants.paddingTopPx
-    + model.pageTops[pageIndex] * scale
+    + model.pageTops[pageIndex]
     + model.marginsBeforePage[pageIndex] * constants.marginPx
     + withinPageOffset * scale
   );
@@ -121,7 +130,7 @@ export function scrollTopToPosition(
 
   const topOf = (i: number) =>
     constants.paddingTopPx
-    + model.pageTops[i] * scale
+    + model.pageTops[i]
     + model.marginsBeforePage[i] * constants.marginPx;
 
   if (scrollTop <= topOf(1)) {

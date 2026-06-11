@@ -1,6 +1,9 @@
 .page {
   position: relative;
-  margin: 0 auto var(--spacing-sm);
+  /* No bottom margin: the page wrapper owns the inter-page gap. An extra
+   * margin here makes rendered pages 8px taller than their placeholders,
+   * shifting the layout on every placeholder→page swap. */
+  margin: 0 auto;
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   line-height: 0;
