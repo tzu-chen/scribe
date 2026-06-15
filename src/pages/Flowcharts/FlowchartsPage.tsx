@@ -1,37 +1,85 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { FlowchartSummary, Flowchart, FlowchartSpec } from '../../types/flowchart';
+import type { FlowchartTag } from '../../types/flowchartTag';
 import type { Note } from '../../types/note';
 import type { AttachmentMeta } from '../../types/attachment';
 import type { Question } from '../../types/question';
 import { flowchartStorage } from '../../services/flowchartStorage';
+import { flowchartTagStorage } from '../../services/flowchartTagStorage';
 import { noteStorage } from '../../services/noteStorage';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { questionStorage } from '../../services/questionStorage';
 import { FlowchartEditor } from '../../components/FlowchartEditor/FlowchartEditor';
 import type { NodeAction, NodeCounts } from '../../components/FlowchartRenderer/FlowchartRenderer';
 import { BookPicker } from '../../components/BookPicker/BookPicker';
-import { ArrowLeftIcon, CloseIcon } from '../../components/Icons/Icons';
+import { SearchBar } from '../../components/SearchBar/SearchBar';
+import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
+import type { ContextMenuItem } from '../../components/ContextMenu/ContextMenu';
+import { ArrowLeftIcon, CloseIcon, ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import { stripExtension } from '../../utils/filename';
 import { NodePopup } from '../../components/NodePopup/NodePopup';
 import popupStyles from '../../components/NodePopup/NodePopup.module.css';
 import styles from './FlowchartsPage.module.css';
 
-// ─── Import JSON Modal ───
+type ViewMode = 'card' | 'list';
+type SortField = 'name' | 'created' | 'updated';
+type SortDir = 'asc' | 'desc';
 
-interface ImportModalProps {
-  onClose: () => void;
-  onImported: () => void;
+const VIEW_MODE_KEY = 'scribe_flowcharts_view';
+
+const TAG_COLOR_PALETTE = [
+  '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',
+  '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
+  '#06b6d4', '#a855f7', '#facc15', '#f43f5e', '#22c55e',
+];
+
+function randomTagColor(): string {
+  return TAG_COLOR_PALETTE[Math.floor(Math.random() * TAG_COLOR_PALETTE.length)];
 }
 
-function ImportModal({ onClose, onImported }: ImportModalProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [specJson, setSpecJson] = useState('');
-  const [error, setError] = useState('');
-  const [importing, setImporting] = useState(false);
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
-  const handleImport = async () => {
+// ─── Create / Edit Flowchart Modal ───
+// Handles creating a flowchart from JSON, and editing an existing flowchart's
+// name, description, raw spec JSON, and tags.
+
+interface FormModalProps {
+  existing?: Flowchart | null;
+  tags: FlowchartTag[];
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function FlowchartFormModal({ existing, tags, onClose, onSaved }: FormModalProps) {
+  const isEdit = !!existing;
+  const [name, setName] = useState(existing?.name ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
+  const [specJson, setSpecJson] = useState(
+    existing ? JSON.stringify(existing.spec, null, 2) : '',
+  );
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(
+    new Set(existing?.tags ?? []),
+  );
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const toggleTag = (id: string) => {
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
     if (!name.trim() || !specJson.trim()) return;
 
     let spec: FlowchartSpec;
@@ -42,18 +90,22 @@ function ImportModal({ onClose, onImported }: ImportModalProps) {
       return;
     }
 
-    setImporting(true);
+    setSaving(true);
     setError('');
     try {
-      await flowchartStorage.create({
+      const data = {
         name: name.trim(),
         description: description.trim() || undefined,
         spec,
-      });
-      onImported();
+      };
+      const id = isEdit && existing
+        ? (await flowchartStorage.update(existing.id, data)).id
+        : (await flowchartStorage.create(data)).id;
+      await flowchartStorage.setTags(id, Array.from(selectedTagIds));
+      onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
-      setImporting(false);
+      setError(err instanceof Error ? err.message : 'Save failed');
+      setSaving(false);
     }
   };
 
@@ -61,7 +113,7 @@ function ImportModal({ onClose, onImported }: ImportModalProps) {
     <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.modalPanel}>
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>Import Flowchart JSON</h3>
+          <h3 className={styles.modalTitle}>{isEdit ? 'Edit Flowchart' : 'Import Flowchart JSON'}</h3>
           <button className={styles.modalClose} onClick={onClose} aria-label="Close">
             <CloseIcon size={18} />
           </button>
@@ -86,6 +138,32 @@ function ImportModal({ onClose, onImported }: ImportModalProps) {
               placeholder="Brief description"
             />
           </div>
+          {tags.length > 0 && (
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>Tags</label>
+              <div className={styles.tagPickerRow}>
+                {tags.map((tag) => {
+                  const selected = selectedTagIds.has(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      className={`${styles.tagPickerChip} ${selected ? styles.tagPickerChipSelected : ''}`}
+                      style={selected && tag.color ? { backgroundColor: tag.color, borderColor: tag.color, color: '#fff' } : undefined}
+                      onClick={() => toggleTag(tag.id)}
+                    >
+                      <span
+                        className={styles.tagPickerDot}
+                        style={tag.color ? { backgroundColor: tag.color } : undefined}
+                        aria-hidden="true"
+                      />
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className={styles.modalField}>
             <label className={styles.modalLabel}>Spec JSON</label>
             <textarea
@@ -93,6 +171,7 @@ function ImportModal({ onClose, onImported }: ImportModalProps) {
               value={specJson}
               onChange={(e) => { setSpecJson(e.target.value); setError(''); }}
               placeholder='Paste FlowchartSpec JSON here...'
+              spellCheck={false}
             />
           </div>
           {error && <p className={styles.modalError}>{error}</p>}
@@ -100,10 +179,10 @@ function ImportModal({ onClose, onImported }: ImportModalProps) {
             <button className={styles.modalButton} onClick={onClose}>Cancel</button>
             <button
               className={`${styles.modalButton} ${styles.modalButtonPrimary}`}
-              onClick={handleImport}
-              disabled={!name.trim() || !specJson.trim() || importing}
+              onClick={handleSave}
+              disabled={!name.trim() || !specJson.trim() || saving}
             >
-              {importing ? 'Importing...' : 'Import'}
+              {saving ? 'Saving...' : isEdit ? 'Save' : 'Import'}
             </button>
           </div>
         </div>
@@ -341,12 +420,42 @@ export function FlowchartsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [flowcharts, setFlowcharts] = useState<FlowchartSummary[]>([]);
+  const [tags, setTags] = useState<FlowchartTag[]>([]);
   const [activeFlowchart, setActiveFlowchart] = useState<Flowchart | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showImport, setShowImport] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Flowchart | null>(null);
   const [selectedNode, setSelectedNode] = useState<{ id: string; title: string } | null>(null);
   const [nodeCounts, setNodeCounts] = useState<NodeCounts>({ attachments: {}, questions: {} });
   const [showBookPicker, setShowBookPicker] = useState(false);
+
+  // List view controls
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem(VIEW_MODE_KEY);
+    return saved === 'list' ? 'list' : 'card';
+  });
+  const [sortField, setSortField] = useState<SortField>('updated');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline rename of a flowchart
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Tag sidebar create/rename
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [renamingTagId, setRenamingTagId] = useState<string | null>(null);
+  const [renameTagValue, setRenameTagValue] = useState('');
+  const newTagInputRef = useRef<HTMLInputElement>(null);
+  const renameTagInputRef = useRef<HTMLInputElement>(null);
+
+  // Context menus
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowchart: FlowchartSummary } | null>(null);
+  const [tagContextMenu, setTagContextMenu] = useState<{ x: number; y: number; tag: FlowchartTag } | null>(null);
 
   // Popup state for node action icons
   const [popup, setPopup] = useState<{
@@ -375,9 +484,59 @@ export function FlowchartsPage() {
     }
   }, []);
 
+  const loadTags = useCallback(async () => {
+    try {
+      setTags(await flowchartTagStorage.getAll());
+    } catch (err) {
+      console.error('Failed to load flowchart tags:', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadList();
-  }, [loadList]);
+    loadTags();
+  }, [loadList, loadTags]);
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
+
+  // '/' focuses the search input (when not already typing in a field)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
+      const input = searchInputRef.current;
+      if (!input) return;
+      e.preventDefault();
+      input.focus();
+      input.select();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingId]);
+
+  useEffect(() => {
+    if (creatingTag && newTagInputRef.current) newTagInputRef.current.focus();
+  }, [creatingTag]);
+
+  useEffect(() => {
+    if (renamingTagId && renameTagInputRef.current) {
+      renameTagInputRef.current.focus();
+      renameTagInputRef.current.select();
+    }
+  }, [renamingTagId]);
 
   // Load active flowchart when view param changes
   useEffect(() => {
@@ -414,10 +573,10 @@ export function FlowchartsPage() {
     });
   }, [activeId]);
 
-  const selectFlowchart = (id: string) => {
+  const selectFlowchart = useCallback((id: string) => {
     setSearchParams({ view: id });
     setSelectedNode(null);
-  };
+  }, [setSearchParams]);
 
   const goBack = () => {
     setSearchParams({});
@@ -425,10 +584,137 @@ export function FlowchartsPage() {
     setActiveFlowchart(null);
   };
 
-  const handleImported = () => {
-    setShowImport(false);
+  const handleCreated = () => {
+    setShowCreate(false);
     loadList();
   };
+
+  const handleEdited = () => {
+    setEditing(null);
+    loadList();
+  };
+
+  // ── List view: sorting, search, rename, edit, delete ──
+
+  const handleSort = useCallback((field: SortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prev;
+      }
+      setSortDir(field === 'name' ? 'asc' : 'desc');
+      return field;
+    });
+  }, []);
+
+  const startRename = useCallback((fc: FlowchartSummary) => {
+    setRenamingId(fc.id);
+    setRenameValue(fc.name);
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    if (!renamingId) return;
+    const trimmed = renameValue.trim();
+    const current = flowcharts.find((f) => f.id === renamingId);
+    if (trimmed && current && trimmed !== current.name) {
+      await flowchartStorage.updateMeta(renamingId, { name: trimmed });
+      setFlowcharts((prev) => prev.map((f) => (f.id === renamingId ? { ...f, name: trimmed } : f)));
+    }
+    setRenamingId(null);
+    setRenameValue('');
+  }, [renamingId, renameValue, flowcharts]);
+
+  const cancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenameValue('');
+  }, []);
+
+  const handleEditFlowchart = useCallback(async (id: string) => {
+    const fc = await flowchartStorage.getById(id);
+    if (fc) setEditing(fc);
+  }, []);
+
+  const handleDeleteFlowchart = useCallback(async (id: string) => {
+    const fc = flowcharts.find((f) => f.id === id);
+    if (!confirm(`Delete "${fc?.name ?? 'this flowchart'}"? This cannot be undone.`)) return;
+    await flowchartStorage.delete(id);
+    await loadList();
+  }, [flowcharts, loadList]);
+
+  // ── Tag management ──
+
+  const handleCreateTag = useCallback(async () => {
+    const trimmed = newTagName.trim();
+    if (!trimmed) {
+      setCreatingTag(false);
+      setNewTagName('');
+      return;
+    }
+    await flowchartTagStorage.create(trimmed, randomTagColor());
+    await loadTags();
+    setCreatingTag(false);
+    setNewTagName('');
+  }, [newTagName, loadTags]);
+
+  const startRenameTag = useCallback((tag: FlowchartTag) => {
+    setRenamingTagId(tag.id);
+    setRenameTagValue(tag.name);
+  }, []);
+
+  const commitRenameTag = useCallback(async () => {
+    if (!renamingTagId) return;
+    const trimmed = renameTagValue.trim();
+    if (trimmed && trimmed !== tags.find((t) => t.id === renamingTagId)?.name) {
+      await flowchartTagStorage.rename(renamingTagId, trimmed);
+      await loadTags();
+    }
+    setRenamingTagId(null);
+    setRenameTagValue('');
+  }, [renamingTagId, renameTagValue, tags, loadTags]);
+
+  const cancelRenameTag = useCallback(() => {
+    setRenamingTagId(null);
+    setRenameTagValue('');
+  }, []);
+
+  const handleDeleteTag = useCallback(async (tagId: string) => {
+    await flowchartTagStorage.delete(tagId);
+    setTagFilter((prev) => (prev === tagId ? null : prev));
+    await loadTags();
+    await loadList();
+  }, [loadTags, loadList]);
+
+  const handleShuffleTagColors = useCallback(async () => {
+    if (tags.length === 0) return;
+    await Promise.all(tags.map((t) => flowchartTagStorage.update(t.id, { color: randomTagColor() })));
+    await loadTags();
+  }, [tags, loadTags]);
+
+  // Toggle a single tag on a flowchart (optimistic, then persist).
+  const handleToggleFlowchartTag = useCallback(async (flowchartId: string, tagId: string) => {
+    const fc = flowcharts.find((f) => f.id === flowchartId);
+    const current = fc?.tags ?? [];
+    const next = current.includes(tagId)
+      ? current.filter((t) => t !== tagId)
+      : [...current, tagId];
+    setFlowcharts((prev) => prev.map((f) => (f.id === flowchartId ? { ...f, tags: next } : f)));
+    try {
+      await flowchartStorage.setTags(flowchartId, next);
+    } catch {
+      loadList();
+    }
+  }, [flowcharts, loadList]);
+
+  const removeFlowchartTag = useCallback(async (flowchartId: string, tagId: string) => {
+    const fc = flowcharts.find((f) => f.id === flowchartId);
+    const next = (fc?.tags ?? []).filter((t) => t !== tagId);
+    setFlowcharts((prev) => prev.map((f) => (f.id === flowchartId ? { ...f, tags: next } : f)));
+    try {
+      await flowchartStorage.setTags(flowchartId, next);
+    } catch {
+      loadList();
+    }
+  }, [flowcharts, loadList]);
 
   const handleNodeSelect = useCallback((nodeId: string, nodeTitle: string) => {
     setSelectedNode({ id: nodeId, title: nodeTitle });
@@ -538,6 +824,66 @@ export function FlowchartsPage() {
     setPopup(null);
     setShowBookPicker(true);
   }, []);
+
+  // ── Derived list-view data ──
+
+  const tagsById = useMemo(() => {
+    const map = new Map<string, FlowchartTag>();
+    for (const t of tags) map.set(t.id, t);
+    return map;
+  }, [tags]);
+
+  const filteredFlowcharts = useMemo(() => {
+    let result = flowcharts;
+    if (tagFilter) result = result.filter((f) => f.tags?.includes(tagFilter));
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (f) =>
+          f.name.toLowerCase().includes(q) ||
+          (f.description?.toLowerCase().includes(q) ?? false),
+      );
+    }
+    return result;
+  }, [flowcharts, tagFilter, searchQuery]);
+
+  const sortedFlowcharts = useMemo(() => {
+    return [...filteredFlowcharts].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case 'created':
+          cmp = a.createdAt.localeCompare(b.createdAt);
+          break;
+        case 'updated':
+          cmp = a.updatedAt.localeCompare(b.updatedAt);
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredFlowcharts, sortField, sortDir]);
+
+  const flowchartContextMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!contextMenu) return [];
+    const fc = flowcharts.find((f) => f.id === contextMenu.flowchart.id) ?? contextMenu.flowchart;
+    const items: ContextMenuItem[] = [
+      { label: 'Open', onClick: () => selectFlowchart(fc.id) },
+      { label: 'Rename', onClick: () => startRename(fc) },
+      { label: 'Edit details…', onClick: () => handleEditFlowchart(fc.id) },
+    ];
+    for (const tag of tags) {
+      items.push({
+        label: tag.name,
+        checked: fc.tags?.includes(tag.id) ?? false,
+        keepOpen: true,
+        onClick: () => handleToggleFlowchartTag(fc.id, tag.id),
+      });
+    }
+    items.push({ label: 'Delete', danger: true, onClick: () => handleDeleteFlowchart(fc.id) });
+    return items;
+  }, [contextMenu, flowcharts, tags, selectFlowchart, startRename, handleEditFlowchart, handleToggleFlowchartTag, handleDeleteFlowchart]);
 
   // ── Detail view ──
 
@@ -725,43 +1071,314 @@ export function FlowchartsPage() {
     );
   }
 
+  const sortIndicator = (field: SortField) => {
+    if (sortField !== field) return null;
+    return (
+      <span className={styles.sortArrow}>
+        {sortDir === 'asc' ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}
+      </span>
+    );
+  };
+
+  const renderTagChips = (fc: FlowchartSummary) => {
+    if (!fc.tags || fc.tags.length === 0) return null;
+    return (
+      <span className={styles.tagChipRow}>
+        {fc.tags.map((tid) => {
+          const tag = tagsById.get(tid);
+          if (!tag) return null;
+          return (
+            <span
+              key={tid}
+              className={styles.tagChip}
+              style={tag.color ? { backgroundColor: tag.color, color: '#fff' } : undefined}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {tag.name}
+              <button
+                type="button"
+                className={styles.tagChipRemove}
+                title={`Remove "${tag.name}"`}
+                aria-label={`Remove ${tag.name}`}
+                onClick={(e) => { e.stopPropagation(); removeFlowchartTag(fc.id, tid); }}
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+      </span>
+    );
+  };
+
+  // Open the flowchart unless the click landed on an interactive child.
+  const handleCardClick = (fc: FlowchartSummary, e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('input, button')) return;
+    selectFlowchart(fc.id);
+  };
+
+  const openContextMenu = (e: React.MouseEvent, fc: FlowchartSummary) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, flowchart: fc });
+    setTagContextMenu(null);
+  };
+
+  const renderRenameInput = () => (
+    <input
+      ref={renameInputRef}
+      className={styles.renameInput}
+      value={renameValue}
+      onChange={(e) => setRenameValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commitRename();
+        if (e.key === 'Escape') cancelRename();
+      }}
+      onBlur={commitRename}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Flowcharts</h1>
         <div className={styles.headerActions}>
-          <button className={styles.importButton} onClick={() => setShowImport(true)}>
+          <div className={styles.viewToggle}>
+            <button
+              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.viewToggleActive : ''}`}
+              onClick={() => setViewMode('card')}
+              title="Card view"
+              aria-label="Card view"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="1" y="1" width="6" height="6" rx="1" />
+                <rect x="9" y="1" width="6" height="6" rx="1" />
+                <rect x="1" y="9" width="6" height="6" rx="1" />
+                <rect x="9" y="9" width="6" height="6" rx="1" />
+              </svg>
+            </button>
+            <button
+              className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List view"
+              aria-label="List view"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="1" y1="3" x2="15" y2="3" />
+                <line x1="1" y1="8" x2="15" y2="8" />
+                <line x1="1" y1="13" x2="15" y2="13" />
+              </svg>
+            </button>
+          </div>
+          <button className={styles.importButton} onClick={() => setShowCreate(true)}>
             Import JSON
           </button>
         </div>
       </div>
 
-      {flowcharts.length === 0 ? (
-        <p className={styles.empty}>
-          No flowcharts yet. Import one using the button above.
-        </p>
-      ) : (
-        <div className={styles.grid}>
-          {flowcharts.map((fc) => (
-            <article
-              key={fc.id}
-              className={styles.card}
-              onClick={() => selectFlowchart(fc.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') selectFlowchart(fc.id);
-              }}
-            >
-              <h3 className={styles.cardTitle}>{fc.name}</h3>
-              {fc.description && <p className={styles.cardDesc}>{fc.description}</p>}
-            </article>
+      <div className={styles.layout}>
+        {/* Sidebar: All + tags */}
+        <nav className={styles.sidebar}>
+          <button
+            className={`${styles.sidebarItem} ${tagFilter === null ? styles.sidebarItemActive : ''}`}
+            onClick={() => setTagFilter(null)}
+          >
+            All
+          </button>
+
+          <div className={styles.sidebarSectionHeader}>
+            <span className={styles.sidebarSectionLabel}>Tags</span>
+            {tags.length > 0 && (
+              <button
+                type="button"
+                className={styles.sidebarHelpBtn}
+                onClick={handleShuffleTagColors}
+                title="Shuffle all tag colors"
+                aria-label="Shuffle all tag colors"
+              >
+                ⤭
+              </button>
+            )}
+          </div>
+          {tags.map((tag) => (
+            <div key={tag.id}>
+              {renamingTagId === tag.id ? (
+                <input
+                  ref={renameTagInputRef}
+                  className={styles.sidebarRenameInput}
+                  value={renameTagValue}
+                  onChange={(e) => setRenameTagValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRenameTag();
+                    if (e.key === 'Escape') cancelRenameTag();
+                  }}
+                  onBlur={commitRenameTag}
+                />
+              ) : (
+                <button
+                  className={`${styles.sidebarItem} ${tagFilter === tag.id ? styles.sidebarItemActive : ''}`}
+                  onClick={() => setTagFilter((prev) => (prev === tag.id ? null : tag.id))}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setTagContextMenu({ x: e.clientX, y: e.clientY, tag });
+                    setContextMenu(null);
+                  }}
+                  title={`Filter by ${tag.name}`}
+                >
+                  <span
+                    className={styles.sidebarTagDot}
+                    style={tag.color ? { backgroundColor: tag.color } : undefined}
+                    aria-hidden="true"
+                  />
+                  {tag.name}
+                </button>
+              )}
+            </div>
           ))}
+          {creatingTag ? (
+            <input
+              ref={newTagInputRef}
+              className={styles.sidebarRenameInput}
+              value={newTagName}
+              placeholder="Tag name"
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateTag();
+                if (e.key === 'Escape') {
+                  setCreatingTag(false);
+                  setNewTagName('');
+                }
+              }}
+              onBlur={handleCreateTag}
+            />
+          ) : (
+            <button className={styles.newFolderBtn} onClick={() => setCreatingTag(true)}>
+              + New Tag
+            </button>
+          )}
+        </nav>
+
+        {/* Main content */}
+        <div className={styles.content}>
+          {flowcharts.length > 0 && (
+            <div className={styles.searchRow}>
+              <SearchBar ref={searchInputRef} value={searchQuery} onChange={setSearchQuery} placeholder="Search flowcharts…" />
+            </div>
+          )}
+
+          {flowcharts.length === 0 ? (
+            <div className={styles.empty}>
+              <p className={styles.emptyTitle}>No flowcharts yet</p>
+              <p className={styles.emptyText}>Import one with the “Import JSON” button above.</p>
+            </div>
+          ) : sortedFlowcharts.length === 0 ? (
+            <div className={styles.empty}>
+              <p className={styles.emptyTitle}>
+                {tagFilter && !searchQuery ? 'No flowcharts with this tag' : 'No matching flowcharts'}
+              </p>
+              <p className={styles.emptyText}>
+                {tagFilter && !searchQuery
+                  ? 'Right-click a flowchart to apply this tag.'
+                  : 'Try adjusting your search or filter.'}
+              </p>
+            </div>
+          ) : viewMode === 'card' ? (
+            <div className={styles.cardList}>
+              {sortedFlowcharts.map((fc) => (
+                <article
+                  key={fc.id}
+                  className={styles.card}
+                  onClick={(e) => handleCardClick(fc, e)}
+                  onContextMenu={(e) => openContextMenu(e, fc)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && renamingId !== fc.id) selectFlowchart(fc.id);
+                  }}
+                >
+                  <div className={styles.cardTitle}>
+                    {renamingId === fc.id ? renderRenameInput() : fc.name}
+                  </div>
+                  {fc.description && <p className={styles.cardDesc}>{fc.description}</p>}
+                  <div className={styles.cardMeta}>
+                    {renderTagChips(fc)}
+                    <span className={styles.cardDates}>
+                      <span title="Last updated">{formatDate(fc.updatedAt)}</span>
+                      <span className={styles.cardDatesSep} aria-hidden="true" />
+                      <span title="Created">{formatDate(fc.createdAt)}</span>
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.listContainer}>
+              <table className={styles.listTable}>
+                <thead>
+                  <tr className={styles.listHeaderRow}>
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>
+                      Name{sortIndicator('name')}
+                    </th>
+                    <th className={styles.listHeaderCell}>Tags</th>
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('created')}>
+                      Created{sortIndicator('created')}
+                    </th>
+                    <th className={styles.listHeaderCell} onClick={() => handleSort('updated')}>
+                      Updated{sortIndicator('updated')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedFlowcharts.map((fc) => (
+                    <tr
+                      key={fc.id}
+                      className={styles.listRow}
+                      onClick={(e) => handleCardClick(fc, e)}
+                      onContextMenu={(e) => openContextMenu(e, fc)}
+                    >
+                      <td className={styles.listNameCell}>
+                        {renamingId === fc.id ? renderRenameInput() : (
+                          <span className={styles.listFileName}>{fc.name}</span>
+                        )}
+                      </td>
+                      <td className={styles.listCell}>{renderTagChips(fc)}</td>
+                      <td className={styles.listCell}>{formatDate(fc.createdAt)}</td>
+                      <td className={styles.listCell}>{formatDate(fc.updatedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Context menus */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={flowchartContextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+      {tagContextMenu && (
+        <ContextMenu
+          x={tagContextMenu.x}
+          y={tagContextMenu.y}
+          items={[
+            { label: 'Rename', onClick: () => startRenameTag(tagContextMenu.tag) },
+            { label: 'Delete tag', onClick: () => handleDeleteTag(tagContextMenu.tag.id), danger: true },
+          ]}
+          onClose={() => setTagContextMenu(null)}
+        />
       )}
 
-      {showImport && (
-        <ImportModal onClose={() => setShowImport(false)} onImported={handleImported} />
+      {showCreate && (
+        <FlowchartFormModal tags={tags} onClose={() => setShowCreate(false)} onSaved={handleCreated} />
+      )}
+      {editing && (
+        <FlowchartFormModal existing={editing} tags={tags} onClose={() => setEditing(null)} onSaved={handleEdited} />
       )}
     </div>
   );

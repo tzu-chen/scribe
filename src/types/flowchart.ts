@@ -65,6 +65,7 @@ export interface Flowchart {
   name: string;
   description?: string;
   spec: FlowchartSpec;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -74,6 +75,7 @@ export interface FlowchartSummary {
   id: string;
   name: string;
   description?: string;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
 }

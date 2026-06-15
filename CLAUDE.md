@@ -86,8 +86,10 @@ server/
     readingTime.ts           # Per-attachment reading time tracking
     viewerPrefs.ts           # Per-attachment PDF viewer preferences
     folders.ts               # Folder management for library
+    bookTags.ts              # Library (book) tag CRUD
+    flowchartTags.ts         # Flowchart tag CRUD
     outlines.ts              # Custom PDF outlines (table of contents)
-    flowcharts.ts            # Flowchart CRUD + node index + node queries
+    flowcharts.ts            # Flowchart CRUD + metadata/tags + node index + node queries
     questions.ts             # Questions linked to flowchart nodes
   scripts/
     migrate-flowcharts.ts    # One-time migration from old HTML flowcharts to SQLite
@@ -188,6 +190,9 @@ Nearly all data lives on the **server** (SQLite + filesystem). Only theme prefer
 | `custom_outlines` | `id` (TEXT) | User-created PDF table of contents entries; FK → attachments |
 | `flowcharts` | `id` (TEXT) | Flowchart metadata + full spec JSON (`FlowchartSpec`) |
 | `flowchart_nodes` | `id` (TEXT) | Denormalized node index rebuilt from spec on save; FK → flowcharts |
+| `flowchart_tags` | `id` (TEXT) | User-defined flowchart tags (name unique, color) |
+| `flowchart_tag_links` | `(flowchart_id, tag_id)` | M2M join of flowcharts ↔ tags; CASCADE on both sides |
+| `book_tags` / `attachment_tags` | — | Library (book) tags + M2M join to attachments |
 | `questions` | `id` (TEXT) | Questions linked to flowchart nodes by `node_id` + `flowchart_id` |
 
 SQLite features enabled: WAL mode, foreign key constraints, CASCADE deletes.
@@ -241,15 +246,21 @@ All endpoints are prefixed with `/api/`.
 - `DELETE /api/reading-time` — clear all reading time data
 
 ### Flowcharts
-- `GET /api/flowcharts` — list all (id, name, description, dates — no spec)
-- `GET /api/flowcharts/:id` — full record including spec JSON
+- `GET /api/flowcharts` — list all (id, name, description, tags, dates — no spec)
+- `GET /api/flowcharts/:id` — full record including spec JSON and tags
 - `POST /api/flowcharts` — create from `{ name, description?, spec }`
-- `PUT /api/flowcharts/:id` — full spec replacement
+- `PUT /api/flowcharts/:id` — full spec replacement (also updates name/description)
+- `PATCH /api/flowcharts/:id` — partial metadata update (`{ name?, description? }`) without touching the spec
+- `PUT /api/flowcharts/:id/tags` — replace the set of tags (`{ tagIds }`)
 - `PATCH /api/flowcharts/:id/nodes/:nodeKey` — partial node update (position and/or content)
 - `DELETE /api/flowcharts/:id` — delete + cascade
 - `GET /api/flowcharts/:id/nodes` — list nodes for one flowchart (from index table)
 - `GET /api/flowcharts/nodes/search?title=X` — search nodes across all flowcharts by title substring
 - `GET /api/flowcharts/nodes/:flowchartId/:nodeKey` — get single node content
+
+### Flowchart Tags / Book Tags
+- `GET|POST /api/flowchart-tags`, `PATCH|DELETE /api/flowchart-tags/:id` — flowchart tag CRUD
+- `GET|POST /api/book-tags`, `PATCH|DELETE /api/book-tags/:id` — library (book) tag CRUD
 
 On POST and PUT, the route handler validates the spec, stores/updates the `flowcharts` row, then rebuilds the `flowchart_nodes` index from the spec's nodes array. On PATCH, it reads the spec, applies the partial update to the target node, writes back the spec, and updates the corresponding `flowchart_nodes` row.
 

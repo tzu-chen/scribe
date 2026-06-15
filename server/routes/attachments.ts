@@ -227,6 +227,12 @@ router.patch('/:id/subject', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/attachments/:id/nodes — list the flowchart nodes this attachment is in
+router.get('/:id/nodes', (req, res) => {
+  const nodes = loadNodeAttachmentsMap([req.params.id]).get(req.params.id) ?? [];
+  res.json(nodes);
+});
+
 // POST /api/attachments/:id/nodes — attach to a flowchart node (additive)
 router.post('/:id/nodes', (req, res) => {
   const { flowchartId, nodeKey } = req.body ?? {};

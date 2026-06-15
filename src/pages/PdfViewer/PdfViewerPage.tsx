@@ -1,6 +1,8 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { viewerPrefsStorage, type ViewerPrefs, type ViewerPosition } from '../../services/viewerPrefsStorage';
+import { attachmentStorage } from '../../services/attachmentStorage';
+import type { NodeAttachmentLink } from '../../types/attachment';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
@@ -47,6 +49,16 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   useEffect(() => {
     if (isActive) setSubject(subjectFromHost);
   }, [isActive, subjectFromHost]);
+
+  // Flowchart nodes this book is linked to (for the title-bar indicator).
+  const [nodeLinks, setNodeLinks] = useState<NodeAttachmentLink[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    attachmentStorage.getNodes(attachmentId)
+      .then((links) => { if (!cancelled) setNodeLinks(links); })
+      .catch(() => { if (!cancelled) setNodeLinks([]); });
+    return () => { cancelled = true; };
+  }, [attachmentId]);
 
   // Reading time only accrues while this tab is visible.
   useReadingTimeTracker(isActive ? attachmentId : undefined, filename);
@@ -612,6 +624,8 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     <div className={`${styles.page} ${immersiveMode ? styles.immersive : ''} ${needsRotation ? styles.rotated : ''}`}>
       <PdfToolbar
         filename={filename}
+        nodeLinks={nodeLinks}
+        onOpenNode={(link) => navigate(`/flowcharts?view=${encodeURIComponent(link.flowchartId)}`)}
         currentPage={currentPage}
         numPages={numPages}
         onPageJump={handleToolbarPageJump}

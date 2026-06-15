@@ -1,4 +1,4 @@
-import type { AttachmentMeta } from '../types/attachment';
+import type { AttachmentMeta, NodeAttachmentLink } from '../types/attachment';
 
 export class DuplicateAttachmentError extends Error {
   existing: AttachmentMeta;
@@ -10,6 +10,13 @@ export class DuplicateAttachmentError extends Error {
 }
 
 export const attachmentStorage = {
+  /** The flowchart nodes a given attachment is linked to. */
+  async getNodes(id: string): Promise<NodeAttachmentLink[]> {
+    const res = await fetch(`/api/attachments/${id}/nodes`);
+    if (!res.ok) throw new Error(`Failed to fetch attachment nodes: ${res.status}`);
+    return res.json();
+  },
+
   async getByNode(flowchartId: string, nodeKey: string): Promise<AttachmentMeta[]> {
     const params = new URLSearchParams({ flowchartId, nodeKey });
     const res = await fetch(`/api/attachments/by-node?${params}`);

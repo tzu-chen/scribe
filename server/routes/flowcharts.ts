@@ -27,22 +27,39 @@ interface FlowchartNodeRow {
 
 // --- Row-to-DTO transformers ---
 
-function rowToFlowchart(row: FlowchartRow) {
+function loadTagsMap(flowchartIds: string[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  if (flowchartIds.length === 0) return map;
+  const placeholders = flowchartIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT flowchart_id, tag_id FROM flowchart_tag_links WHERE flowchart_id IN (${placeholders})`)
+    .all(...flowchartIds) as Array<{ flowchart_id: string; tag_id: string }>;
+  for (const row of rows) {
+    const list = map.get(row.flowchart_id) ?? [];
+    list.push(row.tag_id);
+    map.set(row.flowchart_id, list);
+  }
+  return map;
+}
+
+function rowToFlowchart(row: FlowchartRow, tagIds: string[] = []) {
   return {
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
     spec: JSON.parse(row.spec),
+    tags: tagIds,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function rowToFlowchartSummary(row: FlowchartRow) {
+function rowToFlowchartSummary(row: FlowchartRow, tagIds: string[] = []) {
   return {
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
+    tags: tagIds,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -200,7 +217,8 @@ router.get('/', (_req, res) => {
   const rows = db.prepare(
     'SELECT id, name, description, created_at, updated_at FROM flowcharts'
   ).all() as FlowchartRow[];
-  res.json(rows.map(rowToFlowchartSummary));
+  const tagsMap = loadTagsMap(rows.map(r => r.id));
+  res.json(rows.map(r => rowToFlowchartSummary(r, tagsMap.get(r.id) ?? [])));
 });
 
 // GET /:id — full flowchart with spec
@@ -210,7 +228,8 @@ router.get('/:id', (req, res) => {
     res.status(404).json({ error: 'Flowchart not found' });
     return;
   }
-  res.json(rowToFlowchart(row));
+  const tagIds = loadTagsMap([row.id]).get(row.id) ?? [];
+  res.json(rowToFlowchart(row, tagIds));
 });
 
 // GET /:id/nodes — list nodes for one flowchart
@@ -253,6 +272,63 @@ router.post('/', (req, res) => {
   res.json(rowToFlowchart(row));
 });
 
+// PATCH /:id — partial metadata update (name and/or description)
+router.patch('/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+
+  const existing = db.prepare('SELECT * FROM flowcharts WHERE id = ?').get(id) as FlowchartRow | undefined;
+  if (!existing) {
+    res.status(404).json({ error: 'Flowchart not found' });
+    return;
+  }
+
+  if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+    res.status(400).json({ error: 'name must be a non-empty string' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const nextName = name !== undefined ? name.trim() : existing.name;
+  const nextDescription = description !== undefined
+    ? (typeof description === 'string' && description.trim() ? description.trim() : null)
+    : existing.description;
+
+  db.prepare('UPDATE flowcharts SET name = ?, description = ?, updated_at = ? WHERE id = ?')
+    .run(nextName, nextDescription, now, id);
+
+  const row = db.prepare('SELECT * FROM flowcharts WHERE id = ?').get(id) as FlowchartRow;
+  const tagIds = loadTagsMap([id]).get(id) ?? [];
+  res.json(rowToFlowchart(row, tagIds));
+});
+
+// PUT /:id/tags — replace the set of tags on a flowchart
+router.put('/:id/tags', (req, res) => {
+  const { tagIds } = req.body;
+  if (!Array.isArray(tagIds) || tagIds.some(t => typeof t !== 'string')) {
+    res.status(400).json({ error: 'tagIds must be an array of strings' });
+    return;
+  }
+
+  const flowchartId = req.params.id;
+  const existing = db.prepare('SELECT id FROM flowcharts WHERE id = ?').get(flowchartId) as { id: string } | undefined;
+  if (!existing) {
+    res.status(404).json({ error: 'Flowchart not found' });
+    return;
+  }
+
+  const txn = db.transaction((ids: string[]) => {
+    db.prepare('DELETE FROM flowchart_tag_links WHERE flowchart_id = ?').run(flowchartId);
+    const insert = db.prepare('INSERT OR IGNORE INTO flowchart_tag_links (flowchart_id, tag_id) VALUES (?, ?)');
+    for (const tagId of ids) {
+      insert.run(flowchartId, tagId);
+    }
+  });
+  txn(tagIds);
+
+  res.json({ ok: true });
+});
+
 // PUT /:id — full spec replacement
 router.put('/:id', (req, res) => {
   const { id } = req.params;
@@ -288,7 +364,8 @@ router.put('/:id', (req, res) => {
   run();
 
   const row = db.prepare('SELECT * FROM flowcharts WHERE id = ?').get(id) as FlowchartRow;
-  res.json(rowToFlowchart(row));
+  const tagIds = loadTagsMap([id]).get(id) ?? [];
+  res.json(rowToFlowchart(row, tagIds));
 });
 
 // PATCH /:id/nodes/:nodeKey — partial node update

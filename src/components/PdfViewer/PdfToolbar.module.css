@@ -36,6 +36,14 @@
   min-width: 0;
 }
 
+.titleGroup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
 .filename {
   font-family: 'Special Elite', 'Courier New', monospace;
   font-size: 1.1rem;
@@ -44,6 +52,106 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+/* Indicator shown when the book is linked to one or more flowchart nodes. */
+.nodeIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 1px 7px 1px 5px;
+  border-radius: 999px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: default;
+}
+
+/* Hover preview of the flowchart nodes the book belongs to. */
+.nodeTooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 200px;
+  max-width: 340px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+/* Invisible bridge over the gap so the preview stays open while the pointer
+   travels from the title down into the tooltip. */
+.nodeTooltip::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 0;
+  right: 0;
+  height: 6px;
+}
+
+.titleGroup:hover .nodeTooltip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.nodeTooltipHeader {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  padding: 2px 6px 4px;
+}
+
+.nodeTooltipRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 5px 6px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.nodeTooltipRow:hover {
+  background: var(--color-bg);
+}
+
+.nodeTooltipNode {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.nodeTooltipFlowchart {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
 }
 
 .formatBadge {

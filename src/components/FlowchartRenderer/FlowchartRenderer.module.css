@@ -37,24 +37,6 @@
   letter-spacing: 1px;
 }
 
-/* ── Hint ── */
-
-.hint {
-  position: absolute;
-  text-align: center;
-  width: 100%;
-  top: 48px;
-  font-size: 0.68rem;
-  color: var(--color-text-secondary);
-  opacity: 0.6;
-  z-index: 2;
-  transition: opacity 0.6s;
-}
-
-.hintHidden {
-  opacity: 0;
-}
-
 /* ── Stage labels ── */
 
 .stageLabel {

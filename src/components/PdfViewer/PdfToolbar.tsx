@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon, DownloadIcon, OrientationLockIcon } from '../Icons/Icons';
+import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon, DownloadIcon, OrientationLockIcon, FlowchartIcon } from '../Icons/Icons';
 import { stripExtension } from '../../utils/filename';
+import type { NodeAttachmentLink } from '../../types/attachment';
 import styles from './PdfToolbar.module.css';
 
 const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -10,6 +11,8 @@ const IS_TOUCH = typeof window !== 'undefined'
 
 interface Props {
   filename: string;
+  nodeLinks?: NodeAttachmentLink[];
+  onOpenNode?: (link: NodeAttachmentLink) => void;
   currentPage: number;
   numPages: number;
   onPageJump: (page: number) => void;
@@ -32,6 +35,8 @@ interface Props {
 
 export function PdfToolbar({
   filename,
+  nodeLinks = [],
+  onOpenNode,
   currentPage,
   numPages,
   onPageJump,
@@ -113,9 +118,39 @@ export function PdfToolbar({
   return (
     <div className={styles.toolbar}>
       <div className={styles.left}>
-        <span className={styles.filename} title={stripExtension(filename)}>
-          {stripExtension(filename)}
-        </span>
+        <div className={styles.titleGroup}>
+          <span className={styles.filename} title={stripExtension(filename)}>
+            {stripExtension(filename)}
+          </span>
+          {nodeLinks.length > 0 && (
+            <span
+              className={styles.nodeIndicator}
+              aria-label={`In ${nodeLinks.length} flowchart node${nodeLinks.length === 1 ? '' : 's'}`}
+            >
+              <FlowchartIcon size={13} />
+              {nodeLinks.length}
+            </span>
+          )}
+          {nodeLinks.length > 0 && (
+            <div className={styles.nodeTooltip} role="tooltip">
+              <div className={styles.nodeTooltipHeader}>
+                In {nodeLinks.length} flowchart node{nodeLinks.length === 1 ? '' : 's'}
+              </div>
+              {nodeLinks.map((link) => (
+                <button
+                  key={`${link.flowchartId}:${link.nodeKey}`}
+                  type="button"
+                  className={styles.nodeTooltipRow}
+                  onClick={() => onOpenNode?.(link)}
+                  title={`Open ${link.flowchartName}`}
+                >
+                  <span className={styles.nodeTooltipNode}>{link.title}</span>
+                  <span className={styles.nodeTooltipFlowchart}>{link.flowchartName}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <span className={styles.formatBadge}>
           {fileType === 'djvu' ? 'DJVU' : 'PDF'}
         </span>

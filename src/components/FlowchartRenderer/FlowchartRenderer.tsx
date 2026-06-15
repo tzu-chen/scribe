@@ -164,11 +164,6 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
         {spec.subtitle && <p className={styles.chartSubtitle}>{spec.subtitle}</p>}
       </div>
 
-      {/* Hint */}
-      <div className={`${styles.hint} ${selectedNodeId ? styles.hintHidden : ''}`}>
-        Click any node to trace its prerequisite chain
-      </div>
-
       {/* Stage labels */}
       {spec.stages.map((stage) => (
         <div

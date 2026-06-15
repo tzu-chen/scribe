@@ -33,6 +33,25 @@ export const flowchartStorage = {
     return res.json();
   },
 
+  async updateMeta(id: string, data: { name?: string; description?: string }): Promise<Flowchart> {
+    const res = await fetch(`/api/flowcharts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to update flowchart: ${res.status}`);
+    return res.json();
+  },
+
+  async setTags(id: string, tagIds: string[]): Promise<void> {
+    const res = await fetch(`/api/flowcharts/${id}/tags`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tagIds }),
+    });
+    if (!res.ok) throw new Error(`Failed to update flowchart tags: ${res.status}`);
+  },
+
   async updateNode(flowchartId: string, nodeKey: string, updates: Record<string, unknown>): Promise<FlowchartNodeRecord> {
     const res = await fetch(`/api/flowcharts/${flowchartId}/nodes/${nodeKey}`, {
       method: 'PATCH',

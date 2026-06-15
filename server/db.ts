@@ -147,6 +147,23 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_fn_key ON flowchart_nodes(node_key);
   CREATE INDEX IF NOT EXISTS idx_fn_title ON flowchart_nodes(title);
 
+  CREATE TABLE IF NOT EXISTS flowchart_tags (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    color TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS flowchart_tag_links (
+    flowchart_id TEXT NOT NULL,
+    tag_id TEXT NOT NULL,
+    PRIMARY KEY (flowchart_id, tag_id),
+    FOREIGN KEY (flowchart_id) REFERENCES flowcharts(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES flowchart_tags(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_flowchart_tag_links_flowchart ON flowchart_tag_links(flowchart_id);
+  CREATE INDEX IF NOT EXISTS idx_flowchart_tag_links_tag ON flowchart_tag_links(tag_id);
+
   CREATE TABLE IF NOT EXISTS book_tags (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
