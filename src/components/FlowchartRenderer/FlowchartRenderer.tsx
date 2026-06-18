@@ -1,10 +1,10 @@
 import { useRef, useMemo, useCallback, useId } from 'react';
 import type { FlowchartSpec, FlowchartNode, FlowchartStage } from '../../types/flowchart';
 import { useTheme } from '../../contexts/ThemeContext';
-import { processInlineKatex } from '../../utils/katex';
 import { adjustStageColorsForDark } from './colorUtils';
 import { useHighlight } from './useHighlight';
 import { useFlowchartArrows } from './useFlowchartArrows';
+import { NodeCard } from '../NodeCard/NodeCard';
 import styles from './FlowchartRenderer.module.css';
 
 export type NodeAction = 'write-note' | 'attach-file' | 'view-attachments' | 'view-notes' | 'add-question';
@@ -89,15 +89,12 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
     }
   }, [selectedNodeId, clearHighlight, onNodeDeselect]);
 
-  const getNodeClassName = (nodeId: string): string => {
-    const classes = [styles.node];
-    if (!ancestorMap) return classes.join(' ');
-
-    if (nodeId === selectedNodeId) classes.push(styles.selected);
-    else if (ancestorMap.has(nodeId)) classes.push(styles.highlighted);
-    else classes.push(styles.dimmed);
-
-    return classes.join(' ');
+  // Returns only the highlight-state class; NodeCard applies the base `.node`.
+  const getNodeStateClass = (nodeId: string): string => {
+    if (!ancestorMap) return '';
+    if (nodeId === selectedNodeId) return styles.selected;
+    if (ancestorMap.has(nodeId)) return styles.highlighted;
+    return styles.dimmed;
   };
 
   const getDepthBadgeText = (nodeId: string): string => {
@@ -185,23 +182,17 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
         if (!colors) return null;
 
         return (
-          <div
+          <NodeCard
             key={node.id}
-            ref={(el) => setNodeRef(node.id, el)}
-            className={getNodeClassName(node.id)}
-            style={{
-              left: node.x,
-              top: node.y,
-              width: node.width,
-              background: colors.background,
-              border: `1.2px solid ${colors.border}`,
-            }}
+            node={node}
+            colors={colors}
+            className={getNodeStateClass(node.id)}
+            depthBadge={getDepthBadgeText(node.id)}
+            innerRef={(el) => setNodeRef(node.id, el)}
             onClick={(e) => onNodeClicked(e, node)}
             onMouseDown={onNodeMouseDown ? (e) => onNodeMouseDown(e, node.id) : undefined}
             onDoubleClick={onNodeDoubleClick ? (e) => { e.stopPropagation(); onNodeDoubleClick(e, node.id); } : undefined}
           >
-            <div className={styles.depthBadge}>{getDepthBadgeText(node.id)}</div>
-
             {/* Node action icons — shown on selected node */}
             {onNodeAction && selectedNodeId === node.id && (
               <div className={styles.nodeActions}>
@@ -248,31 +239,7 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
                 </button>
               </div>
             )}
-
-            <div
-              className={styles.nodeTitle}
-              style={{ color: colors.title }}
-              dangerouslySetInnerHTML={{ __html: processInlineKatex(node.title) }}
-            />
-
-            <div className={styles.nodeDivider} style={{ background: colors.divider }} />
-
-            {node.refs && (
-              <div
-                className={styles.nodeRefs}
-                style={{ color: colors.refs }}
-                dangerouslySetInnerHTML={{ __html: processInlineKatex(node.refs) }}
-              />
-            )}
-
-            {node.topics && (
-              <div
-                className={styles.nodeTopics}
-                style={{ color: colors.topics }}
-                dangerouslySetInnerHTML={{ __html: processInlineKatex(node.topics) }}
-              />
-            )}
-          </div>
+          </NodeCard>
         );
       })}
     </div>

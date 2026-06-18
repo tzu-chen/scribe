@@ -70,6 +70,57 @@
   color: var(--color-primary);
 }
 
+.newButton {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.newButton:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: #fff;
+}
+
+/* ── Template picker (New Flowchart modal) ── */
+.templateList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.templateOption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.templateOption:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.templateOptionSelected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.templateName {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.templateDesc {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+
 .loading {
   color: var(--color-text-secondary);
 }
@@ -535,6 +586,26 @@
 .viewTitle {
   font-size: 1.125rem;
   font-weight: 600;
+}
+
+.editButton {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+}
+
+.editButton:hover {
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .viewBody {

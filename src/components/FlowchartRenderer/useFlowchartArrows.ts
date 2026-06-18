@@ -1,48 +1,6 @@
 import { useLayoutEffect, useCallback, type RefObject } from 'react';
 import type { FlowchartEdge } from '../../types/flowchart';
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-function getAnchor(
-  nodeEl: HTMLDivElement,
-  anchorName: string,
-): Point {
-  const x = nodeEl.offsetLeft;
-  const y = nodeEl.offsetTop;
-  const w = nodeEl.offsetWidth;
-  const h = nodeEl.offsetHeight;
-
-  // Named anchors
-  switch (anchorName) {
-    case 'top': return { x: x + w / 2, y };
-    case 'bottom': return { x: x + w / 2, y: y + h };
-    case 'left': return { x, y: y + h / 2 };
-    case 'right': return { x: x + w, y: y + h / 2 };
-  }
-
-  // Percentage anchors: b10-b90 (bottom), t10-t90 (top)
-  const pctMatch = /^([bt])(\d+)$/.exec(anchorName);
-  if (pctMatch) {
-    const pct = parseInt(pctMatch[2], 10) / 100;
-    if (pctMatch[1] === 'b') return { x: x + w * pct, y: y + h };
-    return { x: x + w * pct, y };
-  }
-
-  // Default: center-bottom
-  return { x: x + w / 2, y: y + h };
-}
-
-function cubicPath(
-  a: Point,
-  b: Point,
-  c1: [number, number],
-  c2: [number, number],
-): string {
-  return `M${a.x} ${a.y} C${a.x + c1[0]} ${a.y + c1[1]},${b.x + c2[0]} ${b.y + c2[1]},${b.x} ${b.y}`;
-}
+import { anchorPoint, boxFromElement, cubicPath } from '../../utils/edgeGeometry';
 
 export function useFlowchartArrows(
   svgRef: RefObject<SVGSVGElement | null>,
@@ -83,8 +41,8 @@ export function useFlowchartArrows(
       const toEl = nodes.get(edge.to);
       if (!fromEl || !toEl) continue;
 
-      const a = getAnchor(fromEl, edge.fromAnchor);
-      const b = getAnchor(toEl, edge.toAnchor);
+      const a = anchorPoint(boxFromElement(fromEl), edge.fromAnchor);
+      const b = anchorPoint(boxFromElement(toEl), edge.toAnchor);
       const d = cubicPath(a, b, edge.controlPoints.c1, edge.controlPoints.c2);
 
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');

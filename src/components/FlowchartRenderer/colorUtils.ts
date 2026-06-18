@@ -79,3 +79,34 @@ export function adjustStageColorsForDark(
   }
   return result;
 }
+
+// Per-role saturation/lightness targets, derived from the SKILL.md example
+// palettes, that turn a single accent hue into the full 7-role light-mode set.
+// Keeping S/L fixed (and only taking the hue from the accent) guarantees a
+// harmonious pastel card regardless of how saturated the picked accent is.
+const PALETTE_ROLES: Record<ColorRole, { s: number; l: number }> = {
+  background: { s: 55, l: 94 },
+  border: { s: 38, l: 69 },
+  divider: { s: 38, l: 69 },
+  title: { s: 46, l: 33 },
+  labelText: { s: 46, l: 33 },
+  refs: { s: 32, l: 37 },
+  topics: { s: 28, l: 43 },
+};
+
+/**
+ * Generate a complete light-mode stage palette from a single accent color.
+ * Only the accent's hue is used; saturation/lightness come from PALETTE_ROLES
+ * so the result always reads as a soft, printable pastel that matches the
+ * existing flowchart aesthetic. Dark mode is still derived on the fly via
+ * `adjustStageColorsForDark`, so only the light-mode set is stored in the spec.
+ */
+export function generateStagePalette(accentHex: string): FlowchartStage['colors'] {
+  const [h] = hexToHSL(accentHex);
+  const result = {} as FlowchartStage['colors'];
+  for (const key of Object.keys(PALETTE_ROLES) as ColorRole[]) {
+    const { s, l } = PALETTE_ROLES[key];
+    result[key] = hslToHex(h, s, l);
+  }
+  return result;
+}

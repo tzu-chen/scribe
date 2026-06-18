@@ -1,0 +1,161 @@
+.viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  --grid: 24px;
+  background-image:
+    linear-gradient(var(--color-border-light) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-border-light) 1px, transparent 1px);
+  background-size: var(--grid) var(--grid);
+}
+
+.viewport.spaceHeld {
+  cursor: grab;
+}
+
+.viewport.panning {
+  cursor: grabbing;
+}
+
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.chartBg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 8px;
+  box-shadow: 0 1px 14px rgba(0, 0, 0, 0.08);
+}
+
+.edgeSvg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.edgeHit {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* Selection affordance layered onto the shared NodeCard */
+.nodeSelected {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.nodeDraggable {
+  cursor: grab;
+}
+
+/* ── Alignment guides (Stage 2) ── */
+.guide {
+  position: absolute;
+  background: var(--color-primary);
+  opacity: 0.7;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.guideV {
+  width: 1px;
+}
+
+.guideH {
+  height: 1px;
+}
+
+/* ── Resize handle ── */
+.resizeHandle {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: ew-resize;
+  z-index: 7;
+}
+
+/* ── Connect handle ── */
+.connectHandle {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: crosshair;
+  z-index: 7;
+}
+
+.linkSvg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 9;
+}
+
+/* ── Zoom controls ── */
+.controls {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+}
+
+.controlBtn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.controlBtn:hover {
+  background: var(--color-bg);
+}
+
+.zoomLabel {
+  min-width: 44px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}

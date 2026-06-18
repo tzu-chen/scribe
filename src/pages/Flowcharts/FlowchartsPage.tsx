@@ -10,8 +10,9 @@ import { flowchartTagStorage } from '../../services/flowchartTagStorage';
 import { noteStorage } from '../../services/noteStorage';
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { questionStorage } from '../../services/questionStorage';
-import { FlowchartEditor } from '../../components/FlowchartEditor/FlowchartEditor';
+import { FlowchartRenderer } from '../../components/FlowchartRenderer/FlowchartRenderer';
 import type { NodeAction, NodeCounts } from '../../components/FlowchartRenderer/FlowchartRenderer';
+import { FLOWCHART_TEMPLATES } from '../../utils/flowchartTemplates';
 import { BookPicker } from '../../components/BookPicker/BookPicker';
 import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
@@ -44,6 +45,90 @@ function formatDate(iso: string): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+// ─── New Flowchart Modal ───
+// Creates a flowchart from a starter template (no hand-written JSON needed),
+// then hands the new id back so the caller can open the visual editor.
+
+interface NewModalProps {
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}
+
+function NewFlowchartModal({ onClose, onCreated }: NewModalProps) {
+  const [name, setName] = useState('');
+  const [templateId, setTemplateId] = useState(FLOWCHART_TEMPLATES[0].id);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    const template = FLOWCHART_TEMPLATES.find((t) => t.id === templateId) ?? FLOWCHART_TEMPLATES[0];
+    setCreating(true);
+    setError('');
+    try {
+      const spec = template.build(name.trim());
+      const fc = await flowchartStorage.create({ name: name.trim(), spec });
+      onCreated(fc.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Create failed');
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={styles.modalPanel}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>New Flowchart</h3>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
+            <CloseIcon size={18} />
+          </button>
+        </div>
+        <div className={styles.modalBody}>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Name</label>
+            <input
+              className={styles.modalInput}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Flowchart name"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+            />
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Start from</label>
+            <div className={styles.templateList}>
+              {FLOWCHART_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`${styles.templateOption} ${templateId === t.id ? styles.templateOptionSelected : ''}`}
+                  onClick={() => setTemplateId(t.id)}
+                >
+                  <span className={styles.templateName}>{t.name}</span>
+                  <span className={styles.templateDesc}>{t.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && <p className={styles.modalError}>{error}</p>}
+          <div className={styles.modalActions}>
+            <button className={styles.modalButton} onClick={onClose}>Cancel</button>
+            <button
+              className={`${styles.modalButton} ${styles.modalButtonPrimary}`}
+              onClick={handleCreate}
+              disabled={!name.trim() || creating}
+            >
+              {creating ? 'Creating…' : 'Create & edit'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Create / Edit Flowchart Modal ───
@@ -424,6 +509,7 @@ export function FlowchartsPage() {
   const [activeFlowchart, setActiveFlowchart] = useState<Flowchart | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<Flowchart | null>(null);
   const [selectedNode, setSelectedNode] = useState<{ id: string; title: string } | null>(null);
   const [nodeCounts, setNodeCounts] = useState<NodeCounts>({ attachments: {}, questions: {} });
@@ -895,15 +981,18 @@ export function FlowchartsPage() {
             <ArrowLeftIcon size={14} /> All Flowcharts
           </button>
           <h2 className={styles.viewTitle}>{activeFlowchart.name}</h2>
+          <button
+            className={styles.editButton}
+            onClick={() => navigate(`/flowcharts/${activeFlowchart.id}/edit`)}
+          >
+            Edit
+          </button>
         </div>
 
         <div className={styles.viewBody}>
           <div className={styles.chartArea}>
-            <FlowchartEditor
-              flowchartId={activeFlowchart.id}
-              initialSpec={activeFlowchart.spec}
-              flowchartName={activeFlowchart.name}
-              flowchartDescription={activeFlowchart.description}
+            <FlowchartRenderer
+              spec={activeFlowchart.spec}
               onNodeSelect={handleNodeSelect}
               onNodeDeselect={handleNodeDeselect}
               onNodeAction={handleNodeAction}
@@ -1173,6 +1262,9 @@ export function FlowchartsPage() {
           <button className={styles.importButton} onClick={() => setShowCreate(true)}>
             Import JSON
           </button>
+          <button className={`${styles.importButton} ${styles.newButton}`} onClick={() => setShowNew(true)}>
+            + New Flowchart
+          </button>
         </div>
       </div>
 
@@ -1374,6 +1466,15 @@ export function FlowchartsPage() {
         />
       )}
 
+      {showNew && (
+        <NewFlowchartModal
+          onClose={() => setShowNew(false)}
+          onCreated={(newId) => {
+            setShowNew(false);
+            navigate(`/flowcharts/${newId}/edit`);
+          }}
+        />
+      )}
       {showCreate && (
         <FlowchartFormModal tags={tags} onClose={() => setShowCreate(false)} onSaved={handleCreated} />
       )}

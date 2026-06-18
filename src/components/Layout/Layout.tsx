@@ -37,7 +37,8 @@ export function Layout({ children }: LayoutProps) {
     : tabs[tabs.length - 1]?.id ?? null;
   const readDisabled = !readTargetId;
   const isFlowchartView = isFlowcharts && new URLSearchParams(location.search).has('view');
-  const useFullWidth = isPdfViewer || isFlowchartView;
+  const isFlowchartEdit = location.pathname.startsWith('/flowcharts/') && location.pathname.endsWith('/edit');
+  const useFullWidth = isPdfViewer || isFlowchartView || isFlowchartEdit;
 
   const iconSize = 18;
 

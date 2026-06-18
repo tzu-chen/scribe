@@ -149,14 +149,16 @@ src/
     Icons/                   # SVG icon components
     ContextMenu/             # Reusable context menu
     PdfViewer/               # All PDF viewer sub-components (see below)
-    FlowchartRenderer/       # React+SVG flowchart renderer (nodes, arrows, BFS highlight)
-    FlowchartEditor/         # Wraps FlowchartRenderer with editing (drag, inline edit, add/remove)
+    NodeCard/                # Presentational flowchart node card, shared by renderer + editor
+    FlowchartRenderer/       # React+SVG read-only renderer (nodes, arrows, BFS highlight)
+    FlowchartCanvas/         # Pan/zoom editing canvas (drag+snap, auto-route, inspector, stage manager, undo)
   pages/                     # Route-level components
     Library/LibraryPage.tsx          # / — upload and browse attachments
     Notes/NotesPage.tsx              # /notes — list/filter/search notes
     Editor/EditorPage.tsx            # /note/new, /note/:id/edit
     View/ViewPage.tsx                # /note/:id (read-only)
-    Flowcharts/FlowchartsPage.tsx    # /flowcharts — list + detail view with FlowchartEditor
+    Flowcharts/FlowchartsPage.tsx    # /flowcharts — list + read-only detail viewer (?view=<id>)
+    FlowchartEditor/FlowchartEditorPage.tsx  # /flowcharts/:id/edit — visual editor
     PdfViewer/PdfViewerPage.tsx      # /pdf/:attachmentId
     Questions/QuestionsPage.tsx      # /questions — review node questions
     Summary/SummaryPage.tsx          # /summary — reading time heatmap
@@ -286,7 +288,8 @@ On POST and PUT, the route handler validates the spec, stores/updates the `flowc
 | `/note/new` | `EditorPage` | Create new note (optional `?subject=` param) |
 | `/note/:id/edit` | `EditorPage` | Edit existing note |
 | `/note/:id` | `ViewPage` | Read-only note view |
-| `/flowcharts` | `FlowchartsPage` | Flowchart list + detail view (`?view=<id>`) with FlowchartEditor |
+| `/flowcharts` | `FlowchartsPage` | Flowchart list + read-only detail viewer (`?view=<id>`); "Edit" opens the editor |
+| `/flowcharts/:id/edit` | `FlowchartEditorPage` | Full-screen visual editor (pan/zoom canvas, inspector, stage manager) |
 | `/pdf/:attachmentId` | `PdfViewerPage` | PDF viewer (optional `?subject=` and `?flowchart=`) |
 | `/questions` | `QuestionsPage` | Review questions from flowchart nodes |
 | `/summary` | `SummaryPage` | Reading time heatmap |
@@ -351,9 +354,16 @@ Flowcharts are stored in SQLite as `FlowchartSpec` JSON (nodes, edges, positions
 
 **Data model:** The `flowcharts` table stores the full spec JSON. The `flowchart_nodes` table is a denormalized index rebuilt from the spec whenever a flowchart is created or updated — it enables joins with notes/questions without parsing JSON, and powers cross-app node queries.
 
+**Viewing vs editing are separate surfaces.** The `?view=<id>` detail panel is the read-only viewer (renderer + cross-app node actions); the dedicated `/flowcharts/:id/edit` route is the visual editor. Both render nodes through the shared presentational `NodeCard` so they never drift.
+
 **Components:**
-- `FlowchartRenderer` — core rendering component. Nodes are positioned HTML divs overlaid on an SVG arrow layer. Arrows are drawn in a `useEffect` after first paint using `getBoundingClientRect()` for anchor positions, then rendered as SVG Bézier `<path>` elements. BFS highlight system: click a node to highlight its ancestor chain with depth badges, dimming non-ancestor nodes and edges.
-- `FlowchartEditor` — wraps `FlowchartRenderer` with editing: drag-to-reposition (debounced auto-save via PATCH), inline text editing (double-click), add/remove nodes and edges.
+- `NodeCard` — presentational node card (title/divider/refs/topics with KaTeX + stage colors). Shared by renderer and canvas.
+- `FlowchartRenderer` — read-only renderer. Nodes are positioned `NodeCard`s over an SVG arrow layer; arrows drawn imperatively in `useFlowchartArrows` (anchor + cubic-path math now lives in `src/utils/edgeGeometry.ts`). BFS highlight: click a node to highlight its ancestor chain with depth badges, dimming the rest.
+- `FlowchartCanvas` — the editor canvas. Pan/zoom viewport (`useViewport`), drag-with-snap + alignment guides (`useDragSnap`), width-resize and drag-to-connect handles, a live React-rendered `EdgeLayer` (recomputes paths every frame), docked `Inspector` (node properties), `StageManager` (stages + chart settings with auto-generated palettes), and `useUndoRedo`. Edges are **auto-routed** via `src/utils/edgeRouting.ts` on any geometry change — there are no manual curve handles.
+
+**Auto-routing & palettes:** `routeEdges()` picks anchors (spreading multiple edges off a node across fractional anchors) and Bézier control points from node geometry; the result is written back into `spec.edges`, so the stored schema stays concrete for LLM/automated round-trips. `generateStagePalette(accent)` in `colorUtils.ts` turns one accent hue into the full 7-role light-mode palette. **The `FlowchartSpec` schema is unchanged** — the editor and the `interactive-flowchart` skill produce the same JSON, and there were no server changes.
+
+**Saving:** the editor keeps the spec in undo/redo state and debounces a full-spec `PUT` (`flowchartStorage.update`) ~800ms after any change, flushing on unmount. (The old per-node `PATCH` editing path was retired along with the old `FlowchartEditor`.)
 
 **Node identification:** The node `id` field (e.g., `"qsvt"`, `"linalg"`) is the stable cross-app reference key (`node_key`). Notes, attachments, and questions link to nodes via `node_key`, not the display title.
 
@@ -412,9 +422,10 @@ Run: `npm run lint`
 
 ## Adding a New Flowchart
 
-1. Generate a `FlowchartSpec` JSON conforming to the schema in `src/types/flowchart.ts` (Claude can generate these using the `interactive-flowchart` skill as a layout reference).
-2. Import via the "Import JSON" button in the Flowcharts page UI, or `POST /api/flowcharts` with `{ name, description?, spec }`.
-3. Use Markdown (not HTML) for refs (`*italic*` not `<em>`), `$...$` for inline math (KaTeX), and semantic short node IDs (e.g., `"linalg"`, `"qsvt"`).
+Two paths, both producing the same `FlowchartSpec`:
+
+- **Visually (humans):** "New Flowchart" on the Flowcharts page → pick a template (Blank / roadmap) → opens the visual editor (`/flowcharts/:id/edit`). Add stages (auto palettes), double-click the canvas to add nodes, drag the blue handle to connect, edit in the inspector. No JSON required.
+- **As JSON (Claude / automation):** generate a `FlowchartSpec` per the schema in `src/types/flowchart.ts` (the `interactive-flowchart` skill is the layout reference), then either "Import JSON" on the list page, `POST /api/flowcharts` with `{ name, description?, spec }`, or paste it into the editor's **JSON** drawer ("Apply to chart"). Use Markdown for refs (`*italic*`, not `<em>`), `$...$` for inline KaTeX, and semantic short node IDs (e.g. `"linalg"`, `"qsvt"`) since they're the cross-app `node_key`.
 
 ## Adding a New Page / Route
 
