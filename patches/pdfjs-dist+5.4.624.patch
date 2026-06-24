@@ -1,0 +1,19 @@
+diff --git a/node_modules/pdfjs-dist/build/pdf.mjs b/node_modules/pdfjs-dist/build/pdf.mjs
+index 82a9801..c59624a 100644
+--- a/node_modules/pdfjs-dist/build/pdf.mjs
++++ b/node_modules/pdfjs-dist/build/pdf.mjs
+@@ -15787,7 +15787,13 @@ class WorkerTransport {
+     });
+   }
+   getPage(pageNumber) {
+-    if (!Number.isInteger(pageNumber) || pageNumber <= 0 || pageNumber > this.#pagesMapper.pagesNumber) {
++    // Scribe patch: bound-check against this transport's own page count
++    // (this._numPages) instead of the process-global PagesMapper singleton.
++    // The singleton's pagesNumber is overwritten by whichever document loaded
++    // most recently, so with several PDFs open concurrently a valid page on one
++    // document was being rejected as "Invalid page request." once a shorter
++    // document finished loading. See patches/pdfjs-dist+5.4.624.patch.
++    if (!Number.isInteger(pageNumber) || pageNumber <= 0 || pageNumber > this._numPages) {
+       return Promise.reject(new Error("Invalid page request."));
+     }
+     const pageIndex = pageNumber - 1;
