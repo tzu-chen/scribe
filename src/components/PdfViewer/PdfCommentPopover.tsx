@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { PdfHighlight, PdfComment } from '../../types/annotation';
-import { CloseIcon } from '../Icons/Icons';
+import { EditIcon, TrashIcon } from '../Icons/Icons';
 import styles from './PdfCommentPopover.module.css';
 
 interface Props {
@@ -36,8 +36,15 @@ export function PdfCommentPopover({
         onClose();
       }
     };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [onClose]);
 
   useEffect(() => {
@@ -58,104 +65,80 @@ export function PdfCommentPopover({
 
   const handleSaveEdit = (commentId: string) => {
     const trimmed = editText.trim();
-    if (!trimmed) return;
-    onUpdateComment(commentId, highlight.id, trimmed);
+    if (trimmed) onUpdateComment(commentId, highlight.id, trimmed);
     setEditingId(null);
     setEditText('');
   };
 
   const top = anchorRect.bottom + 8;
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 340));
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 280));
 
   return (
-    <div
-      ref={popoverRef}
-      className={styles.popover}
-      style={{ top, left }}
-    >
-      <div className={styles.header}>
-        <span className={styles.selectedText} title={highlight.selectedText}>
-          &ldquo;{highlight.selectedText.slice(0, 80)}
-          {highlight.selectedText.length > 80 ? '...' : ''}&rdquo;
-        </span>
-        <button className={styles.closeBtn} onClick={onClose}><CloseIcon size={16} /></button>
-      </div>
-
-      {comments.length > 0 && (
-        <ul className={styles.commentList}>
-          {comments.map(c => (
-            <li key={c.id} className={styles.commentItem}>
-              {editingId === c.id ? (
-                <div className={styles.editRow}>
-                  <textarea
-                    className={styles.editInput}
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
-                    rows={2}
-                  />
-                  <div className={styles.editActions}>
-                    <button className={styles.saveBtn} onClick={() => handleSaveEdit(c.id)}>
-                      Save
-                    </button>
-                    <button className={styles.cancelBtn} onClick={() => setEditingId(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.commentRow}>
-                  <p className={styles.commentText}>{c.text}</p>
-                  <div className={styles.commentActions}>
-                    <button
-                      className={styles.actionBtn}
-                      onClick={() => handleStartEdit(c)}
-                      title="Edit"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className={styles.actionBtn}
-                      onClick={() => onDeleteComment(c.id, highlight.id)}
-                      title="Delete"
-                    >
-                      <CloseIcon size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+    <div ref={popoverRef} className={styles.popover} style={{ top, left }}>
+      {comments.map(c =>
+        editingId === c.id ? (
+          <textarea
+            key={c.id}
+            className={styles.edit}
+            value={editText}
+            autoFocus
+            rows={2}
+            onChange={e => setEditText(e.target.value)}
+            onBlur={() => handleSaveEdit(c.id)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSaveEdit(c.id);
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setEditingId(null);
+              }
+            }}
+          />
+        ) : (
+          <div key={c.id} className={styles.comment}>
+            <p className={styles.text}>{c.text}</p>
+            <div className={styles.actions}>
+              <button className={styles.iconBtn} title="Edit" onClick={() => handleStartEdit(c)}>
+                <EditIcon size={13} />
+              </button>
+              <button
+                className={styles.iconBtn}
+                title="Delete comment"
+                onClick={() => onDeleteComment(c.id, highlight.id)}
+              >
+                <TrashIcon size={13} />
+              </button>
+            </div>
+          </div>
+        ),
       )}
 
-      <div className={styles.addRow}>
-        <textarea
-          ref={inputRef}
-          className={styles.input}
-          value={newText}
-          onChange={e => setNewText(e.target.value)}
-          placeholder="Add a comment..."
-          rows={2}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-        />
-        <button className={styles.addBtn} onClick={handleAdd} disabled={!newText.trim()}>
-          Add
-        </button>
-      </div>
-
-      <div className={styles.footer}>
-        <button
-          className={styles.deleteHighlightBtn}
-          onClick={() => onDeleteHighlight(highlight.id)}
-        >
-          Remove highlight
-        </button>
-      </div>
+      {comments.length === 0 && (
+        <div className={styles.composer}>
+          <textarea
+            ref={inputRef}
+            className={styles.add}
+            value={newText}
+            placeholder="Add a comment…"
+            rows={2}
+            onChange={e => setNewText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+          />
+          <button
+            className={styles.iconBtn}
+            title="Remove highlight"
+            onClick={() => onDeleteHighlight(highlight.id)}
+          >
+            <TrashIcon size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

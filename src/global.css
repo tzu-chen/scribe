@@ -32,6 +32,9 @@
 
   --color-pdf-bg: #e8e8e8;
   --pdf-highlight-blend: multiply;
+  --pdf-highlight-opacity: 0.5;
+  --pdf-highlight-opacity-hover: 0.65;
+  --pdf-selection-bg: #a8c7fa;
 
   --font-sans: 'Source Serif 4', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
@@ -99,6 +102,26 @@ input {
 /* Orientation lock — hide the app header so the rotated PDF page fills the viewport */
 [data-orientation-rotated="true"] header {
   display: none !important;
+}
+
+/* PDF text selection — kept idempotent over OCR'd overlapping text spans.
+   pdf.js paints a translucent ::selection background per span, so where OCR
+   produces overlapping spans the selections compound into darker patches.
+   Instead we use an opaque selection color and turn the whole text layer into
+   an isolated group blended once over the canvas: overlapping selection rects
+   then flatten to a single flat tint, and the blend keeps the underlying text
+   readable. Loaded after pdfjs-dist/web/pdf_viewer.css so this wins. */
+.textLayer {
+  isolation: isolate;
+  mix-blend-mode: var(--pdf-highlight-blend);
+}
+
+.textLayer ::selection {
+  background: var(--pdf-selection-bg);
+}
+
+.textLayer ::-moz-selection {
+  background: var(--pdf-selection-bg);
 }
 
 /* Utility classes */

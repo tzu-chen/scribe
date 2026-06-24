@@ -34,6 +34,9 @@ const light: ColorScheme = {
     'color-overlay-light': 'rgba(0, 0, 0, 0.1)',
     'color-pdf-bg': '#e8e8e8',
     'pdf-highlight-blend': 'multiply',
+    'pdf-highlight-opacity': '0.5',
+    'pdf-highlight-opacity-hover': '0.65',
+    'pdf-selection-bg': '#a8c7fa',
     'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.08)',
     'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.1)',
     'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.15)',
@@ -68,7 +71,13 @@ const dark: ColorScheme = {
     'color-published-text': '#a3be8c',
     'color-overlay-light': 'rgba(255, 255, 255, 0.08)',
     'color-pdf-bg': '#3b4252',
-    'pdf-highlight-blend': 'multiply',
+    // The PDF canvas is inverted in dark mode, so the page reads dark.
+    // `screen` lightens the highlight/selection so it stays visible;
+    // `multiply` would darken against the dark page and vanish.
+    'pdf-highlight-blend': 'screen',
+    'pdf-highlight-opacity': '0.55',
+    'pdf-highlight-opacity-hover': '0.7',
+    'pdf-selection-bg': '#4c6ef5',
     'shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.3)',
     'shadow-md': '0 4px 12px rgba(0, 0, 0, 0.4)',
     'shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.5)',

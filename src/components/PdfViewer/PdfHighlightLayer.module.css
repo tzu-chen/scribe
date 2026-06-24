@@ -7,16 +7,27 @@
   pointer-events: none;
 }
 
-.highlight {
+/* Transparency + blend are applied once here. The `opacity` flattens the
+   group's opaque rects into a single layer before it is composited, so
+   overlapping rects within a highlight no longer multiply on top of each
+   other. */
+.group {
   position: absolute;
-  opacity: 0.35;
-  cursor: pointer;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--pdf-highlight-opacity);
   mix-blend-mode: var(--pdf-highlight-blend);
-  border-radius: 2px;
-  pointer-events: auto;
   transition: opacity 0.15s;
 }
 
-.highlight:hover {
-  opacity: 0.55;
+.group:hover {
+  opacity: var(--pdf-highlight-opacity-hover);
+}
+
+.highlight {
+  position: absolute;
+  background-color: currentColor;
+  border-radius: 2px;
+  cursor: pointer;
+  pointer-events: auto;
 }
