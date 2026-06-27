@@ -31,3 +31,9 @@
     padding: 0;
   }
 }
+
+/* In immersive (full-screen) mode, drop the breathing-room padding so the
+ * page fills the viewport edge-to-edge. */
+:global([data-immersive='true']) .container {
+  padding: 0;
+}
