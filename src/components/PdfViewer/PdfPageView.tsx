@@ -14,6 +14,16 @@ const IS_TOUCH = typeof window !== 'undefined'
   && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 const RENDER_DEBOUNCE_MS = IS_TOUCH ? 180 : 50;
 
+// Cap the canvas backing-store area (in device pixels). Large or scanned pages
+// at HiDPI / fit-width can demand 10M+ pixel canvases that are slow to
+// rasterize, transfer from the worker, and upload to the GPU — and drive the
+// memory pressure that causes GC stalls — with no visible gain past the scan's
+// own resolution. When the target exceeds this, we lower the *effective DPR*
+// only; the CSS-size viewport (and therefore the text layer, highlight rects,
+// and selection geometry) stays pixel-exact. 8M px ≈ a 2000×2000 CSS area at
+// 2x, comfortably above normal reading zoom.
+const MAX_CANVAS_PIXELS = 8_000_000;
+
 export interface TextSelection {
   text: string;
   rects: HighlightRect[];
@@ -67,6 +77,15 @@ export function PdfPageView({
     width: Math.floor(expectedWidth * scale),
     height: Math.floor(expectedHeight * scale),
   });
+  // Keep the canvas hidden until pdf.js has finished painting it. The page is
+  // rendered as a white raster and inverted to dark via `filter: invert()` in
+  // dark mode; while it decodes (slow for large scans) the canvas would show
+  // the white fill — and Firefox briefly shows the *unfiltered* white content
+  // for a frame when a filtered canvas is first painted. Revealing only the
+  // finished frame means the dark `.page` surface shows during load instead of
+  // a white flash. Stays true after the first paint so zoom re-renders (which
+  // clear the canvas to transparent → dark surface) don't blink.
+  const [rendered, setRendered] = useState(false);
   useEffect(() => {
     let cancelled = false;
 
@@ -81,9 +100,16 @@ export function PdfPageView({
       pageRef.current = page;
 
       // Cap DPR to 2 to limit canvas memory on 3x displays (iPad Pro)
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rawDpr = Math.min(window.devicePixelRatio || 1, 2);
       // CSS-size viewport (for display dimensions and text layer)
       const viewport = page.getViewport({ scale });
+      // Clamp the backing-store area: if scale*rawDpr would exceed the pixel
+      // budget, scale the DPR down (never below 1, so deliberate zoom stays
+      // crisp). Only the canvas resolution changes — `viewport` is untouched.
+      const wantPixels = viewport.width * viewport.height * rawDpr * rawDpr;
+      const dpr = wantPixels > MAX_CANVAS_PIXELS
+        ? Math.max(1, rawDpr * Math.sqrt(MAX_CANVAS_PIXELS / wantPixels))
+        : rawDpr;
       // High-res viewport for sharp canvas rendering on HiDPI displays
       const renderViewport = page.getViewport({ scale: scale * dpr });
 
@@ -131,6 +157,10 @@ export function PdfPageView({
       }
 
       if (cancelled) return;
+
+      // Canvas is fully painted — reveal it (the text layer below is built
+      // afterward but doesn't gate display, since selection works once it lands).
+      setRendered(true);
 
       // Cancel previous text layer
       textLayerInstanceRef.current?.cancel();
@@ -301,7 +331,7 @@ export function PdfPageView({
           } : undefined),
         } as React.CSSProperties}
       >
-        <canvas ref={canvasRef} className={styles.canvas} />
+        <canvas ref={canvasRef} className={styles.canvas} style={{ opacity: rendered ? 1 : 0 }} />
         {/* Use unscoped "textLayer" class so pdfjs-dist/web/pdf_viewer.css applies */}
         <div ref={textLayerRef} className="textLayer" />
         <PdfHighlightLayer

@@ -128,11 +128,27 @@ export async function loadPdfDocument(blob: Blob): Promise<LoadedPdf> {
   const arrayBuffer = await blob.arrayBuffer();
   const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  const dims: PageDims[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const vp = page.getViewport({ scale: 1 });
-    dims.push({ width: vp.width, height: vp.height });
+  // Enumerate per-page dimensions with bounded concurrency. Awaiting getPage()
+  // one page at a time serializes a worker round-trip per page, which dominates
+  // first-paint latency on large (often scanned) documents. Pipelining in
+  // chunks keeps the worker busy without flooding it. Dimensions remain exact
+  // per-page viewports, so the layout model, scroll math, and jumps are
+  // unaffected. getPage() for every page matches the previous behavior, so the
+  // retained page-proxy set is unchanged.
+  const dims: PageDims[] = new Array(doc.numPages);
+  const CONCURRENCY = 24;
+  for (let start = 1; start <= doc.numPages; start += CONCURRENCY) {
+    const end = Math.min(start + CONCURRENCY - 1, doc.numPages);
+    const batch: Promise<void>[] = [];
+    for (let i = start; i <= end; i++) {
+      batch.push(
+        doc.getPage(i).then(page => {
+          const vp = page.getViewport({ scale: 1 });
+          dims[i - 1] = { width: vp.width, height: vp.height };
+        }),
+      );
+    }
+    await Promise.all(batch);
   }
 
   const rawOutline = await doc.getOutline();

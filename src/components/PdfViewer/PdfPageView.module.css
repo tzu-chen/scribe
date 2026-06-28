@@ -18,6 +18,10 @@
 
 .canvas {
   display: block;
+  /* Gentle fade-in when the finished frame is revealed (opacity is toggled in
+   * PdfPageView once pdf.js finishes painting), so pages resolve from the dark
+   * page surface instead of flashing. */
+  transition: opacity 0.12s ease-out;
 }
 
 :global([data-theme="dark"]) .canvas {
