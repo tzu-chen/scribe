@@ -3,7 +3,11 @@
   overflow-y: auto;
   overflow-x: auto;
   background: var(--color-pdf-bg);
-  padding: var(--spacing-md);
+  /* No padding: the page fills the area edge-to-edge in every mode. Keeping
+   * the content width identical in and out of immersive mode means toggling
+   * fullscreen never changes the fit-width scale, so the page canvases don't
+   * re-render (which flashed white). */
+  padding: 0;
 }
 
 .pageWrapper {
@@ -21,19 +25,4 @@
   justify-content: center;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-sm);
-}
-
-/* Drop the container's breathing-room padding on phones in either orientation
- * (max-height catches landscape phones, where the screen is wide but short).
- * Tablets keep the desktop padding since their landscape height is ≥ 600px. */
-@media (max-width: 640px), (max-height: 500px) {
-  .container {
-    padding: 0;
-  }
-}
-
-/* In immersive (full-screen) mode, drop the breathing-room padding so the
- * page fills the viewport edge-to-edge. */
-:global([data-immersive='true']) .container {
-  padding: 0;
 }
