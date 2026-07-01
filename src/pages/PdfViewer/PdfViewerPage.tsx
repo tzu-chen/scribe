@@ -488,7 +488,6 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
 
   const handleEditNote = useCallback((noteId: string) => {
     setEditingNoteId(noteId);
-    setShowRightPanel(false);
   }, []);
 
   const handleCloseEditor = useCallback(() => {
