@@ -22,7 +22,6 @@ interface Props {
   onZoomChange: (zoom: number) => void;
   onFitWidthToggle: () => void;
   onTwoPageViewToggle: () => void;
-  onCreateNote: () => void;
   immersiveMode?: boolean;
   cropActive?: boolean;
   onCropToggle?: () => void;
@@ -46,7 +45,6 @@ export function PdfToolbar({
   onZoomChange,
   onFitWidthToggle,
   onTwoPageViewToggle,
-  onCreateNote,
   immersiveMode,
   cropActive,
   onCropToggle,
@@ -271,11 +269,7 @@ export function PdfToolbar({
         </button>
       </div>
 
-      <div className={styles.right}>
-        <button className={styles.noteBtn} onClick={onCreateNote}>
-          + Create Note
-        </button>
-      </div>
+      <div className={styles.right} />
     </div>
   );
 }

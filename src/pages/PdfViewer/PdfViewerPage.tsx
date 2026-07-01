@@ -622,6 +622,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
 
   return (
     <div className={`${styles.page} ${immersiveMode ? styles.immersive : ''} ${needsRotation ? styles.rotated : ''}`}>
+      {!immersiveMode && <BookTabs activeId={attachmentId} />}
       <PdfToolbar
         filename={filename}
         nodeLinks={nodeLinks}
@@ -635,7 +636,6 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         onZoomChange={handleZoomChange}
         onFitWidthToggle={handleFitWidthToggle}
         onTwoPageViewToggle={handleTwoPageViewToggle}
-        onCreateNote={handleCreateNote}
         immersiveMode={immersiveMode}
         cropActive={hasCrop(crop) || hasCrop(cropEven)}
         onCropToggle={handleCropModeToggle}
@@ -645,7 +645,6 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         onOrientationLockToggle={handleOrientationLockToggle}
         fileType={isDjvu ? 'djvu' : 'pdf'}
       />
-      {!immersiveMode && <BookTabs activeId={attachmentId} />}
       <div className={styles.body}>
         {showToc && (
           <PdfSidebar
@@ -742,6 +741,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
             subject={subject}
             attachmentId={attachmentId}
             onScrollToPage={handlePanelScrollToPage}
+            onCreateNote={handleCreateNote}
             onNavigateToNote={handleNavigateToNote}
             onEditNote={handleEditNote}
           />

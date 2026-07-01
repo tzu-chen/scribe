@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import type { Note } from '../../types/note';
+import { PlusIcon } from '../Icons/Icons';
 import styles from './PdfRightPanel.module.css';
 
 interface Props {
   notes: Note[];
   subject: string;
   attachmentId?: string;
+  onCreateNote: () => void;
   onNavigateToNote: (noteId: string) => void;
   onEditNote: (noteId: string) => void;
 }
@@ -48,7 +50,7 @@ function NoteItem({ note, onNavigate, onEdit }: { note: Note; onNavigate: () => 
   );
 }
 
-export function PdfNotesTab({ notes, subject, attachmentId, onNavigateToNote, onEditNote }: Props) {
+export function PdfNotesTab({ notes, subject, attachmentId, onCreateNote, onNavigateToNote, onEditNote }: Props) {
   const sortByDate = (a: Note, b: Note) =>
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 
@@ -84,23 +86,15 @@ export function PdfNotesTab({ notes, subject, attachmentId, onNavigateToNote, on
   const hasAttachmentNotes = pageGroups.size > 0 || generalNotes.length > 0;
   const hasAnyNotes = hasAttachmentNotes || subjectNotes.length > 0;
 
-  if (!attachmentId && !subject) {
-    return (
-      <p className={styles.empty}>No subject or book associated with this file.</p>
-    );
-  }
-
-  if (!hasAnyNotes) {
-    return (
-      <p className={styles.empty}>
-        No notes yet.
-      </p>
-    );
-  }
-
   const sortedPages = [...pageGroups.keys()].sort((a, b) => a - b);
 
-  return (
+  let body: ReactNode;
+  if (!attachmentId && !subject) {
+    body = <p className={styles.empty}>No subject or book associated with this file.</p>;
+  } else if (!hasAnyNotes) {
+    body = <p className={styles.empty}>No notes yet.</p>;
+  } else {
+    body = (
     <div>
       {/* Attachment-linked notes grouped by page */}
       {hasAttachmentNotes && (
@@ -160,6 +154,23 @@ export function PdfNotesTab({ notes, subject, attachmentId, onNavigateToNote, on
           </ul>
         </>
       )}
+    </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className={styles.notesHeader}>
+        <button
+          className={styles.createNoteBtn}
+          onClick={onCreateNote}
+          title="Create note"
+          aria-label="Create note"
+        >
+          <PlusIcon size={16} />
+        </button>
+      </div>
+      {body}
     </div>
   );
 }

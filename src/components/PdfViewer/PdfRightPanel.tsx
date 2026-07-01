@@ -14,6 +14,7 @@ interface Props {
   subject: string;
   attachmentId?: string;
   onScrollToPage: (page: number) => void;
+  onCreateNote: () => void;
   onNavigateToNote: (noteId: string) => void;
   onEditNote: (noteId: string) => void;
 }
@@ -25,6 +26,7 @@ export function PdfRightPanel({
   subject,
   attachmentId,
   onScrollToPage,
+  onCreateNote,
   onNavigateToNote,
   onEditNote,
 }: Props) {
@@ -59,6 +61,7 @@ export function PdfRightPanel({
             notes={notes}
             subject={subject}
             attachmentId={attachmentId}
+            onCreateNote={onCreateNote}
             onNavigateToNote={onNavigateToNote}
             onEditNote={onEditNote}
           />
