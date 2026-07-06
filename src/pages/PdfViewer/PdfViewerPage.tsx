@@ -400,6 +400,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   const shortcutsEnabled = isActive && !cropMode;
   useKeyboardShortcut('pdfTocToggle', handleTocToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfFitWidthToggle', handleFitWidthToggle, shortcutsEnabled);
+  useKeyboardShortcut('pdfTwoPageToggle', handleTwoPageViewToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfPanelToggle', handleRightPanelToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfImmersiveToggle', handleImmersiveToggle, shortcutsEnabled);
 
