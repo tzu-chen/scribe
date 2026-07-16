@@ -20,10 +20,32 @@
   justify-content: space-between;
 }
 
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
 .title {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.foldAllButton {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.foldAllButton:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .addButton {
@@ -57,14 +79,48 @@
 
 .itemWrapper {
   position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: var(--spacing-xs);
+}
+
+.twisty {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.twisty:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.twistySpacer {
+  flex-shrink: 0;
+  width: 16px;
+}
+
+.twistyIcon {
+  transition: transform 0.12s ease;
+}
+
+.twistyOpen {
+  transform: rotate(90deg);
 }
 
 .item {
   display: flex;
   align-items: baseline;
   gap: var(--spacing-sm);
-  width: 100%;
-  padding: 4px var(--spacing-md);
+  flex: 1;
+  min-width: 0;
+  padding: 4px var(--spacing-md) 4px var(--spacing-xs);
   text-align: left;
   font-size: 0.8rem;
   color: var(--color-text);

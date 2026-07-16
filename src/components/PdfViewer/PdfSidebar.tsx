@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { EditableOutlineItem } from '../../hooks/useCustomOutline';
 import type { ViewerPosition } from './positionMath';
+import { ChevronRightIcon } from '../Icons/Icons';
 import styles from './PdfSidebar.module.css';
 
 interface Props {
@@ -47,6 +48,21 @@ function collectDescendantIds(items: EditableOutlineItem[], id: string): Set<str
   };
   walk(items);
   ids.add(id);
+  return ids;
+}
+
+// Collect IDs of every item that has children (the foldable ones)
+function collectParentIds(items: EditableOutlineItem[]): string[] {
+  const ids: string[] = [];
+  const walk = (list: EditableOutlineItem[]) => {
+    for (const item of list) {
+      if (item.children.length > 0) {
+        ids.push(item.id);
+        walk(item.children);
+      }
+    }
+  };
+  walk(items);
   return ids;
 }
 
@@ -102,6 +118,8 @@ function insertIntoTree(
 function OutlineTree({
   items,
   depth,
+  collapsedIds,
+  onToggleCollapse,
   onNavigate,
   onContextMenu,
   renamingId,
@@ -118,6 +136,8 @@ function OutlineTree({
 }: {
   items: EditableOutlineItem[];
   depth: number;
+  collapsedIds: Set<string>;
+  onToggleCollapse: (id: string) => void;
   onNavigate: (page: number, destTop: number | null) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
   renamingId: string | null;
@@ -141,6 +161,8 @@ function OutlineTree({
             : dragState.zone === 'after' ? styles.dragOverAfter
             : styles.dragOverInto
           : '';
+        const hasChildren = item.children.length > 0;
+        const isCollapsed = collapsedIds.has(item.id);
 
         return (
           <li key={item.id}>
@@ -156,6 +178,22 @@ function OutlineTree({
               onDrop={onDrop}
               onDragEnd={onDragEnd}
             >
+              {hasChildren ? (
+                <button
+                  className={styles.twisty}
+                  onClick={() => onToggleCollapse(item.id)}
+                  title={isCollapsed ? 'Unfold' : 'Fold'}
+                  aria-label={isCollapsed ? 'Unfold' : 'Fold'}
+                  aria-expanded={!isCollapsed}
+                >
+                  <ChevronRightIcon
+                    size={12}
+                    className={isCollapsed ? styles.twistyIcon : `${styles.twistyIcon} ${styles.twistyOpen}`}
+                  />
+                </button>
+              ) : (
+                <span className={styles.twistySpacer} />
+              )}
               <button
                 className={styles.item}
                 onClick={() => onNavigate(item.pageNumber, item.destTop)}
@@ -182,10 +220,12 @@ function OutlineTree({
                 <span className={styles.itemPage}>{item.pageNumber}</span>
               </button>
             </div>
-            {item.children.length > 0 && (
+            {hasChildren && !isCollapsed && (
               <OutlineTree
                 items={item.children}
                 depth={depth + 1}
+                collapsedIds={collapsedIds}
+                onToggleCollapse={onToggleCollapse}
                 onNavigate={onNavigate}
                 onContextMenu={onContextMenu}
                 renamingId={renamingId}
@@ -239,6 +279,24 @@ export function PdfSidebar({
     overId: null,
     zone: null,
   });
+
+  // --- Fold state ---
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+
+  const parentIds = useMemo(() => collectParentIds(outline), [outline]);
+  const allFolded = parentIds.length > 0 && parentIds.every(id => collapsedIds.has(id));
+
+  const handleToggleCollapse = useCallback((id: string) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleToggleFoldAll = useCallback(() => {
+    setCollapsedIds(allFolded ? new Set() : new Set(parentIds));
+  }, [allFolded, parentIds]);
 
   // Focus add input when shown
   useEffect(() => {
@@ -377,6 +435,15 @@ export function PdfSidebar({
 
     const newTree = insertIntoTree(treeWithout, overId, zone, removed);
     onReorderItems(newTree);
+    if (zone === 'into') {
+      // Keep the dropped item visible rather than hiding it inside a folded parent
+      setCollapsedIds(prev => {
+        if (!prev.has(overId)) return prev;
+        const next = new Set(prev);
+        next.delete(overId);
+        return next;
+      });
+    }
     setDragState({ draggedId: null, overId: null, zone: null });
   }, [dragState, outline, onReorderItems]);
 
@@ -388,7 +455,23 @@ export function PdfSidebar({
     <div className={styles.sidebar}>
       <div className={styles.header}>
         <div className={styles.headerActions}>
-          <h3 className={styles.title}>Table of Contents</h3>
+          <div className={styles.titleGroup}>
+            <h3 className={styles.title}>Table of Contents</h3>
+            {parentIds.length > 0 && (
+              <button
+                className={styles.foldAllButton}
+                onClick={handleToggleFoldAll}
+                title={allFolded ? 'Unfold all entries' : 'Fold all entries'}
+                aria-label={allFolded ? 'Unfold all entries' : 'Fold all entries'}
+                aria-expanded={!allFolded}
+              >
+                <ChevronRightIcon
+                  size={12}
+                  className={allFolded ? styles.twistyIcon : `${styles.twistyIcon} ${styles.twistyOpen}`}
+                />
+              </button>
+            )}
+          </div>
           <button
             className={styles.addButton}
             onClick={handleStartAdd}
@@ -422,6 +505,8 @@ export function PdfSidebar({
           <OutlineTree
             items={outline}
             depth={0}
+            collapsedIds={collapsedIds}
+            onToggleCollapse={handleToggleCollapse}
             onNavigate={onNavigate}
             onContextMenu={handleContextMenu}
             renamingId={renamingId}
