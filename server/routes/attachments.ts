@@ -10,6 +10,21 @@ const router = Router();
 
 const upload = multer({ dest: ATTACHMENTS_DIR });
 
+// Build an RFC 6266 Content-Disposition value. Node's HTTP layer rejects header
+// values containing any character outside Latin-1 (> 0xFF), so a filename with a
+// curly apostrophe (’ U+2019), em dash, or other typographic character — common
+// in copied paper titles — would otherwise crash the response. We emit an ASCII
+// fallback plus an RFC 5987 UTF-8 encoded form so all clients get the real name.
+function contentDisposition(filename: string): string {
+  const asciiFallback = filename
+    .replace(/[^\x20-\x7e]/g, '_') // strip non-ASCII (incl. control chars)
+    .replace(/["\\]/g, '\\$&'); // escape backslash and double-quote
+  const encoded = encodeURIComponent(filename)
+    // Percent-encode chars encodeURIComponent leaves raw but RFC 5987 disallows.
+    .replace(/['()*!]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  return `inline; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
+}
+
 interface AttachmentRow {
   id: string;
   subject: string;
@@ -216,7 +231,7 @@ router.get('/:id/blob', (req, res) => {
 
   res.setHeader('Content-Type', row.type);
   res.setHeader('Content-Length', row.size);
-  res.setHeader('Content-Disposition', `inline; filename="${row.filename}"`);
+  res.setHeader('Content-Disposition', contentDisposition(row.filename));
   fs.createReadStream(filePath).pipe(res);
 });
 
