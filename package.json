@@ -4,14 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n client,server -c blue,green \"npm run dev:client\" \"npm run dev:server\"",
+    "copy-pdf-wasm": "node scripts/copy-pdf-wasm.mjs",
+    "dev": "npm run copy-pdf-wasm && concurrently -k -n client,server -c blue,green \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "build": "tsc -b && vite build",
+    "build": "npm run copy-pdf-wasm && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node --import tsx server/index.ts",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package && npm run copy-pdf-wasm"
   },
   "dependencies": {
     "@uiw/react-md-editor": "^4.0.11",

@@ -126,7 +126,14 @@ async function resolvePdfOutline(
 
 export async function loadPdfDocument(blob: Blob): Promise<LoadedPdf> {
   const arrayBuffer = await blob.arrayBuffer();
-  const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const doc = await pdfjsLib.getDocument({
+    data: arrayBuffer,
+    // pdf.js 5.x decodes JPEG 2000 (JPX) and JBIG2 images in WebAssembly. The
+    // worker fetches those modules from this directory (trailing slash is
+    // required); without it, such images render blank while text/vectors are
+    // fine. The files are staged into public/pdf-wasm/ by scripts/copy-pdf-wasm.mjs.
+    wasmUrl: `${import.meta.env.BASE_URL}pdf-wasm/`,
+  }).promise;
 
   // Enumerate per-page dimensions with bounded concurrency. Awaiting getPage()
   // one page at a time serializes a worker round-trip per page, which dominates

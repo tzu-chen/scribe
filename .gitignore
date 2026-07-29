@@ -13,6 +13,9 @@ dist-ssr
 *.local
 data/
 
+# Staged from node_modules by scripts/copy-pdf-wasm.mjs
+public/pdf-wasm/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
