@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useKeybindings } from '../../contexts/KeybindingsContext';
+import { useUiPrefs } from '../../contexts/UiPrefsContext';
 import { COLOR_SCHEMES } from '../../colorSchemes';
 import { KEYBINDING_META, type KeybindingAction } from '../../types/keybindings';
 import { CloseIcon, PaletteIcon } from '../Icons/Icons';
 import styles from './SettingsMenu.module.css';
 
-type Tab = 'theme' | 'shortcuts';
+type Tab = 'theme' | 'viewer' | 'shortcuts';
 
 function formatKey(key: string): string {
   if (!key) return '—';
@@ -70,6 +71,7 @@ function findDuplicate(action: KeybindingAction, key: string, all: Record<Keybin
 export function SettingsMenu() {
   const { schemeId, setScheme, autoSwitch, setAutoSwitch } = useTheme();
   const { keybindings, resetKeybindings } = useKeybindings();
+  const { uiPrefs, setTocMode } = useUiPrefs();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('theme');
   const overlayMouseDownRef = useRef(false);
@@ -110,6 +112,12 @@ export function SettingsMenu() {
                   Theme
                 </button>
                 <button
+                  className={`${styles.tab} ${tab === 'viewer' ? styles.tabActive : ''}`}
+                  onClick={() => setTab('viewer')}
+                >
+                  Viewer
+                </button>
+                <button
                   className={`${styles.tab} ${tab === 'shortcuts' ? styles.tabActive : ''}`}
                   onClick={() => setTab('shortcuts')}
                 >
@@ -127,10 +135,10 @@ export function SettingsMenu() {
 
             {tab === 'theme' && (
               <div className={styles.body}>
-                <div className={styles.autoSwitch}>
-                  <div className={styles.autoSwitchInfo}>
-                    <span className={styles.autoSwitchLabel}>Auto switch</span>
-                    <span className={styles.autoSwitchDesc}>
+                <div className={`${styles.settingRow} ${styles.settingRowNarrow}`}>
+                  <div className={styles.settingInfo}>
+                    <span className={styles.settingLabel}>Auto switch</span>
+                    <span className={styles.settingDesc}>
                       Light theme by day, dark by night
                     </span>
                   </div>
@@ -194,6 +202,32 @@ export function SettingsMenu() {
                       <span className={styles.cardType}>{scheme.type}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {tab === 'viewer' && (
+              <div className={styles.body}>
+                <p className={styles.shortcutsHint}>
+                  How the PDF viewer lays out its table of contents.
+                </p>
+                <div className={styles.settingRow}>
+                  <div className={styles.settingInfo}>
+                    <span className={styles.settingLabel}>Floating table of contents</span>
+                    <span className={styles.settingDesc}>
+                      The TOC hovers over the page instead of docking beside it,
+                      so opening it never resizes the document
+                    </span>
+                  </div>
+                  <button
+                    className={`${styles.toggle} ${uiPrefs.tocMode === 'floating' ? styles.toggleOn : ''}`}
+                    onClick={() => setTocMode(uiPrefs.tocMode === 'floating' ? 'panel' : 'floating')}
+                    role="switch"
+                    aria-checked={uiPrefs.tocMode === 'floating'}
+                    aria-label="Floating table of contents"
+                  >
+                    <span className={styles.toggleThumb} />
+                  </button>
                 </div>
               </div>
             )}

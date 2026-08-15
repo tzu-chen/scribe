@@ -204,6 +204,7 @@ SQLite features enabled: WAL mode, foreign key constraints, CASCADE deletes.
 | Key | Type | Contents |
 |---|---|---|
 | `scribe_theme` | string | `'default'` or `'dark'` |
+| `scribe_ui_prefs` | JSON | Global UI preferences — currently `{ tocMode: 'panel' \| 'floating' }` (see `UiPrefsContext`) |
 
 ### File Storage
 
@@ -397,7 +398,7 @@ Rendering uses `remark-math` + `rehype-katex` plugins with `@uiw/react-md-editor
 
 The PDF viewer (`PdfViewerPage`) composes multiple sub-components:
 - `PdfToolbar` — zoom, fit-width, TOC toggle, right panel toggle
-- `PdfSidebar` — table of contents from PDF outline
+- `PdfSidebar` — table of contents from PDF outline. Two layouts, chosen globally in Settings → Viewer (`tocMode`): **panel** docks it beside the document (opening it narrows the page area, so pages re-render at a new fit-width zoom), **floating** overlays it on the page area, leaving the document's width — and its rendering — untouched. Floating mode renders the same component inside `.pdfArea` with `position: absolute` and carries its own close button, since it covers the corner TOC toggle.
 - `PdfDocumentView` — scrollable virtualized page list (via `usePdfDocument`)
 - `PdfRightPanel` — highlights, comments, and related notes panel
 - `PdfSelectionToolbar` — floating toolbar on text selection (highlight / highlight + comment)

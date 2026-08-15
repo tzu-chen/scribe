@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { EditableOutlineItem } from '../../hooks/useCustomOutline';
 import type { ViewerPosition } from './positionMath';
-import { ChevronRightIcon } from '../Icons/Icons';
+import { ChevronRightIcon, CloseIcon } from '../Icons/Icons';
 import styles from './PdfSidebar.module.css';
 
 interface Props {
+  /** Overlay the document instead of taking layout space beside it. */
+  floating?: boolean;
+  /** Close handler for the floating variant's own dismiss button. */
+  onClose?: () => void;
   outline: EditableOutlineItem[];
   onNavigate: (page: number, destTop: number | null) => void;
   onAddItem: (title: string, pageNumber: number, destTop: number | null) => void;
@@ -249,6 +253,8 @@ function OutlineTree({
 }
 
 export function PdfSidebar({
+  floating,
+  onClose,
   outline,
   onNavigate,
   onAddItem,
@@ -452,7 +458,7 @@ export function PdfSidebar({
   }, []);
 
   return (
-    <div className={styles.sidebar}>
+    <div className={`${styles.sidebar} ${floating ? styles.floating : ''}`}>
       <div className={styles.header}>
         <div className={styles.headerActions}>
           <div className={styles.titleGroup}>
@@ -472,13 +478,27 @@ export function PdfSidebar({
               </button>
             )}
           </div>
-          <button
-            className={styles.addButton}
-            onClick={handleStartAdd}
-            title="Add current location to TOC"
-          >
-            +
-          </button>
+          <div className={styles.headerButtons}>
+            <button
+              className={styles.addButton}
+              onClick={handleStartAdd}
+              title="Add current location to TOC"
+            >
+              +
+            </button>
+            {/* The floating panel sits on top of the corner toggle, so it
+                carries its own dismiss button. */}
+            {floating && onClose && (
+              <button
+                className={styles.closeButton}
+                onClick={onClose}
+                title="Close table of contents"
+                aria-label="Close table of contents"
+              >
+                <CloseIcon size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
       <div className={styles.content}>

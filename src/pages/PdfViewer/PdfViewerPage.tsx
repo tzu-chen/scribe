@@ -23,6 +23,7 @@ import type { TextSelection } from '../../components/PdfViewer/PdfPageView';
 import { useReadingTimeTracker } from '../../hooks/useReadingTimeTracker';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
 import { useTabDocument } from '../../contexts/OpenBooksContext';
+import { useUiPrefs } from '../../contexts/UiPrefsContext';
 import { BookTabs } from '../../components/BookTabs/BookTabs';
 import styles from './PdfViewerPage.module.css';
 
@@ -63,6 +64,9 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
 
   // Reading time only accrues while this tab is visible.
   useReadingTimeTracker(isActive ? attachmentId : undefined, filename);
+
+  const { uiPrefs } = useUiPrefs();
+  const floatingToc = uiPrefs.tocMode === 'floating';
 
   const doc = useTabDocument(attachmentId);
   const { isDjvu, pdfDoc, djvuDoc, numPages, pageWidth, pageHeight, pageDimensions, outline } = doc;
@@ -677,6 +681,24 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     ? annotations.highlights.find(h => h.id === activeHighlight.highlightId)
     : null;
 
+  // One element, two homes: docked as a flex sibling of the page area, or
+  // absolutely positioned inside it so the page area keeps its width.
+  const tocSidebar = showToc ? (
+    <PdfSidebar
+      floating={floatingToc}
+      onClose={handleTocToggle}
+      outline={customOutline.outline}
+      onNavigate={handleTocNavigate}
+      onAddItem={customOutline.addItem}
+      onRenameItem={customOutline.renameItem}
+      onDeleteItem={customOutline.deleteItem}
+      onReorderItems={customOutline.reorderItems}
+      onResetOutline={customOutline.resetToOriginal}
+      hasCustomOutline={customOutline.hasCustomOutline}
+      getCurrentPosition={getCurrentPosition}
+    />
+  ) : null;
+
   return (
     <div className={`${styles.page} ${immersiveMode ? styles.immersive : ''} ${needsRotation ? styles.rotated : ''}`}>
       {!immersiveMode && <BookTabs activeId={attachmentId} />}
@@ -707,20 +729,9 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         fileType={isDjvu ? 'djvu' : 'pdf'}
       />
       <div className={styles.body}>
-        {showToc && (
-          <PdfSidebar
-            outline={customOutline.outline}
-            onNavigate={handleTocNavigate}
-            onAddItem={customOutline.addItem}
-            onRenameItem={customOutline.renameItem}
-            onDeleteItem={customOutline.deleteItem}
-            onReorderItems={customOutline.reorderItems}
-            onResetOutline={customOutline.resetToOriginal}
-            hasCustomOutline={customOutline.hasCustomOutline}
-            getCurrentPosition={getCurrentPosition}
-          />
-        )}
+        {!floatingToc && tocSidebar}
         <div className={styles.pdfArea}>
+        {floatingToc && tocSidebar}
         <PdfDocumentView
           ref={docViewRef}
           pdfDoc={isDjvu ? undefined : pdfDoc!}
