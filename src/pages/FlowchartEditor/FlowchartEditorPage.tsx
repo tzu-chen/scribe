@@ -10,6 +10,7 @@ import { FlowchartCanvas, type FlowchartCanvasHandle, type WorldPoint } from '..
 import { useUndoRedo } from '../../components/FlowchartCanvas/useUndoRedo';
 import { Inspector } from '../../components/FlowchartCanvas/Inspector';
 import { StageManager } from '../../components/FlowchartCanvas/StageManager';
+import { STAGE_ACCENTS } from '../../palette';
 import styles from './FlowchartEditorPage.module.css';
 
 type LoadState = 'loading' | 'ready' | 'notfound';
@@ -17,8 +18,7 @@ type SidebarTab = 'node' | 'stages';
 type ChartMeta = Partial<Pick<FlowchartSpec, 'title' | 'subtitle' | 'background' | 'width' | 'height'>>;
 
 const SAVE_DEBOUNCE_MS = 800;
-// Warm → cool accent cycle for newly added stages.
-const STAGE_ACCENTS = ['#d98a4a', '#c86a8a', '#8a6ac8', '#5a8ac8', '#4aa39a', '#7aa34a'];
+
 // Arrow-key nudge deltas for the selected node.
 const NUDGE: Record<string, [number, number]> = {
   ArrowUp: [0, -1],

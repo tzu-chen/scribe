@@ -37,17 +37,17 @@ function hasAnyCrop(c: CropBox): boolean {
 export async function exportCroppedPdf(
   sourceBlob: Blob,
   filename: string,
-  cropOdd: CropBox,
-  cropEven: CropBox,
+  /** Crop for a 1-indexed page: page parity for manual crops, the measured box
+   *  for auto-trim. */
+  cropForPage: (pageNumber: number) => CropBox | undefined,
 ): Promise<void> {
   const bytes = new Uint8Array(await sourceBlob.arrayBuffer());
   const pdf = await PDFDocument.load(bytes);
   const pages = pdf.getPages();
 
   pages.forEach((page, idx) => {
-    const isOdd = idx % 2 === 0;
-    const crop = isOdd ? cropOdd : cropEven;
-    if (!hasAnyCrop(crop)) return;
+    const crop = cropForPage(idx + 1);
+    if (!crop || !hasAnyCrop(crop)) return;
     const { width: mediaW, height: mediaH } = page.getSize();
     const rotation = page.getRotation().angle;
     const rect = viewerCropToUserSpaceRect(mediaW, mediaH, rotation, crop);

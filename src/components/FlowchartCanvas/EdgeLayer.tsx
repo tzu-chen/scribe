@@ -43,8 +43,9 @@ export function EdgeLayer({
     return map;
   }, [nodes, heights]);
 
-  const arrowFill = isDark ? '#888880' : '#a0a090';
-  const arrowFillHi = isDark ? '#c0c0b8' : '#4a4a40';
+  // Palette values from monolith-theme.css: --mono-text-faint / --mono-text-muted.
+  const arrowFill = isDark ? '#8b929c' : '#9e9588';
+  const arrowFillHi = isDark ? '#c2c7cf' : '#6b6358';
 
   return (
     <svg className={styles.edgeSvg} width={width} height={height}>
@@ -69,7 +70,7 @@ export function EdgeLayer({
         const selected = selectedKey === key;
         const isSecondary = edge.style === 'secondary';
 
-        const stroke = selected ? arrowFillHi : isSecondary ? (isDark ? '#7a7290' : '#b0a8c8') : arrowFill;
+        const stroke = selected ? arrowFillHi : isSecondary ? (isDark ? '#c58fd6' : '#7a5a99') : arrowFill;
 
         return (
           <g key={`${key}-${i}`}>

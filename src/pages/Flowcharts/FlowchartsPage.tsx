@@ -21,6 +21,7 @@ import { ArrowLeftIcon, CloseIcon, ChevronUpIcon, ChevronDownIcon } from '../../
 import { stripExtension } from '../../utils/filename';
 import { NodePopup } from '../../components/NodePopup/NodePopup';
 import popupStyles from '../../components/NodePopup/NodePopup.module.css';
+import { randomCategorical } from '../../palette';
 import styles from './FlowchartsPage.module.css';
 
 type ViewMode = 'card' | 'list';
@@ -29,15 +30,6 @@ type SortDir = 'asc' | 'desc';
 
 const VIEW_MODE_KEY = 'scribe_flowcharts_view';
 
-const TAG_COLOR_PALETTE = [
-  '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',
-  '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
-  '#06b6d4', '#a855f7', '#facc15', '#f43f5e', '#22c55e',
-];
-
-function randomTagColor(): string {
-  return TAG_COLOR_PALETTE[Math.floor(Math.random() * TAG_COLOR_PALETTE.length)];
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -234,7 +226,7 @@ function FlowchartFormModal({ existing, tags, onClose, onSaved }: FormModalProps
                       key={tag.id}
                       type="button"
                       className={`${styles.tagPickerChip} ${selected ? styles.tagPickerChipSelected : ''}`}
-                      style={selected && tag.color ? { backgroundColor: tag.color, borderColor: tag.color, color: '#fff' } : undefined}
+                      style={selected && tag.color ? { backgroundColor: tag.color, borderColor: tag.color, color: 'var(--color-on-solid)' } : undefined}
                       onClick={() => toggleTag(tag.id)}
                     >
                       <span
@@ -736,7 +728,7 @@ export function FlowchartsPage() {
       setNewTagName('');
       return;
     }
-    await flowchartTagStorage.create(trimmed, randomTagColor());
+    await flowchartTagStorage.create(trimmed, randomCategorical());
     await loadTags();
     setCreatingTag(false);
     setNewTagName('');
@@ -772,7 +764,7 @@ export function FlowchartsPage() {
 
   const handleShuffleTagColors = useCallback(async () => {
     if (tags.length === 0) return;
-    await Promise.all(tags.map((t) => flowchartTagStorage.update(t.id, { color: randomTagColor() })));
+    await Promise.all(tags.map((t) => flowchartTagStorage.update(t.id, { color: randomCategorical() })));
     await loadTags();
   }, [tags, loadTags]);
 
@@ -1180,7 +1172,7 @@ export function FlowchartsPage() {
             <span
               key={tid}
               className={styles.tagChip}
-              style={tag.color ? { backgroundColor: tag.color, color: '#fff' } : undefined}
+              style={tag.color ? { backgroundColor: tag.color, color: 'var(--color-on-solid)' } : undefined}
               onClick={(e) => e.stopPropagation()}
             >
               {tag.name}

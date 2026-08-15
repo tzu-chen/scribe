@@ -10,6 +10,7 @@ import {
 import { readingTimeStorage, getCSTDateString } from '../services/readingTimeStorage';
 import type { ReadingTimeEntry } from '../types/readingTime';
 import { stripExtension } from '../utils/filename';
+import { SERIES_PALETTE } from '../palette';
 
 export type ViewMode = 'week' | 'month';
 
@@ -33,20 +34,7 @@ function roundDown30Min(totalSeconds: number): number {
   return Math.floor(totalSeconds / 1800) * 1800;
 }
 
-const BOOK_COLORS = [
-  '#4263eb',
-  '#e03131',
-  '#2f9e44',
-  '#f08c00',
-  '#7c3aed',
-  '#0891b2',
-  '#d63865',
-  '#059669',
-  '#ea580c',
-  '#6d28d9',
-  '#0077b6',
-  '#b45309',
-];
+const BOOK_COLORS = SERIES_PALETTE;
 
 function hashStringToIndex(str: string, mod: number): number {
   let hash = 0;

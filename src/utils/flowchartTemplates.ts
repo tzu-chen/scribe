@@ -1,6 +1,7 @@
 import type { FlowchartSpec, FlowchartStage, FlowchartNode, FlowchartEdge } from '../types/flowchart';
 import { generateStagePalette } from '../components/FlowchartRenderer/colorUtils';
 import { routeEdges } from './edgeRouting';
+import { STAGE_ACCENTS } from '../palette';
 
 // Starter specs for the "New Flowchart" flow so a chart can be created entirely
 // in-app, without hand-authoring JSON. All produce valid FlowchartSpec objects.
@@ -33,7 +34,7 @@ export function blankSpec(title: string): FlowchartSpec {
     title: title || 'Untitled Flowchart',
     width: 1500,
     height: 1000,
-    stages: [makeStage('stage-0', 'Stage 1', 55, '#d98a4a')],
+    stages: [makeStage('stage-0', 'Stage 1', 55, STAGE_ACCENTS[0])],
     nodes: [],
     edges: [],
   };
@@ -42,9 +43,9 @@ export function blankSpec(title: string): FlowchartSpec {
 /** A three-tier roadmap with sample nodes/edges demonstrating structure. */
 export function roadmapSpec(title: string): FlowchartSpec {
   const stages: FlowchartStage[] = [
-    makeStage('stage-0', 'Foundations', 55, '#d98a4a'),
-    makeStage('stage-1', 'Core', 335, '#8a6ac8'),
-    makeStage('stage-2', 'Advanced', 615, '#5a8ac8'),
+    makeStage('stage-0', 'Foundations', 55, STAGE_ACCENTS[0]),
+    makeStage('stage-1', 'Core', 335, STAGE_ACCENTS[2]),
+    makeStage('stage-2', 'Advanced', 615, STAGE_ACCENTS[3]),
   ];
 
   const nodes: FlowchartNode[] = [

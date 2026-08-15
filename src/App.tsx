@@ -12,6 +12,7 @@ import { FlowchartEditorPage } from './pages/FlowchartEditor/FlowchartEditorPage
 import { PdfViewerPage } from './pages/PdfViewer/PdfViewerPage';
 import { SummaryPage } from './pages/Summary/SummaryPage';
 import { QuestionsPage } from './pages/Questions/QuestionsPage';
+import './monolith-theme.css';
 import './global.css';
 
 export default function App() {

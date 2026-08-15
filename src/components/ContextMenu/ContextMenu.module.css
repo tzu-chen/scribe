@@ -48,13 +48,9 @@
 }
 
 .menuItemDanger {
-  color: var(--color-danger, #e53e3e);
+  color: var(--color-danger);
 }
 
 .menuItemDanger:hover {
-  background: #fef2f2;
-}
-
-[data-theme="dark"] .menuItemDanger:hover {
-  background: rgba(229, 62, 62, 0.1);
+  background: var(--color-danger-light);
 }

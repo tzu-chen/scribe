@@ -2,6 +2,14 @@ import { useLayoutEffect, useCallback, type RefObject } from 'react';
 import type { FlowchartEdge } from '../../types/flowchart';
 import { anchorPoint, boxFromElement, cubicPath } from '../../utils/edgeGeometry';
 
+// The rendered chart is a sheet: `spec.background` is a light paper colour that
+// does not follow the UI theme, so the arrows drawn on it don't either. Values
+// are the Parchment column of monolith-theme.css — --mono-text, --mono-text-faint
+// and --mono-cat-3.
+const SHEET_INK = '#2c2820';
+const SHEET_RULE = '#9e9588';
+const SHEET_RULE_ALT = '#7a5a99';
+
 export function useFlowchartArrows(
   svgRef: RefObject<SVGSVGElement | null>,
   chartRef: RefObject<HTMLDivElement | null>,
@@ -54,12 +62,12 @@ export function useFlowchartArrows(
       if (activeEdges) {
         const key = `${edge.from}->${edge.to}`;
         if (activeEdges.has(key)) {
-          path.setAttribute('stroke', '#4a4a40');
+          path.setAttribute('stroke', SHEET_INK);
           path.setAttribute('stroke-width', '2.5');
           path.setAttribute('stroke-opacity', '1');
           path.setAttribute('marker-end', `url(#${markerId}-hi)`);
         } else {
-          path.setAttribute('stroke', '#a8a090');
+          path.setAttribute('stroke', SHEET_RULE);
           path.setAttribute('stroke-width', '0.8');
           path.setAttribute('stroke-opacity', '0.08');
           path.setAttribute('marker-end', `url(#${markerId}-dim)`);
@@ -69,7 +77,7 @@ export function useFlowchartArrows(
         }
       } else {
         // Normal state
-        path.setAttribute('stroke', edge.style === 'secondary' ? '#b0a8c8' : '#a8a090');
+        path.setAttribute('stroke', edge.style === 'secondary' ? SHEET_RULE_ALT : SHEET_RULE);
         path.setAttribute('stroke-width', '1.5');
         path.setAttribute('stroke-opacity', '1');
         path.setAttribute('marker-end', `url(#${markerId})`);

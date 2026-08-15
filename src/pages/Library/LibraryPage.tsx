@@ -14,6 +14,7 @@ import type { BookTag } from '../../types/bookTag';
 import type { FlowchartNodeWithFlowchart } from '../../types/flowchart';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import { stripExtension } from '../../utils/filename';
+import { randomCategorical } from '../../palette';
 import styles from './LibraryPage.module.css';
 
 type ViewMode = 'card' | 'list';
@@ -27,15 +28,6 @@ type Selection =
 
 const VIEW_MODE_KEY = 'scribe_library_view';
 
-const TAG_COLOR_PALETTE = [
-  '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',
-  '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
-  '#06b6d4', '#a855f7', '#facc15', '#f43f5e', '#22c55e',
-];
-
-function randomTagColor(): string {
-  return TAG_COLOR_PALETTE[Math.floor(Math.random() * TAG_COLOR_PALETTE.length)];
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -366,7 +358,7 @@ export function LibraryPage() {
       setNewTagName('');
       return;
     }
-    await bookTagStorage.create(trimmed, randomTagColor());
+    await bookTagStorage.create(trimmed, randomCategorical());
     await loadTags();
     setCreatingTag(false);
     setNewTagName('');
@@ -417,7 +409,7 @@ export function LibraryPage() {
 
   const handleShuffleTagColors = useCallback(async () => {
     if (tags.length === 0) return;
-    await Promise.all(tags.map(t => bookTagStorage.update(t.id, { color: randomTagColor() })));
+    await Promise.all(tags.map(t => bookTagStorage.update(t.id, { color: randomCategorical() })));
     await loadTags();
   }, [tags, loadTags]);
 
@@ -651,7 +643,7 @@ export function LibraryPage() {
             <span
               key={tid}
               className={styles.tagChip}
-              style={tag.color ? { backgroundColor: tag.color, color: '#fff' } : undefined}
+              style={tag.color ? { backgroundColor: tag.color, color: 'var(--color-on-solid)' } : undefined}
               onClick={e => e.stopPropagation()}
               onDoubleClick={e => e.stopPropagation()}
             >

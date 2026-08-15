@@ -11,11 +11,13 @@
     <!-- Resolve the active theme before first paint to avoid a white flash.
          Mirrors the dark/light decision in src/contexts/ThemeContext.tsx +
          src/services/themeStorage.ts. The matching [data-theme="dark"] block in
-         global.css supplies the colors so the very first paint is already dark. -->
+         monolith-theme.css supplies the colors, so the very first paint is
+         already dark. Legacy scheme ids are listed alongside "graphite" so a
+         localStorage value written before the theme overhaul still resolves. -->
     <script>
       (function() {
         try {
-          var DARK = { dark: 1, 'default-dark': 1, 'solarized-dark': 1, nord: 1, dracula: 1 };
+          var DARK = { graphite: 1, dark: 1, 'default-dark': 1, 'solarized-dark': 1, nord: 1, dracula: 1 };
           function isDark(id) { return !!(id && DARK[id]); }
           var dark = false;
           var auto = null;
@@ -27,7 +29,7 @@
           } else {
             dark = isDark(localStorage.getItem('scribe_theme'));
           }
-          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
         } catch (e) {}
       })();
     </script>

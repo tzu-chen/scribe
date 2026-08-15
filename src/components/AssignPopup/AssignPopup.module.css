@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--color-scrim);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 2100;
@@ -121,21 +121,21 @@
 }
 
 .kind_folder {
-  color: #8e44ad;
-  border-color: rgba(142, 68, 173, 0.4);
-  background: rgba(142, 68, 173, 0.08);
+  color: var(--mono-cat-3);
+  border-color: color-mix(in srgb, var(--mono-cat-3) 40%, transparent);
+  background: color-mix(in srgb, var(--mono-cat-3) 10%, transparent);
 }
 
 .kind_tag {
-  color: #2563eb;
-  border-color: rgba(37, 99, 235, 0.4);
-  background: rgba(37, 99, 235, 0.08);
+  color: var(--mono-cat-2);
+  border-color: color-mix(in srgb, var(--mono-cat-2) 40%, transparent);
+  background: color-mix(in srgb, var(--mono-cat-2) 10%, transparent);
 }
 
 .kind_node {
-  color: #b45309;
-  border-color: rgba(180, 83, 9, 0.4);
-  background: rgba(180, 83, 9, 0.08);
+  color: var(--mono-cat-5);
+  border-color: color-mix(in srgb, var(--mono-cat-5) 40%, transparent);
+  background: color-mix(in srgb, var(--mono-cat-5) 10%, transparent);
 }
 
 .applied {
@@ -150,14 +150,14 @@
 
 .appliedAll {
   color: var(--color-success);
-  background: rgba(47, 158, 68, 0.12);
-  border: 1px solid rgba(47, 158, 68, 0.4);
+  background: var(--color-published-bg);
+  border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent);
 }
 
 .appliedPartial {
   color: var(--color-warning);
-  background: rgba(240, 140, 0, 0.12);
-  border: 1px solid rgba(240, 140, 0, 0.4);
+  background: var(--color-draft-bg);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
 }
 
 .check {

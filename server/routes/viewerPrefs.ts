@@ -19,6 +19,7 @@ interface ViewerPrefsRow {
   crop_right_even: number;
   crop_bottom_even: number;
   crop_left_even: number;
+  trim_mode: string;
   updated_at: string;
 }
 
@@ -43,6 +44,7 @@ function rowToPrefs(row: ViewerPrefsRow) {
     cropRightEven: row.crop_right_even,
     cropBottomEven: row.crop_bottom_even,
     cropLeftEven: row.crop_left_even,
+    trimMode: row.trim_mode,
   };
 }
 
@@ -80,6 +82,7 @@ router.put('/:attachmentId', (req, res) => {
     cropRightEven,
     cropBottomEven,
     cropLeftEven,
+    trimMode,
   } = req.body as {
     zoom: number;
     fitWidth: boolean;
@@ -96,6 +99,7 @@ router.put('/:attachmentId', (req, res) => {
     cropRightEven?: number;
     cropBottomEven?: number;
     cropLeftEven?: number;
+    trimMode?: 'off' | 'uniform' | 'page';
   };
 
   const currentPage = position?.pageIndex ?? legacyCurrentPage;
@@ -116,8 +120,8 @@ router.put('/:attachmentId', (req, res) => {
   const oddL = cropLeft ?? 0;
 
   db.prepare(`
-    INSERT INTO viewer_prefs (attachment_id, zoom, fit_width, current_page, two_page_view, scroll_offset_top, show_toc, crop_top, crop_right, crop_bottom, crop_left, crop_top_even, crop_right_even, crop_bottom_even, crop_left_even, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO viewer_prefs (attachment_id, zoom, fit_width, current_page, two_page_view, scroll_offset_top, show_toc, crop_top, crop_right, crop_bottom, crop_left, crop_top_even, crop_right_even, crop_bottom_even, crop_left_even, trim_mode, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(attachment_id) DO UPDATE SET
       zoom = excluded.zoom,
       fit_width = excluded.fit_width,
@@ -133,6 +137,7 @@ router.put('/:attachmentId', (req, res) => {
       crop_right_even = excluded.crop_right_even,
       crop_bottom_even = excluded.crop_bottom_even,
       crop_left_even = excluded.crop_left_even,
+      trim_mode = excluded.trim_mode,
       updated_at = excluded.updated_at
   `).run(
     attachmentId,
@@ -150,6 +155,7 @@ router.put('/:attachmentId', (req, res) => {
     cropRightEven ?? oddR,
     cropBottomEven ?? oddB,
     cropLeftEven ?? oddL,
+    trimMode === 'uniform' || trimMode === 'page' ? trimMode : 'off',
     now,
   );
 

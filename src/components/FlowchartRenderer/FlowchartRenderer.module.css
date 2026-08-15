@@ -55,7 +55,7 @@
   border-radius: 6px;
   padding: 11px 13px;
   z-index: 1;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: opacity 0.3s, transform 0.3s, box-shadow 0.3s;
 }
@@ -90,8 +90,9 @@
   position: absolute;
   top: -8px;
   right: -8px;
-  background: #3a3a30;
-  color: #faf8f4;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
   font-family: var(--font-mono);
   font-size: 0.52rem;
   font-weight: 600;
@@ -112,7 +113,7 @@
 }
 
 .highlighted {
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--shadow-md);
   transform: scale(1.02);
   z-index: 3;
 }
@@ -122,7 +123,7 @@
 }
 
 .selected {
-  box-shadow: 0 3px 18px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-lg);
   transform: scale(1.04);
   z-index: 4;
 }
@@ -181,8 +182,8 @@
   position: absolute;
   top: -5px;
   right: -5px;
-  background: #4263eb;
-  color: #fff;
+  background: var(--mono-cat-2);
+  color: var(--color-primary-text);
   font-family: var(--font-mono);
   font-size: 0.48rem;
   font-weight: 700;
@@ -195,7 +196,7 @@
 }
 
 .countBadgeQuestion {
-  background: #e67700;
+  background: var(--mono-cat-5);
 }
 
 /* ── Dragging state (applied by editor) ── */

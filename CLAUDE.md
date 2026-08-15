@@ -403,8 +403,23 @@ The PDF viewer (`PdfViewerPage`) composes multiple sub-components:
 - `PdfSelectionToolbar` — floating toolbar on text selection (highlight / highlight + comment)
 - `PdfCommentPopover` — popover for viewing/editing comments on a highlight
 - `PdfHighlightLayer` — renders highlight rectangles over PDF pages
+- `PdfCropOverlay` — full-page manual crop editor (drag edges, separate odd/even boxes, "Auto-detect")
 
 Viewer preferences (zoom, fit-width, current page) are saved per-attachment to `viewerPrefsStorage` with a 1 s debounce and immediately on `beforeunload`.
+
+### Page Trimming
+
+The toolbar's crop button opens a **Trim view** menu modelled on Okular's `View → Trim View`: automatic and manual trimming are alternatives, never both.
+
+The mode lives in `TrimMode` (`src/types/crop.ts`) and is persisted per attachment in the `trim_mode` column.
+
+- **Trim margins** (`uniform`, the automatic default) — `useAutoTrim` measures 24 pages spread through the document, once, then applies a single box to every page. `unifyCrops()` keeps a per-parity left/right (books alternate their gutter) but equalises the trimmed dimensions, so every page renders at exactly the same size and nothing shifts while scrolling. Per side it takes the smallest margin among the *typical* pages (`typicalMin` discards anything under half the median), so a few full-bleed or decorative pages can't drag the crop back open, while no ordinary page gets clipped.
+- **Trim margins (per page)** (`page`) — Okular's literal behaviour: each page trimmed to its own content box, measured lazily around the reading position. Best for scans whose content wanders; pages then differ in size.
+- **Manual crop** (`off` + `crop_*` columns) — the `PdfCropOverlay` odd/even `CropBox`es. Retained while automatic trimming is on, so switching it off restores them.
+
+Detection lives in `src/utils/autoTrim.ts`: the page is rendered small, background luminance is estimated from the border ring, and the ink bounding box is taken with an erosion + row/column ink gate so margin specks on scans don't defeat it. Pages that measure untrustworthy (blank, a lone page number) are skipped rather than trusted. Measured boxes are in-memory only.
+
+All modes feed `PdfDocumentView` through one `cropForPage(pageNumber)` resolver, which drives both page layout (`buildLayoutModel`) and rendering. Fit-width always uses the document-wide box so zoom can't jitter. Export applies the same resolver — in `uniform` mode it needs only the 24-page sample, in `page` mode it measures every page first (with a % readout in the toolbar).
 
 ---
 

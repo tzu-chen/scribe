@@ -92,8 +92,8 @@
 }
 
 .deleteBtn:hover {
-  background: var(--color-danger);
-  color: #fff;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }
 
 .empty {

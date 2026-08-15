@@ -32,16 +32,19 @@ export const DEFAULT_LAYOUT_CONSTANTS: LayoutConstants = {
   marginPx: 8,
 };
 
+/** Resolves the crop applied to a given 1-indexed page. Manual cropping keys it
+ *  on page parity; auto-trim measures each page individually. */
+export type CropForPage = (pageIndex: number) => CropBox | undefined;
+
 function pageEffectiveHeight(
   pageIndex: number,
   pageDimensions: { width: number; height: number }[],
   scale: number,
-  crop: CropBox | undefined,
-  cropEven: CropBox | undefined,
+  cropForPage: CropForPage | undefined,
 ): number {
   const dim = pageDimensions[pageIndex - 1];
   if (!dim) return 0;
-  const cropBox = pageIndex % 2 === 1 ? crop : (cropEven ?? crop);
+  const cropBox = cropForPage?.(pageIndex);
   const cropT = cropBox?.top ?? 0;
   const cropB = cropBox?.bottom ?? 0;
   const factor = Math.max(0, 1 - cropT - cropB);
@@ -57,8 +60,7 @@ export function buildLayoutModel(
   pageDimensions: { width: number; height: number }[],
   scale: number,
   twoPageView: boolean,
-  crop?: CropBox,
-  cropEven?: CropBox,
+  cropForPage?: CropForPage,
 ): LayoutModel {
   const numPages = pageDimensions.length;
   const pageTops = new Array<number>(numPages + 1).fill(0);
@@ -68,7 +70,7 @@ export function buildLayoutModel(
     return { pageTops, marginsBeforePage, numPages };
   }
 
-  const heightAt = (i: number) => pageEffectiveHeight(i, pageDimensions, scale, crop, cropEven);
+  const heightAt = (i: number) => pageEffectiveHeight(i, pageDimensions, scale, cropForPage);
 
   if (!twoPageView || numPages === 1) {
     let acc = 0;

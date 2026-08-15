@@ -64,6 +64,6 @@
 }
 
 .closeButton:hover {
-  background: var(--color-danger-light, rgba(255, 0, 0, 0.1));
-  color: var(--color-danger, #d00);
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }

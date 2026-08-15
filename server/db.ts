@@ -107,6 +107,7 @@ db.exec(`
     crop_right_even REAL NOT NULL DEFAULT 0,
     crop_bottom_even REAL NOT NULL DEFAULT 0,
     crop_left_even REAL NOT NULL DEFAULT 0,
+    trim_mode TEXT NOT NULL DEFAULT 'off',
     updated_at TEXT NOT NULL
   );
 
@@ -247,6 +248,12 @@ if (!vpColumnsAfter.some(c => c.name === 'crop_top_even')) {
 const vpColumnsForToc = db.prepare("PRAGMA table_info(viewer_prefs)").all() as Array<{ name: string }>;
 if (!vpColumnsForToc.some(c => c.name === 'show_toc')) {
   db.exec('ALTER TABLE viewer_prefs ADD COLUMN show_toc INTEGER NOT NULL DEFAULT 0');
+}
+
+// Migration: add trim_mode column to viewer_prefs if missing ('off' | 'uniform' | 'page')
+const vpColumnsForTrim = db.prepare("PRAGMA table_info(viewer_prefs)").all() as Array<{ name: string }>;
+if (!vpColumnsForTrim.some(c => c.name === 'trim_mode')) {
+  db.exec("ALTER TABLE viewer_prefs ADD COLUMN trim_mode TEXT NOT NULL DEFAULT 'off'");
 }
 
 // Migration: add folder_id column to attachments if missing

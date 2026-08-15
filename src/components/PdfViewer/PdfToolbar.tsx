@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, FitWidthIcon, TwoPageIcon, CropIcon, DownloadIcon, OrientationLockIcon, FlowchartIcon } from '../Icons/Icons';
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu';
 import { stripExtension } from '../../utils/filename';
+import type { TrimMode } from '../../types/crop';
 import type { NodeAttachmentLink } from '../../types/attachment';
 import styles from './PdfToolbar.module.css';
 
@@ -23,10 +25,17 @@ interface Props {
   onFitWidthToggle: () => void;
   onTwoPageViewToggle: () => void;
   immersiveMode?: boolean;
-  cropActive?: boolean;
-  onCropToggle?: () => void;
+  /** Active automatic trimming mode. */
+  trimMode?: TrimMode;
+  /** A manual crop box is set (whether or not auto-trim overrides it). */
+  manualCropActive?: boolean;
+  onTrimModeSelect?: (mode: TrimMode) => void;
+  onManualCrop?: () => void;
+  onCropReset?: () => void;
   onExportCropped?: () => void;
   exportingCropped?: boolean;
+  /** 0-1 while an export is measuring pages for auto-trim. */
+  exportProgress?: number | null;
   orientationLocked?: boolean;
   onOrientationLockToggle?: () => void;
   fileType?: 'pdf' | 'djvu';
@@ -46,10 +55,14 @@ export function PdfToolbar({
   onFitWidthToggle,
   onTwoPageViewToggle,
   immersiveMode,
-  cropActive,
-  onCropToggle,
+  trimMode = 'off',
+  manualCropActive,
+  onTrimModeSelect,
+  onManualCrop,
+  onCropReset,
   onExportCropped,
   exportingCropped,
+  exportProgress,
   orientationLocked,
   onOrientationLockToggle,
   fileType,
@@ -61,6 +74,50 @@ export function PdfToolbar({
   const [editingZoom, setEditingZoom] = useState(false);
   const [zoomInput, setZoomInput] = useState('');
   const zoomInputRef = useRef<HTMLInputElement>(null);
+
+  // Trim menu, modelled on Okular's View → Trim View submenu: automatic margin
+  // trimming and the manual crop are alternatives, picked from one menu.
+  const [trimMenu, setTrimMenu] = useState<{ x: number; y: number } | null>(null);
+  const cropBtnRef = useRef<HTMLButtonElement>(null);
+
+  const autoTrim = trimMode !== 'off';
+  const cropActive = autoTrim || !!manualCropActive;
+
+  const trimMenuItems: ContextMenuItem[] = [
+    {
+      label: 'Trim margins',
+      checked: trimMode === 'uniform',
+      onClick: () => onTrimModeSelect?.('uniform'),
+    },
+    {
+      label: 'Trim margins (per page)',
+      checked: trimMode === 'page',
+      onClick: () => onTrimModeSelect?.('page'),
+    },
+    ...(fileType === 'djvu' ? [] : [{
+      label: 'Manual crop…',
+      checked: !autoTrim && !!manualCropActive,
+      onClick: () => onManualCrop?.(),
+    }]),
+    ...(cropActive ? [{
+      label: 'No trim',
+      checked: false,
+      onClick: () => onCropReset?.(),
+    }] : []),
+  ];
+
+  // Opened on click, not mousedown: ContextMenu registers its dismiss listener
+  // on document *during* the opening event, so a mousedown would still be
+  // bubbling up to it and would close the menu again on the way.
+  const closedAtRef = useRef(0);
+  const openTrimMenu = () => {
+    // A click on the button while the menu is open already dismissed it via
+    // that same gesture's mousedown; don't bounce it back open.
+    if (Date.now() - closedAtRef.current < 250) return;
+    const rect = cropBtnRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTrimMenu({ x: rect.left, y: rect.bottom + 4 });
+  };
 
   useEffect(() => {
     if (editingPage) {
@@ -199,12 +256,28 @@ export function PdfToolbar({
           <TwoPageIcon size={16} />
         </button>
         <button
+          ref={cropBtnRef}
           className={`${styles.iconBtn} ${cropActive ? styles.iconBtnActive : ''}`}
-          onClick={onCropToggle}
-          title={cropActive ? 'Edit crop (crop is active)' : 'Crop pages'}
+          onClick={openTrimMenu}
+          title={
+            trimMode === 'uniform' ? 'Trim view (margins trimmed)'
+              : trimMode === 'page' ? 'Trim view (margins trimmed per page)'
+                : cropActive ? 'Trim view (crop is active)' : 'Trim view'
+          }
         >
           <CropIcon size={16} />
         </button>
+        {trimMenu && (
+          <ContextMenu
+            x={trimMenu.x}
+            y={trimMenu.y}
+            items={trimMenuItems}
+            onClose={() => {
+              closedAtRef.current = Date.now();
+              setTrimMenu(null);
+            }}
+          />
+        )}
         {onExportCropped && fileType !== 'djvu' && (
           <button
             className={styles.iconBtn}
@@ -214,6 +287,9 @@ export function PdfToolbar({
           >
             <DownloadIcon size={16} />
           </button>
+        )}
+        {exportingCropped && exportProgress !== null && exportProgress !== undefined && (
+          <span className={styles.exportProgress}>{Math.round(exportProgress * 100)}%</span>
         )}
         {IS_TOUCH && onOrientationLockToggle && (
           <button

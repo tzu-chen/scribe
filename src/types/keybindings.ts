@@ -4,6 +4,7 @@ export type KeybindingAction =
   | 'pdfTwoPageToggle'
   | 'pdfPanelToggle'
   | 'pdfImmersiveToggle'
+  | 'pdfAutoTrimToggle'
   | 'goToLibrary';
 
 export interface KeybindingMeta {
@@ -19,6 +20,7 @@ export const KEYBINDING_META: KeybindingMeta[] = [
   { action: 'pdfTwoPageToggle', label: 'Toggle two-page view', scope: 'PDF viewer', defaultKey: 'd' },
   { action: 'pdfPanelToggle', label: 'Toggle right panel', scope: 'PDF viewer', defaultKey: 'p' },
   { action: 'pdfImmersiveToggle', label: 'Toggle fullscreen', scope: 'PDF viewer', defaultKey: 'f' },
+  { action: 'pdfAutoTrimToggle', label: 'Toggle auto-trim margins', scope: 'PDF viewer', defaultKey: 'c' },
   { action: 'goToLibrary', label: 'Go to Library', scope: 'Global', defaultKey: 'l' },
 ];
 

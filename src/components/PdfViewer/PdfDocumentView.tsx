@@ -7,6 +7,7 @@ import {
   buildLayoutModel,
   positionToScrollTop,
   scrollTopToPosition,
+  type CropForPage,
   type LayoutConstants,
   type ViewerPosition,
 } from './positionMath';
@@ -20,8 +21,9 @@ interface Props {
   pageHeight: number;
   pageDimensions: { width: number; height: number }[];
   highlights?: PdfHighlight[];
-  crop?: CropBox;
-  cropEven?: CropBox;
+  /** Crop applied to each page. Must be referentially stable: its identity is
+   *  what tells the layout model the page geometry changed. */
+  cropForPage?: CropForPage;
   twoPageView: boolean;
   onTextSelected?: (selection: TextSelection) => void;
   onSelectionCleared?: () => void;
@@ -57,7 +59,7 @@ const DEFAULT_CONSTANTS: LayoutConstants = { paddingTopPx: 16, marginPx: 8 };
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, crop, cropEven, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, restorePosition, onPositionChange, onContainerResize, renderVisiblePage },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, cropForPage, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, restorePosition, onPositionChange, onContainerResize, renderVisiblePage },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -71,8 +73,8 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
     // Rebuilt on scale changes too: the model stores per-page floored heights
     // in scaled pixels so it matches the DOM exactly (an O(numPages) pass).
     const layoutModel = useMemo(
-      () => buildLayoutModel(pageDimensions, scale, twoPageView, crop, cropEven),
-      [pageDimensions, scale, twoPageView, crop, cropEven],
+      () => buildLayoutModel(pageDimensions, scale, twoPageView, cropForPage),
+      [pageDimensions, scale, twoPageView, cropForPage],
     );
 
     // CSS-driven layout constants. Read from computed style so mobile (padding:0)
@@ -322,14 +324,9 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
       [pageDimensions, pageWidth, pageHeight],
     );
 
-    const cropForPage = (pageNum: number): CropBox | undefined => {
-      const c = pageNum % 2 === 1 ? crop : (cropEven ?? crop);
-      return c;
-    };
-
     const renderPageContent = (pageNum: number) => {
       const dims = getPageDims(pageNum);
-      const pageCrop = cropForPage(pageNum);
+      const pageCrop = cropForPage?.(pageNum);
       if (isPageVisible(pageNum)) {
         if (renderVisiblePage) {
           return renderVisiblePage(pageNum, dims, scale, pageCrop, navigationPendingRef.current);

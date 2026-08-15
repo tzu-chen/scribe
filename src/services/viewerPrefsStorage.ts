@@ -1,4 +1,5 @@
 import type { ViewerPosition } from '../components/PdfViewer/positionMath';
+import type { TrimMode } from '../types/crop';
 
 export type { ViewerPosition };
 
@@ -16,6 +17,8 @@ export interface ViewerPrefs {
   cropRightEven?: number;
   cropBottomEven?: number;
   cropLeftEven?: number;
+  /** Automatic margin trimming. Overrides the manual crop unless 'off'. */
+  trimMode?: TrimMode;
 }
 
 const STORAGE_KEY = 'scribe_viewer_prefs';
@@ -60,6 +63,7 @@ function normalizePrefs(raw: ViewerPrefs & { currentPage?: number; scrollOffsetT
     cropRightEven: raw.cropRightEven ?? oddR,
     cropBottomEven: raw.cropBottomEven ?? oddB,
     cropLeftEven: raw.cropLeftEven ?? oddL,
+    trimMode: raw.trimMode ?? 'off',
   };
 }
 
@@ -85,6 +89,7 @@ function toWireBody(prefs: ViewerPrefs) {
     cropRightEven: prefs.cropRightEven ?? oddR,
     cropBottomEven: prefs.cropBottomEven ?? oddB,
     cropLeftEven: prefs.cropLeftEven ?? oddL,
+    trimMode: prefs.trimMode ?? 'off',
   };
 }
 

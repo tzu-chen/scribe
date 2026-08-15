@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { CropBox } from '../../types/crop';
 import { hasCrop } from '../../types/crop';
+import { createTrimCanvas, detectPdfPageCrop } from '../../utils/autoTrim';
 import styles from './PdfCropOverlay.module.css';
 
 interface Props {
@@ -149,6 +150,22 @@ export function PdfCropOverlay({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
+  // Seed the manual box from the same detector auto-trim uses, measured on the
+  // page currently shown. Gives a starting point to nudge instead of dragging
+  // all four edges from scratch.
+  const [detecting, setDetecting] = useState(false);
+  const handleAutoDetect = useCallback(async () => {
+    setDetecting(true);
+    try {
+      const detected = await detectPdfPageCrop(pdfDoc, samplePage, createTrimCanvas());
+      if (detected) setCrop(detected);
+    } catch (err) {
+      console.error('Auto-detect failed:', err);
+    } finally {
+      setDetecting(false);
+    }
+  }, [pdfDoc, samplePage, setCrop]);
+
   const handleApplyToAll = () => {
     // Copy the currently-edited parity's crop to both sides.
     onApply(crop, crop);
@@ -250,6 +267,14 @@ export function PdfCropOverlay({
         </div>
 
         <div className={styles.controls}>
+          <button
+            className={styles.detectBtn}
+            onClick={handleAutoDetect}
+            disabled={detecting}
+            title={`Detect the margins of page ${samplePage}`}
+          >
+            {detecting ? 'Detecting…' : 'Auto-detect'}
+          </button>
           <button className={styles.applyBtn} onClick={handleApply}>
             Apply
           </button>

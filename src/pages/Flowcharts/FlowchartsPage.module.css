@@ -71,15 +71,15 @@
 }
 
 .newButton {
-  background: var(--color-primary);
+  background: var(--color-primary-light);
   border-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-primary);
 }
 
 .newButton:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-wash);
   border-color: var(--color-primary-hover);
-  color: #fff;
+  color: var(--color-primary-hover);
 }
 
 /* ── Template picker (New Flowchart modal) ── */
@@ -370,7 +370,7 @@
   line-height: 1.5;
   letter-spacing: 0.2px;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .tagChipRemove {
@@ -400,8 +400,8 @@
 }
 
 .tagChipRemove:hover {
-  background: var(--color-danger);
-  color: #fff;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }
 
 /* ── List (table) view ── */
@@ -536,7 +536,7 @@
 }
 
 .tagPickerChipSelected {
-  color: #fff;
+  color: var(--color-on-solid);
 }
 
 .tagPickerDot {
@@ -604,8 +604,8 @@
 }
 
 .editButton:hover {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-primary-wash);
+  color: var(--color-primary);
 }
 
 .viewBody {
@@ -821,7 +821,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--color-scrim);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
@@ -914,7 +914,7 @@
 .modalInput:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(66, 99, 235, 0.15);
+  box-shadow: 0 0 0 2px var(--color-primary-wash);
 }
 
 .modalTextarea {

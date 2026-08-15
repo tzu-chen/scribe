@@ -6,7 +6,8 @@ import type { NodeAttachmentLink } from '../../types/attachment';
 import { usePdfAnnotations } from '../../hooks/usePdfAnnotations';
 import { useCustomOutline } from '../../hooks/useCustomOutline';
 import { useNotes } from '../../hooks/useNotes';
-import type { CropBox } from '../../types/crop';
+import { useAutoTrim } from '../../hooks/useAutoTrim';
+import type { CropBox, TrimMode } from '../../types/crop';
 import { NO_CROP, hasCrop } from '../../types/crop';
 import { ExpandIcon, CollapseIcon, SidebarLeftIcon, SidebarRightIcon } from '../../components/Icons/Icons';
 import { PdfToolbar } from '../../components/PdfViewer/PdfToolbar';
@@ -94,8 +95,10 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     left: savedPrefs?.cropLeftEven ?? savedPrefs?.cropLeft ?? 0,
   });
   const [cropMode, setCropMode] = useState(false);
+  const [trimMode, setTrimMode] = useState<TrimMode>(savedPrefs?.trimMode ?? 'off');
   const [lockedOrientation, setLockedOrientation] = useState<'portrait' | 'landscape' | null>(null);
   const [exportingCropped, setExportingCropped] = useState(false);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [actualOrientation, setActualOrientation] = useState<'portrait' | 'landscape'>(
     () => (typeof window !== 'undefined' && window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
   );
@@ -210,6 +213,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         bottom: serverPrefs.cropBottomEven ?? serverPrefs.cropBottom ?? 0,
         left: serverPrefs.cropLeftEven ?? serverPrefs.cropLeft ?? 0,
       });
+      setTrimMode(serverPrefs.trimMode ?? 'off');
       positionRef.current = serverPrefs.position;
       // New object reference triggers PdfDocumentView's one-shot restore effect.
       setRestorePosition({ ...serverPrefs.position });
@@ -246,7 +250,8 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     cropRightEven: cropEven.right,
     cropBottomEven: cropEven.bottom,
     cropLeftEven: cropEven.left,
-  }), [zoom, fitWidth, twoPageView, showToc, crop, cropEven]);
+    trimMode,
+  }), [zoom, fitWidth, twoPageView, showToc, crop, cropEven, trimMode]);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const scheduleSaveRef = useRef<(() => void) | null>(null);
@@ -354,8 +359,39 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     setTwoPageView(prev => !prev);
   }, []);
 
-  const handleCropModeToggle = useCallback(() => {
-    setCropMode(prev => !prev);
+  // Automatic trimming (Okular's "Trim Margins"), either one measured box for
+  // the whole document or each page's own. The manual crop stays stored while
+  // it's on, so turning trimming off restores whatever the user had dragged.
+  const trim = useAutoTrim({
+    mode: trimMode,
+    pdfDoc: isDjvu ? undefined : (pdfDoc ?? undefined),
+    djvuDoc: isDjvu ? (djvuDoc ?? undefined) : undefined,
+    numPages,
+    currentPage,
+  });
+
+  const manualCropForPage = useCallback((page: number): CropBox | undefined => {
+    const box = page % 2 === 1 ? crop : cropEven;
+    return hasCrop(box) ? box : undefined;
+  }, [crop, cropEven]);
+
+  const cropForPage = trimMode === 'off' ? manualCropForPage : trim.cropForPage;
+
+  // Selecting the active mode again switches trimming off, the way a checkable
+  // menu item behaves.
+  const handleTrimModeSelect = useCallback((next: TrimMode) => {
+    setTrimMode(prev => (prev === next ? 'off' : next));
+  }, []);
+
+  const handleAutoTrimToggle = useCallback(() => {
+    setTrimMode(prev => (prev === 'off' ? 'uniform' : 'off'));
+  }, []);
+
+  const handleManualCrop = useCallback(() => {
+    // Manual and automatic trimming are alternatives; opening the manual
+    // editor takes over.
+    setTrimMode('off');
+    setCropMode(true);
   }, []);
 
   const handleCropApply = useCallback((newCropOdd: CropBox, newCropEven: CropBox) => {
@@ -367,6 +403,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   const handleCropReset = useCallback(() => {
     setCrop(NO_CROP);
     setCropEven(NO_CROP);
+    setTrimMode('off');
     setCropMode(false);
   }, []);
 
@@ -378,14 +415,28 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     if (!doc.blob || isDjvu || exportingCropped) return;
     setExportingCropped(true);
     try {
-      await exportCroppedPdf(doc.blob, filename || 'document.pdf', crop, cropEven);
+      let resolve = manualCropForPage;
+      if (trimMode !== 'off') {
+        // Every page needs a box, not just the ones scrolled past.
+        setExportProgress(0);
+        let lastPct = -1;
+        const boxes = await trim.measureAll((done, total) => {
+          const pct = Math.floor((done / total) * 100);
+          if (pct === lastPct) return;
+          lastPct = pct;
+          setExportProgress(done / total);
+        });
+        resolve = (page: number) => boxes.get(page);
+      }
+      await exportCroppedPdf(doc.blob, filename || 'document.pdf', resolve);
     } catch (err) {
       console.error('Failed to export cropped PDF:', err);
       alert('Failed to export PDF. See console for details.');
     } finally {
       setExportingCropped(false);
+      setExportProgress(null);
     }
-  }, [doc.blob, isDjvu, exportingCropped, filename, crop, cropEven]);
+  }, [doc.blob, isDjvu, exportingCropped, filename, trimMode, trim, manualCropForPage]);
 
   const handleTocToggle = useCallback(() => {
     setShowToc(prev => !prev);
@@ -403,6 +454,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
   useKeyboardShortcut('pdfTwoPageToggle', handleTwoPageViewToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfPanelToggle', handleRightPanelToggle, shortcutsEnabled);
   useKeyboardShortcut('pdfImmersiveToggle', handleImmersiveToggle, shortcutsEnabled);
+  useKeyboardShortcut('pdfAutoTrimToggle', handleAutoTrimToggle, shortcutsEnabled);
 
   // Browser-style back/forward history for in-PDF jumps (TOC clicks, page
   // input, prev/next, right-panel jumps). Manual scrolling does not push
@@ -583,9 +635,14 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
 
   const availableWidth = pdfContainerWidth;
   const currentPageWidth = fitWidth ? fitWidthRefPageWidth.current : pageWidth;
+  // Fit-width uses the document-wide estimate rather than the current page's
+  // own box: a per-page width would re-derive the zoom level on every page and
+  // make the view jitter as the reader scrolls.
+  const horizCropOdd = trimMode === 'off' ? crop : trim.uniform.odd;
+  const horizCropEven = trimMode === 'off' ? cropEven : trim.uniform.even;
   const minHorizCropFactor = Math.min(
-    1 - crop.left - crop.right,
-    1 - cropEven.left - cropEven.right,
+    1 - horizCropOdd.left - horizCropOdd.right,
+    1 - horizCropEven.left - horizCropEven.right,
   );
   const croppedPageWidth = currentPageWidth * minHorizCropFactor;
   const fitWidthPageSpan = twoPageView ? croppedPageWidth * 2 + 8 : croppedPageWidth;
@@ -637,10 +694,14 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
         onFitWidthToggle={handleFitWidthToggle}
         onTwoPageViewToggle={handleTwoPageViewToggle}
         immersiveMode={immersiveMode}
-        cropActive={hasCrop(crop) || hasCrop(cropEven)}
-        onCropToggle={handleCropModeToggle}
+        trimMode={trimMode}
+        manualCropActive={hasCrop(crop) || hasCrop(cropEven)}
+        onTrimModeSelect={handleTrimModeSelect}
+        onManualCrop={handleManualCrop}
+        onCropReset={handleCropReset}
         onExportCropped={isDjvu ? undefined : handleExportCropped}
         exportingCropped={exportingCropped}
+        exportProgress={exportProgress}
         orientationLocked={lockedOrientation !== null}
         onOrientationLockToggle={handleOrientationLockToggle}
         fileType={isDjvu ? 'djvu' : 'pdf'}
@@ -669,8 +730,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
           pageHeight={pageHeight}
           pageDimensions={pageDimensions}
           highlights={isDjvu ? undefined : annotations.highlights}
-          crop={hasCrop(crop) ? crop : undefined}
-          cropEven={hasCrop(cropEven) ? cropEven : undefined}
+          cropForPage={cropForPage}
           twoPageView={twoPageView}
           onTextSelected={isDjvu ? undefined : handleTextSelected}
           onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}

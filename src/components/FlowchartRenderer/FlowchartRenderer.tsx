@@ -128,7 +128,7 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
             markerHeight={5.5}
             orient="auto"
           >
-            <polygon points="0 0.5,9 3.5,0 6.5" fill={isDark ? '#888880' : '#a0a090'} />
+            <polygon points="0 0.5,9 3.5,0 6.5" fill={isDark ? '#8b929c' : '#9e9588'} />
           </marker>
           <marker
             id={`${markerId}-hi`}
@@ -139,7 +139,7 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
             markerHeight={5.5}
             orient="auto"
           >
-            <polygon points="0 0.5,9 3.5,0 6.5" fill={isDark ? '#c0c0b8' : '#4a4a40'} />
+            <polygon points="0 0.5,9 3.5,0 6.5" fill={isDark ? '#c2c7cf' : '#6b6358'} />
           </marker>
           <marker
             id={`${markerId}-dim`}
@@ -150,7 +150,7 @@ export function FlowchartRenderer({ spec, onNodeSelect, onNodeDeselect, onNodeMo
             markerHeight={5.5}
             orient="auto"
           >
-            <polygon points="0 0.5,9 3.5,0 6.5" fill={isDark ? '#555550' : '#c8c0b0'} />
+            <polygon points="0 0.5,9 3.5,0 6.5" fill={isDark ? '#3a3f48' : '#cdc6b8'} />
           </marker>
         </defs>
       </svg>

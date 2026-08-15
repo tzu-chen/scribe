@@ -84,8 +84,8 @@
 }
 
 .toolBtnDanger:hover:not(:disabled) {
-  background: var(--color-danger);
-  color: #fff;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
   border-color: var(--color-danger);
 }
 
@@ -158,7 +158,7 @@
 .confirmOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-scrim);
   display: flex;
   align-items: center;
   justify-content: center;

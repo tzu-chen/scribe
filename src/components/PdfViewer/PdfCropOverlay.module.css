@@ -6,7 +6,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--color-scrim-strong);
 }
 
 .content {
@@ -19,7 +19,7 @@
 
 .pageContainer {
   position: relative;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   user-select: none;
   touch-action: none;
   overflow: hidden;
@@ -39,7 +39,7 @@
 .dimLeft,
 .dimRight {
   position: absolute;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-scrim);
   pointer-events: none;
 }
 
@@ -68,7 +68,7 @@
   position: absolute;
   border: 2px dashed var(--color-primary);
   pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 1px var(--mono-on-dark-line);
 }
 
 /* Edge handles — large hit targets for easy dragging */
@@ -114,7 +114,7 @@
   position: absolute;
   background: var(--color-primary);
   border-radius: 3px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
 }
 
 .handleTop .handleBar,
@@ -154,7 +154,7 @@
 
 .applyAllBtn {
   background: transparent;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--mono-on-dark);
   border: 1px solid var(--color-primary);
 }
 
@@ -174,14 +174,15 @@
   padding: 6px 16px;
   border-radius: var(--radius-md);
   background: transparent;
-  color: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--mono-on-dark-muted);
+  border: 1px solid var(--mono-on-dark-line);
   white-space: nowrap;
   cursor: pointer;
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--mono-on-dark-muted);
+  color: var(--mono-on-dark);
 }
 
 .tabActive,
@@ -191,24 +192,32 @@
   border-color: var(--color-primary);
 }
 
+.detectBtn,
 .resetBtn,
 .cancelBtn {
   font-size: 0.85rem;
   padding: 8px 16px;
   border-radius: var(--radius-md);
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--mono-on-dark);
+  border: 1px solid var(--mono-on-dark-line);
   background: transparent;
   white-space: nowrap;
 }
 
+.detectBtn:hover,
 .resetBtn:hover,
 .cancelBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--mono-on-dark-muted);
+  color: var(--mono-on-dark);
+}
+
+.detectBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .hint {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--mono-on-dark-muted);
   text-align: center;
 }

@@ -11,11 +11,13 @@ const AUTO_STORAGE_KEY = 'scribe_theme_auto';
 /** Map old stored values to the current light/dark scheme IDs. */
 const LEGACY_MAP: Record<string, string> = {
   default: DEFAULT_LIGHT_SCHEME_ID,
+  light: DEFAULT_LIGHT_SCHEME_ID,
   'default-light': DEFAULT_LIGHT_SCHEME_ID,
   'solarized-light': DEFAULT_LIGHT_SCHEME_ID,
   'gruvbox-light': DEFAULT_LIGHT_SCHEME_ID,
   'github-light': DEFAULT_LIGHT_SCHEME_ID,
   'catppuccin-latte': DEFAULT_LIGHT_SCHEME_ID,
+  dark: DEFAULT_DARK_SCHEME_ID,
   'default-dark': DEFAULT_DARK_SCHEME_ID,
   'solarized-dark': DEFAULT_DARK_SCHEME_ID,
   nord: DEFAULT_DARK_SCHEME_ID,
