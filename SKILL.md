@@ -9,6 +9,8 @@ Create polished, interactive dependency flowcharts as **FlowchartSpec JSON**. Th
 
 **Your job is to produce the data — nodes, edges, positions, colors, and arrow routing. The renderer handles everything else.**
 
+> Scribe also has a built-in **visual editor** (the "Edit" button on any flowchart, or "New Flowchart" → a template). It reads and writes this exact `FlowchartSpec` schema, so your JSON round-trips losslessly: the user can paste it via the editor's **JSON** drawer or the "Import JSON" button, then refine layout, stages, and colours by hand. Arrow routing is also recomputed automatically in the editor, so rough control points are fine — but still aim for clean routing in your output.
+
 ## When to Use
 
 - Study roadmaps and learning paths
