@@ -13,6 +13,8 @@ import flowchartTagsRouter from './routes/flowchartTags.ts';
 import outlinesRouter from './routes/outlines.ts';
 import flowchartsRouter from './routes/flowcharts.ts';
 import questionsRouter from './routes/questions.ts';
+import sourcesRouter from './routes/sources.ts';
+import { startSources } from './lib/sources.ts';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
@@ -51,6 +53,7 @@ app.use('/api/flowchart-tags', flowchartTagsRouter);
 app.use('/api/outlines', outlinesRouter);
 app.use('/api/flowcharts', flowchartsRouter);
 app.use('/api/questions', questionsRouter);
+app.use('/api/sources', sourcesRouter);
 
 // --- Static Frontend (production) ---
 if (fs.existsSync(DIST_DIR)) {
@@ -64,4 +67,6 @@ if (fs.existsSync(DIST_DIR)) {
 
 app.listen(PORT, HOST, () => {
   console.log(`Server running on http://${HOST}:${PORT}`);
+  // Catch up with linked folders changed while the server was down, then watch them.
+  void startSources();
 });

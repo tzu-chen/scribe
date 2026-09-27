@@ -4,6 +4,12 @@ import { enrichAttachment, needsEnrichment } from '../../services/attachmentEnri
 import { attachmentStorage } from '../../services/attachmentStorage';
 import { byLastOpenedDesc } from './libraryModel';
 
+/**
+ * One attempt per file version: a linked file rewritten on disk comes back
+ * un-enriched with a new modification time, and must be retried.
+ */
+const attemptKey = (b: AttachmentMeta) => `${b.id}@${b.fileModifiedAt ?? ''}`;
+
 export interface EnrichmentProgress {
   /** Items still waiting (including the one in flight). */
   pending: number;
@@ -24,7 +30,7 @@ export function useLibraryEnrichment(
   const [progress, setProgress] = useState<EnrichmentProgress>({ pending: 0, total: 0, active: false });
   const runningRef = useRef(false);
   const cancelledRef = useRef(false);
-  // Ids we already attempted this session (success or failure) — never retry in-session.
+  // File versions we already attempted this session (success or failure) — never retry in-session.
   const attemptedRef = useRef<Set<string>>(new Set());
   const onUpdatedRef = useRef(onUpdated);
   onUpdatedRef.current = onUpdated;
@@ -41,7 +47,7 @@ export function useLibraryEnrichment(
   useEffect(() => {
     if (runningRef.current) return;
     const nextQueue = () =>
-      booksRef.current.filter(b => needsEnrichment(b) && !attemptedRef.current.has(b.id)).sort(byLastOpenedDesc);
+      booksRef.current.filter(b => needsEnrichment(b) && !b.missing && !attemptedRef.current.has(attemptKey(b))).sort(byLastOpenedDesc);
     if (nextQueue().length === 0) return;
 
     runningRef.current = true;
@@ -59,7 +65,7 @@ export function useLibraryEnrichment(
           if (cancelledRef.current) break;
           // Re-read the latest record: the viewer may have enriched it meanwhile.
           const current = booksRef.current.find(b => b.id === initial.id) ?? initial;
-          attemptedRef.current.add(current.id);
+          attemptedRef.current.add(attemptKey(current));
           if (needsEnrichment(current)) {
             try {
               const updated = await enrichAttachment(current);

@@ -48,6 +48,14 @@ export interface AttachmentMeta {
   hasThumbnail?: boolean;
   /** Set once the client has parsed the file (page count, metadata, thumbnail). */
   enrichedAt?: string;
+  /** Linked folder this item lives in (see Source); undefined for uploads. */
+  sourceId?: string;
+  /** Path inside the linked folder, '/'-separated. */
+  relPath?: string;
+  /** Last modification of a linked file on disk. */
+  fileModifiedAt?: string;
+  /** A linked file that has disappeared from disk; kept so its annotations survive. */
+  missing?: boolean;
 }
 
 export interface Attachment extends AttachmentMeta {

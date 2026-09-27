@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, ATTACHMENTS_DIR, THUMBNAILS_DIR } from '../db.ts';
 import { guessKind, isAttachmentKind, type AttachmentKind } from '../lib/kindGuess.ts';
+import { attachmentFilePath, removeLinkedAttachment } from '../lib/sources.ts';
 
 const router = Router();
 
@@ -45,6 +46,11 @@ interface AttachmentRow {
   status: string | null;
   thumbnail_path: string | null;
   enriched_at: string | null;
+  /** Linked-folder items (see server/lib/sources.ts); null for uploads. */
+  source_id: string | null;
+  rel_path: string | null;
+  mtime_ms: number | null;
+  missing_at: string | null;
   /** From the LEFT JOIN on viewer_prefs; absent on rows fetched without it. */
   current_page?: number | null;
 }
@@ -153,6 +159,10 @@ function rowToMeta(
     currentPage: row.current_page ?? undefined,
     hasThumbnail: !!row.thumbnail_path,
     enrichedAt: row.enriched_at ?? undefined,
+    sourceId: row.source_id ?? undefined,
+    relPath: row.rel_path ?? undefined,
+    fileModifiedAt: row.mtime_ms ? new Date(row.mtime_ms).toISOString() : undefined,
+    missing: !!row.missing_at,
   };
 }
 
@@ -291,16 +301,24 @@ router.get('/:id/blob', (req, res) => {
     return;
   }
 
-  const filePath = path.join(ATTACHMENTS_DIR, row.file_path);
-  if (!fs.existsSync(filePath)) {
+  // Size comes from the file, not the row: linked files change under us, and
+  // a stale Content-Length makes PDF.js reject the response.
+  const filePath = attachmentFilePath(row);
+  let size: number;
+  try {
+    if (!filePath) throw new Error('unresolvable');
+    size = fs.statSync(filePath).size;
+  } catch {
     res.status(404).json({ error: 'File not found on disk' });
     return;
   }
 
   res.setHeader('Content-Type', row.type);
-  res.setHeader('Content-Length', row.size);
+  res.setHeader('Content-Length', size);
   res.setHeader('Content-Disposition', contentDisposition(row.filename));
-  fs.createReadStream(filePath).pipe(res);
+  // A linked file can vanish between the stat and the read; without a handler
+  // the stream error would take the whole server down.
+  fs.createReadStream(filePath).on('error', () => res.destroy()).pipe(res);
 });
 
 // GET /api/attachments/:id/thumbnail — first-page JPEG, if enriched
@@ -468,6 +486,11 @@ router.patch('/:id/filename', (req, res) => {
     res.status(400).json({ error: 'filename is required' });
     return;
   }
+  const linked = db.prepare('SELECT source_id FROM attachments WHERE id = ?').get(req.params.id) as { source_id: string | null } | undefined;
+  if (linked?.source_id) {
+    res.status(409).json({ error: 'A linked file is named by the file on disk; set a title instead' });
+    return;
+  }
   db.prepare('UPDATE attachments SET filename = ? WHERE id = ?').run(filename.trim(), req.params.id);
   res.json({ ok: true });
 });
@@ -539,10 +562,18 @@ router.put('/:id/folders', (req, res) => {
 });
 
 // DELETE /api/attachments/:id
+// For a linked item this is "Remove from library": the file on disk is never
+// touched, and is excluded from its folder so the next scan does not re-add it.
 router.delete('/:id', (req, res) => {
-  const row = db.prepare('SELECT file_path, thumbnail_path FROM attachments WHERE id = ?').get(req.params.id) as
-    | { file_path: string; thumbnail_path: string | null }
+  const row = db.prepare('SELECT id, file_path, thumbnail_path, source_id, rel_path FROM attachments WHERE id = ?').get(req.params.id) as
+    | { id: string; file_path: string; thumbnail_path: string | null; source_id: string | null; rel_path: string | null }
     | undefined;
+
+  if (row?.source_id) {
+    removeLinkedAttachment({ ...row, source_id: row.source_id });
+    res.status(204).end();
+    return;
+  }
 
   // Delete from DB (cascading deletes will remove highlights, comments, links)
   db.prepare('DELETE FROM attachments WHERE id = ?').run(req.params.id);

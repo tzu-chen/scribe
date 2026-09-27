@@ -2,18 +2,22 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
 import { folderStorage } from '../../services/folderStorage';
 import { bookTagStorage } from '../../services/bookTagStorage';
+import { sourceStorage } from '../../services/sourceStorage';
 import type { AttachmentMeta } from '../../types/attachment';
 import type { Folder } from '../../types/folder';
 import type { BookTag } from '../../types/bookTag';
+import type { Source } from '../../types/source';
 import { randomCategorical } from '../../palette';
 import type { Selection } from './libraryModel';
 import { sameSelection } from './libraryModel';
+import { LinkFolderDialog } from './LinkFolderDialog';
 import styles from './LibraryPage.module.css';
 
 interface Props {
   books: AttachmentMeta[];
   folders: Folder[];
   tags: BookTag[];
+  sources: Source[];
   selection: Selection;
   selectedCount: number;
   onSelect: (selection: Selection) => void;
@@ -21,6 +25,7 @@ interface Props {
   onApplyTagToSelection: (tag: BookTag) => void;
   onFoldersChanged: () => Promise<void> | void;
   onTagsChanged: () => Promise<void> | void;
+  onSourcesChanged: () => Promise<void> | void;
   onBooksChanged: () => Promise<void> | void;
 }
 
@@ -28,12 +33,14 @@ export function LibrarySidebar({
   books,
   folders,
   tags,
+  sources,
   selection,
   selectedCount,
   onSelect,
   onApplyTagToSelection,
   onFoldersChanged,
   onTagsChanged,
+  onSourcesChanged,
   onBooksChanged,
 }: Props) {
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -53,6 +60,9 @@ export function LibrarySidebar({
 
   const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; folder: Folder } | null>(null);
   const [tagMenu, setTagMenu] = useState<{ x: number; y: number; tag: BookTag } | null>(null);
+  const [sourceMenu, setSourceMenu] = useState<{ x: number; y: number; source: Source } | null>(null);
+  /** Open link/edit dialog: `null` source = link a new folder. */
+  const [sourceDialog, setSourceDialog] = useState<{ source: Source | null } | null>(null);
 
   useEffect(() => { if (creatingFolder) newFolderInputRef.current?.focus(); }, [creatingFolder]);
   useEffect(() => {
@@ -71,6 +81,12 @@ export function LibrarySidebar({
   const tagCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of books) for (const id of b.tags ?? []) m.set(id, (m.get(id) ?? 0) + 1);
+    return m;
+  }, [books]);
+
+  const sourceCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of books) if (b.sourceId) m.set(b.sourceId, (m.get(b.sourceId) ?? 0) + 1);
     return m;
   }, [books]);
 
@@ -154,6 +170,46 @@ export function LibrarySidebar({
     await onTagsChanged();
   }, [tags, onTagsChanged]);
 
+  // --- Linked folders ---
+  const handleRescanSource = useCallback(async (source: Source) => {
+    try {
+      await sourceStorage.scan(source.id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+    await onSourcesChanged();
+    await onBooksChanged();
+  }, [onSourcesChanged, onBooksChanged]);
+
+  const handleRemoveMissing = useCallback(async (source: Source) => {
+    const n = source.missingCount;
+    if (!confirm(`Remove ${n} missing item${n === 1 ? '' : 's'} of "${source.name}" from the library? Their highlights and comments are deleted too.`)) return;
+    await sourceStorage.removeMissing(source.id);
+    await onSourcesChanged();
+    await onBooksChanged();
+  }, [onSourcesChanged, onBooksChanged]);
+
+  const handleUnlinkSource = useCallback(async (source: Source) => {
+    const n = source.itemCount;
+    const lines = [`Unlink "${source.name}"?`];
+    if (n > 0) {
+      lines.push(`Its ${n} item${n === 1 ? '' : 's'} leave the library${source.highlightCount > 0 ? `, along with ${source.highlightCount} highlight${source.highlightCount === 1 ? '' : 's'} on them` : ''}.`);
+    }
+    lines.push('The files on disk are not touched.');
+    if (!confirm(lines.join(' '))) return;
+    await sourceStorage.delete(source.id);
+    if (selection.kind === 'source' && selection.id === source.id) onSelect({ kind: 'all' });
+    await onSourcesChanged();
+    await onBooksChanged();
+  }, [selection, onSelect, onSourcesChanged, onBooksChanged]);
+
+  const sourceTitle = (source: Source): string => {
+    if (source.offline) return `${source.path} — offline: the folder can't be reached, so its items are left as they were`;
+    if (source.error) return `${source.path} — ${source.error}`;
+    if (source.missingCount > 0) return `${source.path} — ${source.missingCount} missing`;
+    return source.path;
+  };
+
   const itemClass = (sel: Selection) =>
     `${styles.sidebarItem} ${sameSelection(selection, sel) ? styles.sidebarItemActive : ''}`;
 
@@ -184,6 +240,7 @@ export function LibrarySidebar({
           e.preventDefault();
           setFolderMenu({ x: e.clientX, y: e.clientY, folder });
           setTagMenu(null);
+          setSourceMenu(null);
         }}
         title={folder.name}
       >
@@ -235,6 +292,38 @@ export function LibrarySidebar({
       )}
 
       <div className={styles.sidebarSectionHeader}>
+        <span className={styles.sidebarSectionLabel}>Linked folders</span>
+      </div>
+      {sources.map(source => {
+        const sel: Selection = { kind: 'source', id: source.id };
+        const flagged = source.offline || !!source.error;
+        return (
+          <button
+            key={source.id}
+            className={`${itemClass(sel)} ${flagged ? styles.sidebarItemArchived : ''}`}
+            onClick={() => onSelect(sel)}
+            onContextMenu={e => {
+              e.preventDefault();
+              setSourceMenu({ x: e.clientX, y: e.clientY, source });
+              setFolderMenu(null);
+              setTagMenu(null);
+            }}
+            title={sourceTitle(source)}
+          >
+            <span className={styles.sidebarItemLabel}>{source.name}</span>
+            {flagged ? (
+              <span className={styles.sidebarWarn} aria-label={source.offline ? 'offline' : 'error'}>{source.offline ? 'offline' : '!'}</span>
+            ) : (
+              <span className={styles.sidebarCount}>{sourceCounts.get(source.id) ?? 0}</span>
+            )}
+          </button>
+        );
+      })}
+      <button className={styles.newFolderBtn} onClick={() => setSourceDialog({ source: null })}>
+        + Link folder…
+      </button>
+
+      <div className={styles.sidebarSectionHeader}>
         <span className={styles.sidebarSectionLabel}>Tags</span>
         {tags.length > 0 && (
           <button
@@ -275,6 +364,7 @@ export function LibrarySidebar({
               e.preventDefault();
               setTagMenu({ x: e.clientX, y: e.clientY, tag });
               setFolderMenu(null);
+              setSourceMenu(null);
             }}
             title={selectedCount > 0 ? `Apply "${tag.name}" to ${selectedCount} selected` : `Filter by ${tag.name}`}
           >
@@ -315,6 +405,34 @@ export function LibrarySidebar({
             { label: 'Delete project', onClick: () => handleDeleteFolder(folderMenu.folder), danger: true },
           ]}
           onClose={() => setFolderMenu(null)}
+        />
+      )}
+      {sourceMenu && (
+        <ContextMenu
+          x={sourceMenu.x}
+          y={sourceMenu.y}
+          items={[
+            { label: 'Rescan', onClick: () => handleRescanSource(sourceMenu.source) },
+            { label: 'Edit…', onClick: () => setSourceDialog({ source: sourceMenu.source }) },
+            ...(sourceMenu.source.missingCount > 0
+              ? [{ label: `Remove ${sourceMenu.source.missingCount} missing`, onClick: () => handleRemoveMissing(sourceMenu.source) }]
+              : []),
+            { label: 'Unlink folder', onClick: () => handleUnlinkSource(sourceMenu.source), danger: true },
+          ]}
+          onClose={() => setSourceMenu(null)}
+        />
+      )}
+      {sourceDialog && (
+        <LinkFolderDialog
+          source={sourceDialog.source ?? undefined}
+          onClose={() => setSourceDialog(null)}
+          onSaved={async saved => {
+            const isNew = !sourceDialog.source;
+            setSourceDialog(null);
+            await onSourcesChanged();
+            await onBooksChanged();
+            if (isNew) onSelect({ kind: 'source', id: saved.id });
+          }}
         />
       )}
       {tagMenu && (

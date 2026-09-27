@@ -375,4 +375,36 @@ if (!foldersBackfilled) {
   db.prepare("INSERT INTO schema_meta (key, value) VALUES ('attachment_folders_backfilled', ?)").run(new Date().toISOString());
 }
 
-export { db, ATTACHMENTS_DIR, THUMBNAILS_DIR };
+// Migration: linked folders ("sources"). A source is a directory on disk whose
+// PDFs are tracked in place rather than copied into ATTACHMENTS_DIR. Linked
+// attachments carry source_id + rel_path (their identity) and leave file_path
+// empty; missing_at marks a file that vanished, so its annotations survive
+// until the user removes it on purpose. See server/lib/sources.ts.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sources (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    root_path TEXT NOT NULL UNIQUE,
+    recursive INTEGER NOT NULL DEFAULT 1,
+    exclude TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    last_scan_at TEXT,
+    offline_since TEXT,
+    error TEXT
+  );
+`);
+const attColumnsForSources = db.prepare("PRAGMA table_info(attachments)").all() as Array<{ name: string }>;
+if (!attColumnsForSources.some(c => c.name === 'source_id')) {
+  db.exec(`
+    ALTER TABLE attachments ADD COLUMN source_id TEXT REFERENCES sources(id);
+    ALTER TABLE attachments ADD COLUMN rel_path TEXT;
+    ALTER TABLE attachments ADD COLUMN mtime_ms REAL;
+    ALTER TABLE attachments ADD COLUMN missing_at TEXT;
+  `);
+}
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_attachments_source_path
+    ON attachments(source_id, rel_path) WHERE source_id IS NOT NULL;
+`);
+
+export { db, DATA_DIR, ATTACHMENTS_DIR, THUMBNAILS_DIR };

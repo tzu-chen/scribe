@@ -10,7 +10,8 @@ export type Selection =
   | { kind: 'home' }
   | { kind: 'all' }
   | { kind: 'folder'; id: string }
-  | { kind: 'tag'; id: string };
+  | { kind: 'tag'; id: string }
+  | { kind: 'source'; id: string };
 
 export type KindFilter = AttachmentKind | 'unsorted' | null;
 export type ActivityFilter = Activity | null;
@@ -28,6 +29,7 @@ export type SortDir = 'asc' | 'desc';
 // /?                → home
 // /?view=browse     → everything
 // /?project=<id>    → one project     /?tag=<id> → one tag
+// /?source=<id>     → one linked folder
 // &kind=paper|unsorted  &activity=reading   (filters, browse only)
 
 export function selectionFromParams(p: URLSearchParams): Selection {
@@ -35,6 +37,8 @@ export function selectionFromParams(p: URLSearchParams): Selection {
   if (project) return { kind: 'folder', id: project };
   const tag = p.get('tag');
   if (tag) return { kind: 'tag', id: tag };
+  const source = p.get('source');
+  if (source) return { kind: 'source', id: source };
   if (p.get('view') === 'browse') return { kind: 'all' };
   return { kind: 'home' };
 }
@@ -56,6 +60,7 @@ export function paramsFor(selection: Selection, filters: LibraryFilters): URLSea
   if (selection.kind === 'all') p.set('view', 'browse');
   if (selection.kind === 'folder') p.set('project', selection.id);
   if (selection.kind === 'tag') p.set('tag', selection.id);
+  if (selection.kind === 'source') p.set('source', selection.id);
   if (filters.kind) p.set('kind', filters.kind);
   if (filters.activity) p.set('activity', filters.activity);
   return p;
@@ -63,7 +68,7 @@ export function paramsFor(selection: Selection, filters: LibraryFilters): URLSea
 
 export function sameSelection(a: Selection, b: Selection): boolean {
   if (a.kind !== b.kind) return false;
-  if (a.kind === 'folder' || a.kind === 'tag') return a.id === (b as { id: string }).id;
+  if (a.kind === 'folder' || a.kind === 'tag' || a.kind === 'source') return a.id === (b as { id: string }).id;
   return true;
 }
 
@@ -75,6 +80,8 @@ export function matchesSelection(book: AttachmentMeta, selection: Selection): bo
       return book.folderIds.includes(selection.id);
     case 'tag':
       return (book.tags ?? []).includes(selection.id);
+    case 'source':
+      return book.sourceId === selection.id;
     default:
       return true;
   }
@@ -90,7 +97,7 @@ export function matchesActivity(book: AttachmentMeta, activity: ActivityFilter, 
   return activity === null || getActivity(book, now) === activity;
 }
 
-/** Search across title, filename, authors, and the *names* of tags and projects. */
+/** Search across title, filename, linked path, authors, and the *names* of tags and projects. */
 export function matchesQuery(
   book: AttachmentMeta,
   query: string,
@@ -103,6 +110,7 @@ export function matchesQuery(
   const hay = [
     displayTitle(book),
     book.filename,
+    book.relPath ?? '',
     book.authors ?? '',
     book.year ? String(book.year) : '',
     ...(book.tags ?? []).map(id => tagsById.get(id)?.name ?? ''),

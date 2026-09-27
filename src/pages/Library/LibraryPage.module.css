@@ -20,6 +20,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .viewToggle {
@@ -997,4 +998,47 @@
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
+}
+
+/* Linked folders */
+.sidebarWarn {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.headerPath {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-warning);
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* A linked file that is gone from disk (or whose folder is offline). */
+.unavailable {
+  opacity: 0.5;
+}
+
+.unavailableTag {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-warning);
+  white-space: nowrap;
 }

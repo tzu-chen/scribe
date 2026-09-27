@@ -9,10 +9,12 @@ import { attachmentStorage, DuplicateAttachmentError } from '../../services/atta
 import { folderStorage } from '../../services/folderStorage';
 import { bookTagStorage } from '../../services/bookTagStorage';
 import { flowchartStorage } from '../../services/flowchartStorage';
+import { sourceStorage } from '../../services/sourceStorage';
 import type { AttachmentKind, AttachmentMeta } from '../../types/attachment';
 import { ATTACHMENT_KINDS, KIND_LABELS } from '../../types/attachment';
 import type { Folder } from '../../types/folder';
 import type { BookTag } from '../../types/bookTag';
+import type { Source } from '../../types/source';
 import type { FlowchartNodeWithFlowchart } from '../../types/flowchart';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
 import { displayTitle, formatRelativeDate, getActivity, getProgress, ACTIVITY_LABELS } from '../../utils/libraryActivity';
@@ -58,6 +60,7 @@ export function LibraryPage() {
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<BookTag[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
   const [nodes, setNodes] = useState<FlowchartNodeWithFlowchart[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,13 +127,31 @@ export function LibraryPage() {
   const loadNodes = useCallback(async () => {
     try { setNodes(await flowchartStorage.getAllNodes()); } catch (err) { console.error('Failed to load flowchart nodes:', err); }
   }, []);
+  const loadSources = useCallback(async () => {
+    try { setSources(await sourceStorage.getAll()); } catch (err) { console.error('Failed to load linked folders:', err); }
+  }, []);
 
   useEffect(() => {
     loadBooks();
     loadFolders();
     loadTags();
     loadNodes();
-  }, [loadBooks, loadFolders, loadTags, loadNodes]);
+    loadSources();
+  }, [loadBooks, loadFolders, loadTags, loadNodes, loadSources]);
+
+  // Linked folders: the server watches them and pushes an event on any change;
+  // opening the Library also asks for a catch-up scan, for changes a watcher
+  // cannot see (network mounts, a folder that came back online).
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reload = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { loadBooks(); loadSources(); }, 250);
+    };
+    const unsubscribe = sourceStorage.subscribe(reload);
+    sourceStorage.scanAll().then(r => { if (r.changed) reload(); }).catch(() => {});
+    return () => { unsubscribe(); clearTimeout(timer); };
+  }, [loadBooks, loadSources]);
 
   useEffect(() => { localStorage.setItem(VIEW_MODE_KEY, viewMode); }, [viewMode]);
 
@@ -229,7 +250,21 @@ export function LibraryPage() {
   }, [uploadFiles, selection]);
 
   // --- Open / delete / rename --------------------------------------------------
+  const sourcesById = useMemo(() => new Map(sources.map(s => [s.id, s])), [sources]);
+  /** Linked file that can't be opened right now: gone from disk, or its folder is offline. */
+  const isUnavailable = useCallback(
+    (book: AttachmentMeta) => !!book.missing || (!!book.sourceId && !!sourcesById.get(book.sourceId)?.offline),
+    [sourcesById],
+  );
+
   const handleOpen = useCallback((book: AttachmentMeta, openInNewTab = false) => {
+    if (isUnavailable(book)) {
+      const src = book.sourceId ? sourcesById.get(book.sourceId) : undefined;
+      alert(src?.offline
+        ? `"${src.name}" can't be reached right now (${src.path}).`
+        : `This file is no longer on disk:\n${src ? `${src.path}/` : ''}${book.relPath ?? book.filename}`);
+      return;
+    }
     attachmentStorage.markOpened(book.id).catch(() => {});
     const isViewable = book.type === 'application/pdf'
       || book.type === 'image/vnd.djvu'
@@ -241,11 +276,19 @@ export function LibraryPage() {
     } else {
       attachmentStorage.openFile(book.id);
     }
-  }, [navigate]);
+  }, [navigate, isUnavailable, sourcesById]);
 
+  // Uploads are deleted; linked items are only removed from the library (and
+  // excluded from their folder so they are not re-added) — their files stay.
   const handleDelete = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
-    const msg = ids.length === 1 ? 'Delete 1 item? This cannot be undone.' : `Delete ${ids.length} items? This cannot be undone.`;
+    const linked = ids.filter(id => books.find(b => b.id === id)?.sourceId).length;
+    const n = (k: number) => (k === 1 ? '1 item' : `${k} items`);
+    const msg = linked === 0
+      ? `Delete ${n(ids.length)}? This cannot be undone.`
+      : linked === ids.length
+        ? `Remove ${n(ids.length)} from the library? The files stay on disk and won't be re-added; highlights and comments on them are deleted.`
+        : `Delete ${n(ids.length - linked)} uploaded and remove ${n(linked)} linked from the library? Linked files stay on disk. This cannot be undone.`;
     if (!confirm(msg)) return;
     await Promise.all(ids.map(id => attachmentStorage.delete(id)));
     setSelectedIds(prev => { const next = new Set(prev); for (const id of ids) next.delete(id); return next; });
@@ -253,7 +296,8 @@ export function LibraryPage() {
     setAnchorId(prev => (prev && ids.includes(prev) ? null : prev));
     setTriageIds(prev => prev.filter(id => !ids.includes(id)));
     await loadBooks();
-  }, [loadBooks]);
+    if (linked > 0) await loadSources();
+  }, [books, loadBooks, loadSources]);
 
   const startRename = useCallback((book: AttachmentMeta) => {
     setRenamingId(book.id);
@@ -356,6 +400,8 @@ export function LibraryPage() {
     () => [...filteredBooks].sort((a, b) => compareBooks(a, b, sortField, sortDir)),
     [filteredBooks, sortField, sortDir],
   );
+  // Files gone from disk stay findable in Browse, but don't clutter the shelves.
+  const homeBooks = useMemo(() => books.filter(b => !b.missing), [books]);
   const triageBooks = useMemo(
     () => triageIds.map(id => books.find(b => b.id === id)).filter((b): b is AttachmentMeta => !!b),
     [triageIds, books],
@@ -555,9 +601,14 @@ export function LibraryPage() {
   };
 
   const subtitleFor = (book: AttachmentMeta) => {
-    const bits = [book.authors, book.year ? String(book.year) : null, book.pageCount ? `${book.pageCount} pp` : null].filter(Boolean);
+    // For linked files the subfolder tells same-titled versions apart (e.g. baseline/ snapshots).
+    const dir = book.relPath?.includes('/') ? book.relPath.slice(0, book.relPath.lastIndexOf('/') + 1) : null;
+    const bits = [dir, book.authors, book.year ? String(book.year) : null, book.pageCount ? `${book.pageCount} pp` : null].filter(Boolean);
     return bits.join(' · ');
   };
+
+  const renderUnavailableTag = (book: AttachmentMeta) =>
+    isUnavailable(book) ? <span className={styles.unavailableTag}>{book.missing ? 'Missing' : 'Offline'}</span> : null;
 
   // Right-click acts on the selection when the clicked item is part of it.
   const contextTargetIds = useMemo(() => {
@@ -590,8 +641,10 @@ export function LibraryPage() {
     }
     const allDone = targets.length > 0 && targets.every(b => b.status === 'done');
     items.push({ label: allDone ? 'Mark as not done' : 'Mark as done', onClick: () => handleSetDone(targetIds, !allDone) });
+    const linkedCount = targets.filter(b => b.sourceId).length;
+    const verb = linkedCount === 0 ? 'Delete' : linkedCount === targets.length ? 'Remove from library' : 'Delete / remove';
     items.push({
-      label: targetIds.length === 1 ? 'Delete' : `Delete ${targetIds.length}`,
+      label: targetIds.length === 1 ? verb : `${verb} (${targetIds.length})`,
       onClick: () => handleDelete(targetIds),
       danger: true,
     });
@@ -662,8 +715,10 @@ export function LibraryPage() {
       case 'all': return 'All items';
       case 'folder': return foldersById.get(selection.id)?.name ?? 'Project';
       case 'tag': return tagsById.get(selection.id)?.name ?? 'Tag';
+      case 'source': return sourcesById.get(selection.id)?.name ?? 'Linked folder';
     }
   };
+  const selectedSource = selection.kind === 'source' ? sourcesById.get(selection.id) : undefined;
 
   const emptyState = () => {
     if (books.length === 0) {
@@ -671,6 +726,12 @@ export function LibraryPage() {
     }
     if (baseBooks.length === 0 && selection.kind === 'folder' && !searchQuery) {
       return (<><p className={styles.emptyTitle}>This project is empty</p><p className={styles.emptyText}>Drop files here, or right-click items elsewhere and choose &quot;Projects…&quot;.</p></>);
+    }
+    if (baseBooks.length === 0 && selectedSource && !searchQuery) {
+      if (selectedSource.offline) {
+        return (<><p className={styles.emptyTitle}>Folder offline</p><p className={styles.emptyText}>{selectedSource.path} can&apos;t be reached.</p></>);
+      }
+      return (<><p className={styles.emptyTitle}>No documents here yet</p><p className={styles.emptyText}>PDFs added to {selectedSource.path} will appear automatically.</p></>);
     }
     if (baseBooks.length === 0 && selection.kind === 'tag' && !searchQuery) {
       return (<><p className={styles.emptyTitle}>No items with this tag</p><p className={styles.emptyText}>Select items and click the tag in the sidebar to apply it.</p></>);
@@ -687,6 +748,12 @@ export function LibraryPage() {
     >
       <div className={styles.header}>
         <h1 className={styles.title}>{headingFor()}</h1>
+        {selectedSource && <span className={styles.headerPath} title={selectedSource.path}>{selectedSource.path}</span>}
+        {selectedSource?.offline && <span className={styles.statusBadge} title="The folder can't be reached; its items are left as they were">Offline</span>}
+        {selectedSource?.error && <span className={styles.statusBadge} title={selectedSource.error}>Scan failed</span>}
+        {selectedSource && selectedSource.missingCount > 0 && (
+          <span className={styles.statusBadge} title="Files gone from disk; right-click the folder to remove them">{selectedSource.missingCount} missing</span>
+        )}
         {enrichment.active && enrichment.pending > 0 && (
           <span className={styles.enrichBadge} title="Reading page counts, metadata and covers from files">
             Indexing {enrichment.total - enrichment.pending + 1}/{enrichment.total}
@@ -734,12 +801,14 @@ export function LibraryPage() {
           books={books}
           folders={folders}
           tags={tags}
+          sources={sources}
           selection={selection}
           selectedCount={selectedIds.size}
           onSelect={sel => setView(sel)}
           onApplyTagToSelection={tag => handleToggleBookTag(Array.from(selectedIds), tag.id)}
           onFoldersChanged={loadFolders}
           onTagsChanged={loadTags}
+          onSourcesChanged={loadSources}
           onBooksChanged={loadBooks}
         />
 
@@ -762,7 +831,7 @@ export function LibraryPage() {
 
           {isHome ? (
             <LibraryHome
-              books={books}
+              books={homeBooks}
               folders={folders}
               onOpen={handleOpen}
               onBrowse={(sel, f) => setView(sel, { kind: null, activity: null, ...f })}
@@ -798,7 +867,7 @@ export function LibraryPage() {
                         <article
                           key={book.id}
                           ref={el => { if (el) cardRefs.current.set(book.id, el); else cardRefs.current.delete(book.id); }}
-                          className={`${styles.gridCard} ${isSelected ? styles.gridCardSelected : ''} ${isActive ? styles.gridCardActive : ''}`}
+                          className={`${styles.gridCard} ${isSelected ? styles.gridCardSelected : ''} ${isActive ? styles.gridCardActive : ''} ${isUnavailable(book) ? styles.unavailable : ''}`}
                           onClick={e => handleCardClick(book, e)}
                           onDoubleClick={e => handleCardDoubleClick(book, e)}
                           onAuxClick={e => { if (e.button === 1) handleOpen(book, true); }}
@@ -821,7 +890,8 @@ export function LibraryPage() {
                             )}
                             <div className={styles.gridMeta}>
                               {renderKindBadge(book)}
-                              <span className={styles.gridMetaText}>{subtitleFor(book) || formatRelativeDate(book.lastOpenedAt, now)}</span>
+                              {renderUnavailableTag(book)}
+                              <span className={styles.gridMetaText} title={book.relPath}>{subtitleFor(book) || formatRelativeDate(book.lastOpenedAt, now)}</span>
                             </div>
                             {(book.tags?.length || book.nodeAttachments?.length) ? (
                               <div className={styles.gridChips}>{renderTagChips(book)}{renderNodeChips(book)}</div>
@@ -862,7 +932,7 @@ export function LibraryPage() {
                             <tr
                               key={book.id}
                               ref={el => { if (el) cardRefs.current.set(book.id, el); else cardRefs.current.delete(book.id); }}
-                              className={`${styles.listRow} ${isSelected ? styles.listRowSelected : ''} ${isActive ? styles.listRowActive : ''}`}
+                              className={`${styles.listRow} ${isSelected ? styles.listRowSelected : ''} ${isActive ? styles.listRowActive : ''} ${isUnavailable(book) ? styles.unavailable : ''}`}
                               onClick={e => handleCardClick(book, e)}
                               onDoubleClick={e => handleCardDoubleClick(book, e)}
                               onAuxClick={e => { if (e.button === 1) handleOpen(book, true); }}
@@ -883,9 +953,10 @@ export function LibraryPage() {
                                         onClick={e => e.stopPropagation()}
                                       />
                                     ) : (
-                                      <span className={styles.listFileName} title={book.filename}>{displayTitle(book)}</span>
+                                      <span className={styles.listFileName} title={book.relPath ?? book.filename}>{displayTitle(book)}</span>
                                     )}
                                     <span className={styles.listSubtitle}>
+                                      {renderUnavailableTag(book)}
                                       <span className={styles.listSubtitleText}>{subtitleFor(book)}</span>
                                       {renderNodeChips(book)}
                                     </span>

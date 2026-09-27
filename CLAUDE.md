@@ -4,7 +4,7 @@
 
 Scribe is a study tool built with React 19, TypeScript, and Vite on the frontend, backed by an **Express + SQLite** server. The app helps users manage:
 
-- A **Library** of uploaded PDF and other files, organised along three axes — *kind* (book/paper/draft/notes), *project* (many-to-many, archivable) and *activity* (derived from reading data) — with a shelf-style Home and a filterable Browse view
+- A **Library** of uploaded PDF and other files — plus **linked folders** tracked in place on disk — organised along three axes — *kind* (book/paper/draft/notes), *project* (many-to-many, archivable) and *activity* (derived from reading data) — with a shelf-style Home and a filterable Browse view
 - **Notes** written in Markdown with LaTeX support
 - **Flowcharts** — data-driven flowcharts stored in SQLite, rendered with React+SVG, with interactive node actions
 - **Questions** linked to flowchart nodes
@@ -37,6 +37,7 @@ In development, `npm run dev` runs both processes via `concurrently`:
 - **Vite dev server** — serves the React app with HMR
 - **Express server** — runs on port 3001 (configurable via `PORT` env var). Also honors `SUITE_DATA_ROOT`: when set, data lives at `$SUITE_DATA_ROOT/scribe/` (`scribe.db`, `attachments/`); when unset it falls back **byte-for-byte** to the legacy in-repo `data/` (resolved in `server/db.ts`). Part of the suite data-centralization scheme.
 - Vite proxies `/api/*` requests to the Express server (configured in `vite.config.ts`)
+- `SCRIBE_SOURCE_ROOTS` (`:`-separated, default: the home directory) limits where folders may be linked from (see [Linked folders](#linked-folders)).
 
 In production, the Express server serves the built React app from `dist/` and handles all API requests on a single port.
 
@@ -91,8 +92,11 @@ server/
     outlines.ts              # Custom PDF outlines (table of contents)
     flowcharts.ts            # Flowchart CRUD + metadata/tags + node index + node queries
     questions.ts             # Questions linked to flowchart nodes
+    sources.ts               # Linked folders: CRUD, preview (dry run), rescan, SSE change events
   lib/
     kindGuess.ts             # Heuristic book/paper/draft/notes classifier (filename, page count, PDF metadata)
+    sources.ts               # Linked folders: walk, reconcile scan, move detection, fs.watch, attachmentFilePath()
+    excludePatterns.ts       # gitignore-style exclude patterns for linked folders
   scripts/
     migrate-flowcharts.ts    # One-time migration from old HTML flowcharts to SQLite
 
@@ -113,6 +117,7 @@ src/
     readingTime.ts           # ReadingTimeEntry, ReadingTimeMap
     flowchart.ts             # FlowchartSpec, FlowchartNode, FlowchartEdge, etc.
     folder.ts                # Folder
+    source.ts                # Source (linked folder), SourcePreview, ScanSummary
     crop.ts                  # Crop settings
   services/                  # Data access layer (calls REST API or localStorage)
     noteStorage.ts           # REST API → /api/notes
@@ -122,6 +127,7 @@ src/
     readingTimeStorage.ts    # REST API → /api/reading-time
     viewerPrefsStorage.ts    # REST API → /api/viewer-prefs (+ localStorage fallback)
     folderStorage.ts         # REST API → /api/folders
+    sourceStorage.ts         # REST API → /api/sources (+ EventSource subscription to change events)
     outlineStorage.ts        # REST API → /api/outlines
     flowchartStorage.ts      # REST API → /api/flowcharts
     questionStorage.ts       # REST API → /api/questions
@@ -161,7 +167,8 @@ src/
   pages/                     # Route-level components
     Library/LibraryPage.tsx          # / — Home shelves or Browse (grid/list), selection, context menus, upload + drop
     Library/LibraryHome.tsx          #   Shelves: Continue reading, Projects, Recently added, one per kind
-    Library/LibrarySidebar.tsx       #   Home / All / Projects (+archived) / Tags, with create/rename/archive/delete
+    Library/LibrarySidebar.tsx       #   Home / All / Projects (+archived) / Linked folders / Tags, with create/rename/archive/delete
+    Library/LinkFolderDialog.tsx     #   Link/edit a folder on disk, with live preview and upload adoption
     Library/LibraryFilterBar.tsx     #   Kind + activity chips with counts, sort select (grid)
     Library/UploadTriage.tsx         #   "Just uploaded" strip: set kind/project/tags right after upload
     Library/libraryModel.ts          #   Selection/filter types, URL (de)serialisation, matching, sorting
@@ -197,7 +204,8 @@ Nearly all data lives on the **server** (SQLite + filesystem). Only theme prefer
 | `notes` | `id` (TEXT) | Note content, tags (JSON), status, category, subject |
 | `folders` | `id` (TEXT) | Library projects (name, `archived_at`) |
 | `attachment_folders` | `(attachment_id, folder_id)` | M2M join of attachments ↔ projects; CASCADE on both sides. The legacy `attachments.folder_id` column is kept but no longer read. |
-| `attachments` | `id` (TEXT) | File metadata; actual blobs stored at `data/attachments/`. Library columns: `kind`, `kind_manual`, `title`, `authors`, `year`, `page_count`, `status` ('done' or NULL), `thumbnail_path`, `enriched_at` |
+| `attachments` | `id` (TEXT) | File metadata; uploaded blobs stored at `data/attachments/`. Library columns: `kind`, `kind_manual`, `title`, `authors`, `year`, `page_count`, `status` ('done' or NULL), `thumbnail_path`, `enriched_at`. Linked-folder items set `source_id` + `rel_path` (unique together; `file_path` is `''`), `mtime_ms`, and `missing_at` when the file has vanished |
+| `sources` | `id` (TEXT) | Linked folders: `root_path` (canonical, unique), `recursive`, `exclude` (JSON pattern list), `last_scan_at`, `offline_since`, `error` |
 | `highlights` | `id` (TEXT) | PDF highlight rects (JSON), selected text, color; FK → attachments |
 | `comments` | `id` (TEXT) | Annotation comments; FK → highlights, FK → attachments |
 | `reading_time` | `(attachment_id, date_cst)` | Per-attachment daily reading seconds |
@@ -242,7 +250,7 @@ All endpoints are prefixed with `/api/`.
 - `GET /api/attachments/by-subject?subject=X` — filter by subject
 - `GET /api/attachments/counts-by-subject` — aggregate attachment counts per subject
 - `POST /api/attachments` — upload a file (multipart form data via multer)
-- `GET /api/attachments/:id/blob` — download the file blob
+- `GET /api/attachments/:id/blob` — download the file blob (managed or linked; `Content-Length` comes from `fs.stat`, not the `size` column)
 - `PATCH /api/attachments/:id/subject` — update subject
 - `PATCH /api/attachments/:id/filename` — rename file
 - `PATCH /api/attachments/:id/last-opened` — mark as recently opened
@@ -253,7 +261,8 @@ All endpoints are prefixed with `/api/`.
 - `PUT /api/attachments/:id/tags` — replace the set of tags (`{ tagIds }`)
 - `PUT /api/attachments/:id/enrichment` — `{ pageCount?, title?, authors?, year?, creator?, producer?, thumbnail? }` (thumbnail is a JPEG data URL). Stores metadata, writes `data/thumbnails/<id>.jpg`, sets `enriched_at`, and re-runs the kind guess unless the kind is manual
 - `GET /api/attachments/:id/thumbnail` — first-page JPEG (immutable cache; client appends `?v=<enrichedAt>`)
-- `DELETE /api/attachments/:id` — delete attachment (cascades to DB rows + filesystem)
+- `DELETE /api/attachments/:id` — delete attachment (cascades to DB rows + filesystem). For a linked item: remove it from the library and add its path to the folder's excludes; the file on disk is never touched
+- `PATCH /api/attachments/:id/filename` returns 409 for linked items (their name follows the file on disk)
 
 ### Annotations
 - `GET /api/annotations/highlights?attachmentId=X` — list highlights for an attachment
@@ -267,6 +276,15 @@ All endpoints are prefixed with `/api/`.
 
 ### Folders (projects)
 - `GET|POST /api/folders`, `PATCH /api/folders/:id/name`, `PATCH /api/folders/:id/archived` (`{ archived }`), `DELETE /api/folders/:id`
+
+### Linked folders (sources)
+- `GET /api/sources` — list, with `itemCount`, `missingCount`, `highlightCount`, `offline`, `error`
+- `POST /api/sources/preview` — `{ path, recursive?, exclude?, sourceId? }` dry run: documents found, uploads with identical content (`matches`), and when editing, how many linked items the settings would drop
+- `POST /api/sources` — `{ name?, path, recursive?, exclude?, adoptIds? }` link + first scan; `adoptIds` are uploads to convert into the matching linked file
+- `PATCH /api/sources/:id` — `{ name?, path?, recursive?, exclude? }` then rescan (items now excluded are removed)
+- `POST /api/sources/:id/scan`, `POST /api/sources/scan` (all, throttled to one per folder per 10 s; `{ changed }`)
+- `DELETE /api/sources/:id/missing` — remove items whose files are gone; `DELETE /api/sources/:id` — unlink (items leave the library; files untouched)
+- `GET /api/sources/events` — server-sent events, `data: { sourceId }` after any change
 
 ### Reading Time
 - `GET /api/reading-time` — all entries (optional `?start=DATE&end=DATE` filter)
@@ -309,7 +327,7 @@ On POST and PUT, the route handler validates the spec, stores/updates the `flowc
 
 | Path | Component | Description |
 |---|---|---|
-| `/` | `LibraryPage` | Home shelves by default; `?view=browse`, `?project=<id>`, `?tag=<id>` open Browse, with optional `&kind=` / `&activity=` filters |
+| `/` | `LibraryPage` | Home shelves by default; `?view=browse`, `?project=<id>`, `?tag=<id>`, `?source=<id>` open Browse, with optional `&kind=` / `&activity=` filters |
 | `/notes` | `NotesPage` | Browse and filter notes |
 | `/note/new` | `EditorPage` | Create new note (optional `?subject=` param) |
 | `/note/:id/edit` | `EditorPage` | Edit existing note |
@@ -406,6 +424,18 @@ Three independent axes, each answering a different question, replace the single 
 Tags and flowchart-node links are unchanged (topics and curriculum respectively).
 
 **Enrichment** (`src/services/attachmentEnrichment.ts`): the server never parses PDFs. The browser, which already ships pdf.js, reads page count, `Title`/`Author`/`CreationDate`/`Creator`/`Producer`, renders page 1 at 240 px wide to a JPEG, and `PUT`s it to `/enrichment`. Two triggers: `useLibraryEnrichment` back-fills un-enriched items one at a time while the Library is open (most recently opened first; an "Indexing n/m" badge shows in the header), and `OpenBooksContext` enriches from the already-loaded document when a PDF is opened in the viewer. A file that fails to parse is still marked enriched (empty payload) so it is not retried every session.
+
+### Linked folders
+
+A linked folder ("source") is a directory on the server's disk whose PDFs/DjVu files are tracked **in place** — one-way, disk → library; nothing on disk is ever modified. Its items are ordinary attachments (kinds, projects, tags, annotations all work) with `source_id` + `rel_path`. All logic is in `server/lib/sources.ts`:
+
+- **Reconcile scan is the only writer.** Triggers: server start-up, the Library page opening (`POST /api/sources/scan`), a manual Rescan, and a debounced (1 s) scan after `fs.watch` events. Watchers are one non-recursive `fs.watch` per visited directory, so skipped trees cost no inotify watches; events for non-document files are ignored. Clients refresh via the SSE stream.
+- **Identity = relative path.** Size + mtime decide whether to re-hash. Same path, new sha256 → content changed: `enriched_at` is cleared so the client re-reads page count/metadata/cover (the enrichment queue keys attempts by `id@fileModifiedAt`). A vanished path + a new path with the same sha256 in one scan → a move (same id, annotations kept).
+- **Never deleted because a file vanished** (highlights etc. CASCADE): it gets `missing_at` and shows dimmed ("Missing"), hidden from Home shelves. An unreachable root — or a completely empty one that had files (an unmounted mount point) — marks the source `offline` and leaves its items alone. Items are deleted only when the user excludes them (pattern, subfolders off, "Remove from library"), removes missing items, or unlinks the folder.
+- **Half-written files** (pdflatex truncates, then rewrites) are skipped until their mtime is ≥2 s old *and* the PDF ends in `%%EOF` (or ≥60 s old); a rescan is scheduled meanwhile.
+- **Walk rules:** `.pdf`/`.djvu` only; hidden entries, `node_modules`, `__pycache__` always skipped; symlinked directories not followed; gitignore-style excludes (`figures/`, `*_plot.pdf`, `/anchored.pdf`, `**`); limits of 20k directories / 5k documents.
+- **Adoption:** linking previews uploads with identical content (sizes compared first, then sha256); ticked ones are converted in place — same id, so annotations/tags/projects/progress survive — and the managed copy is deleted.
+- **Safety:** a root must be inside `SCRIBE_SOURCE_ROOTS` (default `~`), must not overlap another source or the data dir, and only files found by the walk are served (paths are re-checked to lie inside the root).
 
 **Library UI:** Home (shelves: Continue reading, Projects with drop-to-upload cards, Recently added, one shelf per kind, Unsorted) vs Browse (cover grid or table, kind/activity chips with counts, search across title/filename/authors/tag/project names). Selection and filters live in the URL so Back from the viewer restores the view. The **Upload triage** strip appears after any upload (button or drag-and-drop) to set kind/project/tags while context is fresh. Right-click: Set kind…, Projects… (toggle membership), Mark as done, Rename (sets display `title`, leaves the filename alone).
 
