@@ -12,11 +12,15 @@ const DATA_DIR = process.env.SUITE_DATA_ROOT
   : path.resolve(__dirname, '..', 'data');
 console.log(`[scribe] data dir: ${DATA_DIR}`);
 const ATTACHMENTS_DIR = path.join(DATA_DIR, 'attachments');
+// First-page thumbnails rendered client-side and uploaded via the enrichment
+// endpoint; one small JPEG per attachment, keyed by attachment id.
+const THUMBNAILS_DIR = path.join(DATA_DIR, 'thumbnails');
 const DB_PATH = path.join(DATA_DIR, 'scribe.db');
 
 // Ensure directories exist
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
+fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 
@@ -41,7 +45,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS folders (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    archived_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS attachments (
@@ -319,4 +324,55 @@ if (!backfilled) {
   db.prepare("INSERT INTO schema_meta (key, value) VALUES ('attachment_nodes_backfilled', ?)").run(new Date().toISOString());
 }
 
-export { db, ATTACHMENTS_DIR };
+// Migration: library organizing axes. Folders become many-to-many "projects";
+// attachments gain a kind (book/paper/draft/notes/other), PDF metadata, page
+// count, a manual done status, and a thumbnail path. All enrichment columns
+// are nullable so existing rows stay valid; the client back-fills them lazily.
+const attColumnsForLibrary = db.prepare("PRAGMA table_info(attachments)").all() as Array<{ name: string }>;
+const addAttColumn = (name: string, ddl: string) => {
+  if (!attColumnsForLibrary.some(c => c.name === name)) {
+    db.exec(`ALTER TABLE attachments ADD COLUMN ${name} ${ddl}`);
+  }
+};
+addAttColumn('kind', 'TEXT');
+addAttColumn('kind_manual', 'INTEGER NOT NULL DEFAULT 0');
+addAttColumn('title', 'TEXT');
+addAttColumn('authors', 'TEXT');
+addAttColumn('year', 'INTEGER');
+addAttColumn('page_count', 'INTEGER');
+addAttColumn('status', 'TEXT');
+addAttColumn('thumbnail_path', 'TEXT');
+addAttColumn('enriched_at', 'TEXT');
+db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_kind ON attachments(kind)');
+
+const folderColumns = db.prepare("PRAGMA table_info(folders)").all() as Array<{ name: string }>;
+if (!folderColumns.some(c => c.name === 'archived_at')) {
+  db.exec('ALTER TABLE folders ADD COLUMN archived_at TEXT');
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS attachment_folders (
+    attachment_id TEXT NOT NULL,
+    folder_id TEXT NOT NULL,
+    PRIMARY KEY (attachment_id, folder_id),
+    FOREIGN KEY (attachment_id) REFERENCES attachments(id) ON DELETE CASCADE,
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_attachment_folders_attachment ON attachment_folders(attachment_id);
+  CREATE INDEX IF NOT EXISTS idx_attachment_folders_folder ON attachment_folders(folder_id);
+`);
+
+// One-time copy of the legacy single folder_id into the join table. The old
+// column is left in place (untouched) so a rollback loses nothing.
+const foldersBackfilled = db.prepare("SELECT value FROM schema_meta WHERE key = 'attachment_folders_backfilled'").get() as { value: string } | undefined;
+if (!foldersBackfilled) {
+  db.exec(`
+    INSERT OR IGNORE INTO attachment_folders (attachment_id, folder_id)
+    SELECT a.id, a.folder_id FROM attachments a
+    JOIN folders f ON f.id = a.folder_id
+    WHERE a.folder_id IS NOT NULL;
+  `);
+  db.prepare("INSERT INTO schema_meta (key, value) VALUES ('attachment_folders_backfilled', ?)").run(new Date().toISOString());
+}
+
+export { db, ATTACHMENTS_DIR, THUMBNAILS_DIR };

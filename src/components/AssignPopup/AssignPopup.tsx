@@ -52,7 +52,7 @@ export function AssignPopup({
     }
 
     const folderItems: Item[] = folders.map(f => {
-      const count = selectedBooks.filter(b => b.folderId === f.id).length;
+      const count = selectedBooks.filter(b => b.folderIds.includes(f.id)).length;
       return { kind: 'folder', key: `folder:${f.id}`, id: f.id, name: f.name, applied: appliedState(count), appliedCount: count };
     });
 
@@ -116,7 +116,15 @@ export function AssignPopup({
     const ids = Array.from(selectedBookIds);
     try {
       if (item.kind === 'folder') {
-        await Promise.all(ids.map(id => attachmentStorage.moveToFolder(id, item.id)));
+        // Projects are additive, like tags: only PUT for books not already in it.
+        await Promise.all(
+          ids.map(async id => {
+            const book = books.find(b => b.id === id);
+            const current = book?.folderIds ?? [];
+            if (current.includes(item.id)) return;
+            await attachmentStorage.setFolders(id, [...current, item.id]);
+          }),
+        );
       } else if (item.kind === 'tag') {
         await Promise.all(
           ids.map(async id => {
@@ -179,7 +187,7 @@ export function AssignPopup({
         <div className={styles.list}>
           {filtered.length === 0 ? (
             <div className={styles.empty}>
-              {allItems.length === 0 ? 'No folders, tags, or nodes yet' : 'No matches'}
+              {allItems.length === 0 ? 'No projects, tags, or nodes yet' : 'No matches'}
             </div>
           ) : (
             filtered.map((item, idx) => {
@@ -224,7 +232,7 @@ export function AssignPopup({
                     </span>
                   )}
                   <span className={`${styles.kind} ${styles[`kind_${item.kind}`]}`}>
-                    {item.kind}
+                    {item.kind === 'folder' ? 'project' : item.kind}
                   </span>
                 </div>
               );

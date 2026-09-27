@@ -4,7 +4,7 @@
 
 Scribe is a study tool built with React 19, TypeScript, and Vite on the frontend, backed by an **Express + SQLite** server. The app helps users manage:
 
-- A **Library** of uploaded PDF and other files
+- A **Library** of uploaded PDF and other files, organised along three axes — *kind* (book/paper/draft/notes), *project* (many-to-many, archivable) and *activity* (derived from reading data) — with a shelf-style Home and a filterable Browse view
 - **Notes** written in Markdown with LaTeX support
 - **Flowcharts** — data-driven flowcharts stored in SQLite, rendered with React+SVG, with interactive node actions
 - **Questions** linked to flowchart nodes
@@ -81,22 +81,25 @@ server/
   db.ts                      # SQLite schema init + migrations
   routes/
     notes.ts                 # CRUD for notes
-    attachments.ts           # Upload, download, list, delete attachments
+    attachments.ts           # Upload, download, list, delete attachments; kind/status/projects/enrichment/thumbnail
     annotations.ts           # PDF highlights and comments
     readingTime.ts           # Per-attachment reading time tracking
     viewerPrefs.ts           # Per-attachment PDF viewer preferences
-    folders.ts               # Folder management for library
+    folders.ts               # Project (folder) management for library, incl. archive
     bookTags.ts              # Library (book) tag CRUD
     flowchartTags.ts         # Flowchart tag CRUD
     outlines.ts              # Custom PDF outlines (table of contents)
     flowcharts.ts            # Flowchart CRUD + metadata/tags + node index + node queries
     questions.ts             # Questions linked to flowchart nodes
+  lib/
+    kindGuess.ts             # Heuristic book/paper/draft/notes classifier (filename, page count, PDF metadata)
   scripts/
     migrate-flowcharts.ts    # One-time migration from old HTML flowcharts to SQLite
 
 data/                        # Created at runtime, git-ignored
   scribe.db                  # SQLite database file
   attachments/               # Uploaded file blobs stored on disk
+  thumbnails/                # First-page JPEG covers (<attachment id>.jpg), produced by client-side enrichment
 
 src/
   App.tsx                    # Root: router + ThemeProvider + Layout
@@ -113,7 +116,8 @@ src/
     crop.ts                  # Crop settings
   services/                  # Data access layer (calls REST API or localStorage)
     noteStorage.ts           # REST API → /api/notes
-    attachmentStorage.ts     # REST API → /api/attachments
+    attachmentStorage.ts     # REST API → /api/attachments (incl. kind, status, projects, enrichment, thumbnail URL)
+    attachmentEnrichment.ts  # Client-side PDF/DjVu parse → page count, metadata, thumbnail → PUT enrichment
     annotationStorage.ts     # REST API → /api/annotations
     readingTimeStorage.ts    # REST API → /api/reading-time
     viewerPrefsStorage.ts    # REST API → /api/viewer-prefs (+ localStorage fallback)
@@ -133,6 +137,7 @@ src/
     useReadingTimeTracker.ts
     useReadingSummary.ts
     useCustomOutline.ts
+    useNow.ts                # Minute-refreshed "now" for relative dates without Date.now() in render
   contexts/
     ThemeContext.tsx          # Theme ('default' | 'dark'), reads/writes themeStorage
   components/                # Reusable UI components
@@ -146,6 +151,7 @@ src/
     SearchBar/               # Search input
     ThemeMenu/               # Light/dark toggle
     BookPicker/              # Modal for picking an existing attachment
+    BookCover/               # Thumbnail with typographic fallback + optional progress bar (shared by Library views)
     Icons/                   # SVG icon components
     ContextMenu/             # Reusable context menu
     PdfViewer/               # All PDF viewer sub-components (see below)
@@ -153,7 +159,13 @@ src/
     FlowchartRenderer/       # React+SVG read-only renderer (nodes, arrows, BFS highlight)
     FlowchartCanvas/         # Pan/zoom editing canvas (drag+snap, auto-route, inspector, stage manager, undo)
   pages/                     # Route-level components
-    Library/LibraryPage.tsx          # / — upload and browse attachments
+    Library/LibraryPage.tsx          # / — Home shelves or Browse (grid/list), selection, context menus, upload + drop
+    Library/LibraryHome.tsx          #   Shelves: Continue reading, Projects, Recently added, one per kind
+    Library/LibrarySidebar.tsx       #   Home / All / Projects (+archived) / Tags, with create/rename/archive/delete
+    Library/LibraryFilterBar.tsx     #   Kind + activity chips with counts, sort select (grid)
+    Library/UploadTriage.tsx         #   "Just uploaded" strip: set kind/project/tags right after upload
+    Library/libraryModel.ts          #   Selection/filter types, URL (de)serialisation, matching, sorting
+    Library/useLibraryEnrichment.ts  #   Background one-at-a-time enrichment queue
     Notes/NotesPage.tsx              # /notes — list/filter/search notes
     Editor/EditorPage.tsx            # /note/new, /note/:id/edit
     View/ViewPage.tsx                # /note/:id (read-only)
@@ -183,8 +195,9 @@ Nearly all data lives on the **server** (SQLite + filesystem). Only theme prefer
 | Table | Key | Description |
 |---|---|---|
 | `notes` | `id` (TEXT) | Note content, tags (JSON), status, category, subject |
-| `folders` | `id` (TEXT) | Library folder names |
-| `attachments` | `id` (TEXT) | File metadata; actual blobs stored at `data/attachments/` |
+| `folders` | `id` (TEXT) | Library projects (name, `archived_at`) |
+| `attachment_folders` | `(attachment_id, folder_id)` | M2M join of attachments ↔ projects; CASCADE on both sides. The legacy `attachments.folder_id` column is kept but no longer read. |
+| `attachments` | `id` (TEXT) | File metadata; actual blobs stored at `data/attachments/`. Library columns: `kind`, `kind_manual`, `title`, `authors`, `year`, `page_count`, `status` ('done' or NULL), `thumbnail_path`, `enriched_at` |
 | `highlights` | `id` (TEXT) | PDF highlight rects (JSON), selected text, color; FK → attachments |
 | `comments` | `id` (TEXT) | Annotation comments; FK → highlights, FK → attachments |
 | `reading_time` | `(attachment_id, date_cst)` | Per-attachment daily reading seconds |
@@ -205,6 +218,7 @@ SQLite features enabled: WAL mode, foreign key constraints, CASCADE deletes.
 |---|---|---|
 | `scribe_theme` | string | `'default'` or `'dark'` |
 | `scribe_ui_prefs` | JSON | Global UI preferences — currently `{ tocMode: 'panel' \| 'floating' }` (see `UiPrefsContext`) |
+| `scribe_library_view` | string | Library Browse layout: `'grid'` or `'list'` |
 
 ### File Storage
 
@@ -223,7 +237,8 @@ All endpoints are prefixed with `/api/`.
 - `DELETE /api/notes/:id` — delete a note
 
 ### Attachments
-- `GET /api/attachments` — list all attachments
+- `GET /api/attachments` — list all attachments (joined with `viewer_prefs.current_page` → `currentPage`; includes `folderIds`, `kind`, `pageCount`, `hasThumbnail`, `enrichedAt`, …)
+- `GET /api/attachments/:id` — single attachment with the same shape
 - `GET /api/attachments/by-subject?subject=X` — filter by subject
 - `GET /api/attachments/counts-by-subject` — aggregate attachment counts per subject
 - `POST /api/attachments` — upload a file (multipart form data via multer)
@@ -231,6 +246,13 @@ All endpoints are prefixed with `/api/`.
 - `PATCH /api/attachments/:id/subject` — update subject
 - `PATCH /api/attachments/:id/filename` — rename file
 - `PATCH /api/attachments/:id/last-opened` — mark as recently opened
+- `PATCH /api/attachments/:id/title` — set display title (`''` clears, falls back to filename)
+- `PATCH /api/attachments/:id/kind` — `{ kind }` sets a manual kind (`kind_manual = 1`); `{ kind: null }` returns to automatic guessing
+- `PATCH /api/attachments/:id/status` — `{ status: 'done' | null }`
+- `PUT /api/attachments/:id/folders` — replace the set of projects (`{ folderIds }`)
+- `PUT /api/attachments/:id/tags` — replace the set of tags (`{ tagIds }`)
+- `PUT /api/attachments/:id/enrichment` — `{ pageCount?, title?, authors?, year?, creator?, producer?, thumbnail? }` (thumbnail is a JPEG data URL). Stores metadata, writes `data/thumbnails/<id>.jpg`, sets `enriched_at`, and re-runs the kind guess unless the kind is manual
+- `GET /api/attachments/:id/thumbnail` — first-page JPEG (immutable cache; client appends `?v=<enrichedAt>`)
 - `DELETE /api/attachments/:id` — delete attachment (cascades to DB rows + filesystem)
 
 ### Annotations
@@ -242,6 +264,9 @@ All endpoints are prefixed with `/api/`.
 - `PATCH /api/annotations/comments/:id` — update comment text
 - `DELETE /api/annotations/comments/:id` — delete a comment
 - `DELETE /api/annotations/comments?highlightId=X` — batch delete comments by highlight
+
+### Folders (projects)
+- `GET|POST /api/folders`, `PATCH /api/folders/:id/name`, `PATCH /api/folders/:id/archived` (`{ archived }`), `DELETE /api/folders/:id`
 
 ### Reading Time
 - `GET /api/reading-time` — all entries (optional `?start=DATE&end=DATE` filter)
@@ -284,7 +309,7 @@ On POST and PUT, the route handler validates the spec, stores/updates the `flowc
 
 | Path | Component | Description |
 |---|---|---|
-| `/` | `LibraryPage` | Upload/browse books |
+| `/` | `LibraryPage` | Home shelves by default; `?view=browse`, `?project=<id>`, `?tag=<id>` open Browse, with optional `&kind=` / `&activity=` filters |
 | `/notes` | `NotesPage` | Browse and filter notes |
 | `/note/new` | `EditorPage` | Create new note (optional `?subject=` param) |
 | `/note/:id/edit` | `EditorPage` | Edit existing note |
@@ -369,6 +394,20 @@ Flowcharts are stored in SQLite as `FlowchartSpec` JSON (nodes, edges, positions
 **Node identification:** The node `id` field (e.g., `"qsvt"`, `"linalg"`) is the stable cross-app reference key (`node_key`). Notes, attachments, and questions link to nodes via `node_key`, not the display title.
 
 Node actions supported: `write-note`, `attach-file`, `view-attachments`, `view-notes`, `add-question`.
+
+### Library Organisation
+
+Three independent axes, each answering a different question, replace the single folder tree:
+
+- **Kind** — what it is: `book | paper | draft | notes | other`, or unset ("Unsorted"). Guessed by `server/lib/kindGuess.ts` from filename at upload and again after enrichment (page count ≥120 → book, ≤60 → paper, TeX-produced snake_case small file with no metadata title → draft, "slides"/"notes"/arXiv ids etc.). A kind set by hand (`kind_manual`) is never overwritten; guessed kinds render in italics.
+- **Project** — what it's for: the `folders` table, now many-to-many via `attachment_folders`, with `archived_at`. Labelled "Projects" throughout the UI. Nothing is hidden from "All items" because it belongs to a project (the old "Default" bucket is gone).
+- **Activity** — where the reader stands, derived in `src/utils/libraryActivity.ts` with zero input: `done` (manual status) · `reading` (opened ≤14 days) · `paused` · `dormant` (≥180 days) · `unopened`. Progress = `viewer_prefs.current_page / page_count`.
+
+Tags and flowchart-node links are unchanged (topics and curriculum respectively).
+
+**Enrichment** (`src/services/attachmentEnrichment.ts`): the server never parses PDFs. The browser, which already ships pdf.js, reads page count, `Title`/`Author`/`CreationDate`/`Creator`/`Producer`, renders page 1 at 240 px wide to a JPEG, and `PUT`s it to `/enrichment`. Two triggers: `useLibraryEnrichment` back-fills un-enriched items one at a time while the Library is open (most recently opened first; an "Indexing n/m" badge shows in the header), and `OpenBooksContext` enriches from the already-loaded document when a PDF is opened in the viewer. A file that fails to parse is still marked enriched (empty payload) so it is not retried every session.
+
+**Library UI:** Home (shelves: Continue reading, Projects with drop-to-upload cards, Recently added, one shelf per kind, Unsorted) vs Browse (cover grid or table, kind/activity chips with counts, search across title/filename/authors/tag/project names). Selection and filters live in the URL so Back from the viewer restores the view. The **Upload triage** strip appears after any upload (button or drag-and-drop) to set kind/project/tags while context is fresh. Right-click: Set kind…, Projects… (toggle membership), Mark as done, Rename (sets display `title`, leaves the filename alone).
 
 ### Note Model
 

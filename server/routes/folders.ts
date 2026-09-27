@@ -2,12 +2,16 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db.ts';
 
+// Folders are surfaced in the UI as "projects": non-exclusive groupings of
+// attachments (see attachment_folders) that can be archived when finished.
+
 const router = Router();
 
 interface FolderRow {
   id: string;
   name: string;
   created_at: string;
+  archived_at: string | null;
 }
 
 function rowToFolder(row: FolderRow) {
@@ -15,6 +19,7 @@ function rowToFolder(row: FolderRow) {
     id: row.id,
     name: row.name,
     createdAt: row.created_at,
+    archivedAt: row.archived_at ?? undefined,
   };
 }
 
@@ -45,6 +50,20 @@ router.patch('/:id/name', (req, res) => {
     return;
   }
   db.prepare('UPDATE folders SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
+  res.json({ ok: true });
+});
+
+// PATCH /api/folders/:id/archived — { archived: boolean }
+router.patch('/:id/archived', (req, res) => {
+  const { archived } = req.body ?? {};
+  if (typeof archived !== 'boolean') {
+    res.status(400).json({ error: 'archived must be a boolean' });
+    return;
+  }
+  db.prepare('UPDATE folders SET archived_at = ? WHERE id = ?').run(
+    archived ? new Date().toISOString() : null,
+    req.params.id,
+  );
   res.json({ ok: true });
 });
 

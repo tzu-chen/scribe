@@ -1,4 +1,15 @@
-import type { AttachmentMeta, NodeAttachmentLink } from '../types/attachment';
+import type { AttachmentKind, AttachmentMeta, AttachmentStatus, NodeAttachmentLink } from '../types/attachment';
+
+export interface EnrichmentPayload {
+  pageCount?: number;
+  title?: string;
+  authors?: string;
+  year?: number;
+  creator?: string;
+  producer?: string;
+  /** JPEG data URL of the first page. */
+  thumbnail?: string;
+}
 
 export class DuplicateAttachmentError extends Error {
   existing: AttachmentMeta;
@@ -107,13 +118,65 @@ export const attachmentStorage = {
     if (!res.ok) throw new Error(`Failed to update attachment tags: ${res.status}`);
   },
 
-  async moveToFolder(id: string, folderId: string | null): Promise<void> {
-    const res = await fetch(`/api/attachments/${id}/folder`, {
+  async setFolders(id: string, folderIds: string[]): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/folders`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderIds }),
+    });
+    if (!res.ok) throw new Error(`Failed to update attachment projects: ${res.status}`);
+  },
+
+  /** Pass null to clear a manual choice and fall back to the automatic guess. */
+  async setKind(id: string, kind: AttachmentKind | null): Promise<AttachmentMeta> {
+    const res = await fetch(`/api/attachments/${id}/kind`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folderId }),
+      body: JSON.stringify({ kind }),
     });
-    if (!res.ok) throw new Error(`Failed to move attachment: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to set attachment kind: ${res.status}`);
+    return res.json();
+  },
+
+  async setStatus(id: string, status: AttachmentStatus | null): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error(`Failed to set attachment status: ${res.status}`);
+  },
+
+  async setTitle(id: string, title: string): Promise<void> {
+    const res = await fetch(`/api/attachments/${id}/title`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) throw new Error(`Failed to set attachment title: ${res.status}`);
+  },
+
+  async get(id: string): Promise<AttachmentMeta | null> {
+    const res = await fetch(`/api/attachments/${id}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Failed to fetch attachment: ${res.status}`);
+    return res.json();
+  },
+
+  async enrich(id: string, payload: EnrichmentPayload): Promise<AttachmentMeta> {
+    const res = await fetch(`/api/attachments/${id}/enrichment`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Failed to enrich attachment: ${res.status}`);
+    return res.json();
+  },
+
+  thumbnailUrl(meta: Pick<AttachmentMeta, 'id' | 'hasThumbnail' | 'enrichedAt'>): string | null {
+    if (!meta.hasThumbnail) return null;
+    const v = meta.enrichedAt ? `?v=${encodeURIComponent(meta.enrichedAt)}` : '';
+    return `/api/attachments/${meta.id}/thumbnail${v}`;
   },
 
   async markOpened(id: string): Promise<void> {

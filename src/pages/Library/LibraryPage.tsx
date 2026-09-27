@@ -1,44 +1,60 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef, useMemo, type DragEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SearchBar } from '../../components/SearchBar/SearchBar';
 import { ContextMenu } from '../../components/ContextMenu/ContextMenu';
 import type { ContextMenuItem } from '../../components/ContextMenu/ContextMenu';
 import { AssignPopup } from '../../components/AssignPopup/AssignPopup';
+import { BookCover } from '../../components/BookCover/BookCover';
 import { attachmentStorage, DuplicateAttachmentError } from '../../services/attachmentStorage';
 import { folderStorage } from '../../services/folderStorage';
 import { bookTagStorage } from '../../services/bookTagStorage';
 import { flowchartStorage } from '../../services/flowchartStorage';
-import type { AttachmentMeta } from '../../types/attachment';
+import type { AttachmentKind, AttachmentMeta } from '../../types/attachment';
+import { ATTACHMENT_KINDS, KIND_LABELS } from '../../types/attachment';
 import type { Folder } from '../../types/folder';
 import type { BookTag } from '../../types/bookTag';
 import type { FlowchartNodeWithFlowchart } from '../../types/flowchart';
 import { ChevronUpIcon, ChevronDownIcon } from '../../components/Icons/Icons';
-import { stripExtension } from '../../utils/filename';
-import { randomCategorical } from '../../palette';
+import { displayTitle, formatRelativeDate, getActivity, getProgress, ACTIVITY_LABELS } from '../../utils/libraryActivity';
+import { LibrarySidebar } from './LibrarySidebar';
+import { LibraryHome } from './LibraryHome';
+import { LibraryFilterBar } from './LibraryFilterBar';
+import { UploadTriage } from './UploadTriage';
+import { useLibraryEnrichment } from './useLibraryEnrichment';
+import { useNow } from '../../hooks/useNow';
+import {
+  type Selection,
+  type LibraryFilters,
+  type ViewMode,
+  type SortField,
+  type SortDir,
+  selectionFromParams,
+  filtersFromParams,
+  paramsFor,
+  matchesSelection,
+  matchesKind,
+  matchesActivity,
+  matchesQuery,
+  countByKind,
+  countByActivity,
+  compareBooks,
+} from './libraryModel';
 import styles from './LibraryPage.module.css';
-
-type ViewMode = 'card' | 'list';
-type SortField = 'name' | 'uploaded' | 'lastOpened';
-type SortDir = 'asc' | 'desc';
-
-type Selection =
-  | { kind: 'all' }
-  | { kind: 'folder'; id: string }
-  | { kind: 'tag'; id: string };
 
 const VIEW_MODE_KEY = 'scribe_library_view';
 
-
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function isFileDrag(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes('Files');
 }
 
 export function LibraryPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [books, setBooks] = useState<AttachmentMeta[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<BookTag[]>([]);
@@ -49,9 +65,19 @@ export function LibraryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Selection + filters live in the URL so "back" from the viewer restores the view.
+  const selection = useMemo(() => selectionFromParams(searchParams), [searchParams]);
+  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+  const isHome = selection.kind === 'home';
+
+  const setView = useCallback((sel: Selection, f: LibraryFilters = filters) => {
+    setSearchParams(paramsFor(sel, f));
+  }, [filters, setSearchParams]);
+  const setFilters = useCallback((f: LibraryFilters) => setView(selection, f), [selection, setView]);
+
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY);
-    return saved === 'list' ? 'list' : 'card';
+    return saved === 'list' ? 'list' : 'grid';
   });
   const [sortField, setSortField] = useState<SortField>('lastOpened');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -66,29 +92,15 @@ export function LibraryPage() {
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  // Sidebar selection (mutually exclusive — only one filter active at a time)
-  const [selection, setSelection] = useState<Selection>({ kind: 'all' });
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
-  const [renameFolderValue, setRenameFolderValue] = useState('');
-  const newFolderInputRef = useRef<HTMLInputElement>(null);
-  const renameFolderInputRef = useRef<HTMLInputElement>(null);
-
-  // Tag state
-  const [creatingTag, setCreatingTag] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
-  const [renamingTagId, setRenamingTagId] = useState<string | null>(null);
-  const [renameTagValue, setRenameTagValue] = useState('');
-  const newTagInputRef = useRef<HTMLInputElement>(null);
-  const renameTagInputRef = useRef<HTMLInputElement>(null);
-
-  // Context menu state
+  // Context menus
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; book: AttachmentMeta } | null>(null);
-  const [folderContextMenu, setFolderContextMenu] = useState<{ x: number; y: number; folder: Folder } | null>(null);
-  const [tagContextMenu, setTagContextMenu] = useState<{ x: number; y: number; tag: BookTag } | null>(null);
-  const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
+  const [kindMenu, setKindMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
+  const [projectMenu, setProjectMenu] = useState<{ x: number; y: number; bookIds: string[] } | null>(null);
   const [showAssign, setShowAssign] = useState(false);
+
+  // Items uploaded this session that have not been dismissed from the triage strip.
+  const [triageIds, setTriageIds] = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
 
   const loadBooks = useCallback(async () => {
     try {
@@ -104,30 +116,13 @@ export function LibraryPage() {
   }, []);
 
   const loadFolders = useCallback(async () => {
-    try {
-      const all = await folderStorage.getAll();
-      setFolders(all);
-    } catch (err) {
-      console.error('Failed to load folders:', err);
-    }
+    try { setFolders(await folderStorage.getAll()); } catch (err) { console.error('Failed to load folders:', err); }
   }, []);
-
   const loadTags = useCallback(async () => {
-    try {
-      const all = await bookTagStorage.getAll();
-      setTags(all);
-    } catch (err) {
-      console.error('Failed to load tags:', err);
-    }
+    try { setTags(await bookTagStorage.getAll()); } catch (err) { console.error('Failed to load tags:', err); }
   }, []);
-
   const loadNodes = useCallback(async () => {
-    try {
-      const all = await flowchartStorage.getAllNodes();
-      setNodes(all);
-    } catch (err) {
-      console.error('Failed to load flowchart nodes:', err);
-    }
+    try { setNodes(await flowchartStorage.getAllNodes()); } catch (err) { console.error('Failed to load flowchart nodes:', err); }
   }, []);
 
   useEffect(() => {
@@ -137,9 +132,14 @@ export function LibraryPage() {
     loadNodes();
   }, [loadBooks, loadFolders, loadTags, loadNodes]);
 
-  useEffect(() => {
-    localStorage.setItem(VIEW_MODE_KEY, viewMode);
-  }, [viewMode]);
+  useEffect(() => { localStorage.setItem(VIEW_MODE_KEY, viewMode); }, [viewMode]);
+
+  // Background metadata/thumbnail back-fill. Each result is merged in place so
+  // covers appear progressively without a full reload.
+  const patchBook = useCallback((meta: AttachmentMeta) => {
+    setBooks(prev => prev.map(b => (b.id === meta.id ? meta : b)));
+  }, []);
+  const enrichment = useLibraryEnrichment(books, patchBook);
 
   // '/' focuses the search input
   useEffect(() => {
@@ -148,7 +148,7 @@ export function LibraryPage() {
       const target = e.target as HTMLElement | null;
       if (target) {
         const tag = target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
       }
       const input = searchInputRef.current;
       if (!input) return;
@@ -167,351 +167,208 @@ export function LibraryPage() {
     }
   }, [renamingId]);
 
-  useEffect(() => {
-    if (creatingFolder && newFolderInputRef.current) {
-      newFolderInputRef.current.focus();
-    }
-  }, [creatingFolder]);
+  // Typing a search while on Home jumps to Browse so results have somewhere to show.
+  const handleSearchChange = useCallback((q: string) => {
+    setSearchQuery(q);
+    if (q && isHome) setView({ kind: 'all' });
+  }, [isHome, setView]);
 
-  useEffect(() => {
-    if (renamingFolderId && renameFolderInputRef.current) {
-      renameFolderInputRef.current.focus();
-      renameFolderInputRef.current.select();
-    }
-  }, [renamingFolderId]);
-
-  useEffect(() => {
-    if (creatingTag && newTagInputRef.current) {
-      newTagInputRef.current.focus();
-    }
-  }, [creatingTag]);
-
-  useEffect(() => {
-    if (renamingTagId && renameTagInputRef.current) {
-      renameTagInputRef.current.focus();
-      renameTagInputRef.current.select();
-    }
-  }, [renamingTagId]);
-
-  const handleUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-      const uploadFolderId = selection.kind === 'folder' ? selection.id : null;
-      const uploadedIds: string[] = [];
-      const duplicates: Array<{ filename: string; existing: string }> = [];
-      for (const file of Array.from(files)) {
-        try {
-          const created = await attachmentStorage.add('', file, uploadFolderId);
-          uploadedIds.push(created.id);
-        } catch (err) {
-          if (err instanceof DuplicateAttachmentError) {
-            duplicates.push({ filename: file.name, existing: err.existing.filename });
-          } else {
-            throw err;
-          }
-        }
-      }
-      if (selection.kind === 'tag') {
-        await Promise.all(uploadedIds.map(id => attachmentStorage.setTags(id, [selection.id])));
-      }
-      await loadBooks();
-      e.target.value = '';
-      if (duplicates.length > 0) {
-        const lines = duplicates.map(d =>
-          d.filename === d.existing ? `• ${d.filename}` : `• ${d.filename} (already in library as "${d.existing}")`,
-        );
-        const header = duplicates.length === 1
-          ? 'Skipped 1 duplicate:'
-          : `Skipped ${duplicates.length} duplicates:`;
-        alert(`${header}\n\n${lines.join('\n')}`);
-      }
-    },
-    [loadBooks, selection],
-  );
-
-  const handleOpen = useCallback(
-    (book: AttachmentMeta, openInNewTab = false) => {
-      attachmentStorage.markOpened(book.id).catch(() => {});
-      const isViewable = book.type === 'application/pdf'
-        || book.type === 'image/vnd.djvu'
-        || book.type === 'image/x-djvu'
-        || book.filename.toLowerCase().endsWith('.djvu');
-      if (isViewable) {
-        if (openInNewTab) {
-          window.open(`/pdf/${book.id}`, '_blank', 'noopener,noreferrer');
+  // --- Upload ---------------------------------------------------------------
+  const uploadFiles = useCallback(async (files: File[], folderId: string | null) => {
+    if (files.length === 0) return;
+    const uploadedIds: string[] = [];
+    const duplicates: Array<{ filename: string; existing: string }> = [];
+    for (const file of files) {
+      try {
+        const created = await attachmentStorage.add('', file, folderId);
+        uploadedIds.push(created.id);
+      } catch (err) {
+        if (err instanceof DuplicateAttachmentError) {
+          duplicates.push({ filename: file.name, existing: err.existing.filename });
         } else {
-          navigate(`/pdf/${book.id}`);
+          console.error('Upload failed:', err);
+          alert(`Upload failed for ${file.name}`);
         }
-      } else {
-        attachmentStorage.openFile(book.id);
       }
-    },
-    [navigate],
-  );
+    }
+    if (selection.kind === 'tag' && uploadedIds.length > 0) {
+      await Promise.all(uploadedIds.map(id => attachmentStorage.setTags(id, [selection.id])));
+    }
+    setTriageIds(prev => [...uploadedIds.reverse(), ...prev]);
+    await loadBooks();
+    if (duplicates.length > 0) {
+      const lines = duplicates.map(d =>
+        d.filename === d.existing ? `• ${d.filename}` : `• ${d.filename} (already in library as "${d.existing}")`,
+      );
+      const header = duplicates.length === 1 ? 'Skipped 1 duplicate:' : `Skipped ${duplicates.length} duplicates:`;
+      alert(`${header}\n\n${lines.join('\n')}`);
+    }
+  }, [loadBooks, selection]);
 
-  const handleDelete = useCallback(
-    async (ids: string[]) => {
-      if (ids.length === 0) return;
-      const msg = ids.length === 1
-        ? 'Delete 1 book? This cannot be undone.'
-        : `Delete ${ids.length} books? This cannot be undone.`;
-      if (!confirm(msg)) return;
-      await Promise.all(ids.map(id => attachmentStorage.delete(id)));
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        for (const id of ids) next.delete(id);
-        return next;
-      });
-      setActiveId(prev => (prev && ids.includes(prev) ? null : prev));
-      setAnchorId(prev => (prev && ids.includes(prev) ? null : prev));
-      await loadBooks();
-    },
-    [loadBooks],
-  );
+  const handleUploadInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    await uploadFiles(files, selection.kind === 'folder' ? selection.id : null);
+  }, [uploadFiles, selection]);
+
+  const handlePageDragOver = useCallback((e: DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    setDragging(true);
+  }, []);
+  const handlePageDragLeave = useCallback((e: DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setDragging(false);
+  }, []);
+  const handlePageDrop = useCallback((e: DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    void uploadFiles(files, selection.kind === 'folder' ? selection.id : null);
+  }, [uploadFiles, selection]);
+
+  // --- Open / delete / rename --------------------------------------------------
+  const handleOpen = useCallback((book: AttachmentMeta, openInNewTab = false) => {
+    attachmentStorage.markOpened(book.id).catch(() => {});
+    const isViewable = book.type === 'application/pdf'
+      || book.type === 'image/vnd.djvu'
+      || book.type === 'image/x-djvu'
+      || book.filename.toLowerCase().endsWith('.djvu');
+    if (isViewable) {
+      if (openInNewTab) window.open(`/pdf/${book.id}`, '_blank', 'noopener,noreferrer');
+      else navigate(`/pdf/${book.id}`);
+    } else {
+      attachmentStorage.openFile(book.id);
+    }
+  }, [navigate]);
+
+  const handleDelete = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const msg = ids.length === 1 ? 'Delete 1 item? This cannot be undone.' : `Delete ${ids.length} items? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    await Promise.all(ids.map(id => attachmentStorage.delete(id)));
+    setSelectedIds(prev => { const next = new Set(prev); for (const id of ids) next.delete(id); return next; });
+    setActiveId(prev => (prev && ids.includes(prev) ? null : prev));
+    setAnchorId(prev => (prev && ids.includes(prev) ? null : prev));
+    setTriageIds(prev => prev.filter(id => !ids.includes(id)));
+    await loadBooks();
+  }, [loadBooks]);
 
   const startRename = useCallback((book: AttachmentMeta) => {
     setRenamingId(book.id);
-    setRenameValue(book.filename);
+    setRenameValue(displayTitle(book));
   }, []);
 
   const commitRename = useCallback(async () => {
     if (!renamingId) return;
+    const book = books.find(b => b.id === renamingId);
     const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== books.find(b => b.id === renamingId)?.filename) {
-      await attachmentStorage.rename(renamingId, trimmed);
+    if (book && trimmed && trimmed !== displayTitle(book)) {
+      await attachmentStorage.setTitle(renamingId, trimmed);
       await loadBooks();
     }
     setRenamingId(null);
     setRenameValue('');
   }, [renamingId, renameValue, books, loadBooks]);
 
-  const cancelRename = useCallback(() => {
-    setRenamingId(null);
-    setRenameValue('');
-  }, []);
+  const cancelRename = useCallback(() => { setRenamingId(null); setRenameValue(''); }, []);
 
-  const handleSort = useCallback((field: SortField) => {
+  const handleSort = useCallback((field: SortField, dir?: SortDir) => {
+    if (dir) { setSortField(field); setSortDir(dir); return; }
     setSortField(prev => {
-      if (prev === field) {
-        setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
-        return prev;
-      }
-      setSortDir(field === 'name' ? 'asc' : 'desc');
+      if (prev === field) { setSortDir(d => (d === 'asc' ? 'desc' : 'asc')); return prev; }
+      setSortDir(field === 'name' || field === 'kind' ? 'asc' : 'desc');
       return field;
     });
   }, []);
 
-  // Folder handlers
-  const handleCreateFolder = useCallback(async () => {
-    const trimmed = newFolderName.trim();
-    if (!trimmed) {
-      setCreatingFolder(false);
-      setNewFolderName('');
-      return;
-    }
-    await folderStorage.create(trimmed);
-    await loadFolders();
-    setCreatingFolder(false);
-    setNewFolderName('');
-  }, [newFolderName, loadFolders]);
-
-  const startRenameFolder = useCallback((folder: Folder) => {
-    setRenamingFolderId(folder.id);
-    setRenameFolderValue(folder.name);
-  }, []);
-
-  const commitRenameFolder = useCallback(async () => {
-    if (!renamingFolderId) return;
-    const trimmed = renameFolderValue.trim();
-    if (trimmed && trimmed !== folders.find(f => f.id === renamingFolderId)?.name) {
-      await folderStorage.rename(renamingFolderId, trimmed);
-      await loadFolders();
-    }
-    setRenamingFolderId(null);
-    setRenameFolderValue('');
-  }, [renamingFolderId, renameFolderValue, folders, loadFolders]);
-
-  const cancelRenameFolder = useCallback(() => {
-    setRenamingFolderId(null);
-    setRenameFolderValue('');
-  }, []);
-
-  const handleDeleteFolder = useCallback(async (folderId: string) => {
-    await folderStorage.delete(folderId);
-    setSelection(prev => (prev.kind === 'folder' && prev.id === folderId ? { kind: 'all' } : prev));
-    await loadFolders();
+  // --- Classification --------------------------------------------------------
+  const handleSetKind = useCallback(async (bookIds: string[], kind: AttachmentKind | null) => {
+    await Promise.all(bookIds.map(id => attachmentStorage.setKind(id, kind)));
     await loadBooks();
-  }, [loadFolders, loadBooks]);
-
-  const handleMoveToFolder = useCallback(async (bookIds: string[], folderId: string | null) => {
-    await Promise.all(bookIds.map(id => attachmentStorage.moveToFolder(id, folderId)));
-    await loadBooks();
-    setMoveMenu(null);
   }, [loadBooks]);
 
-  // Tag handlers
-  const handleCreateTag = useCallback(async () => {
-    const trimmed = newTagName.trim();
-    if (!trimmed) {
-      setCreatingTag(false);
-      setNewTagName('');
-      return;
-    }
-    await bookTagStorage.create(trimmed, randomCategorical());
-    await loadTags();
-    setCreatingTag(false);
-    setNewTagName('');
-  }, [newTagName, loadTags]);
-
-  const startRenameTag = useCallback((tag: BookTag) => {
-    setRenamingTagId(tag.id);
-    setRenameTagValue(tag.name);
-  }, []);
-
-  const commitRenameTag = useCallback(async () => {
-    if (!renamingTagId) return;
-    const trimmed = renameTagValue.trim();
-    if (trimmed && trimmed !== tags.find(t => t.id === renamingTagId)?.name) {
-      await bookTagStorage.rename(renamingTagId, trimmed);
-      await loadTags();
-    }
-    setRenamingTagId(null);
-    setRenameTagValue('');
-  }, [renamingTagId, renameTagValue, tags, loadTags]);
-
-  const cancelRenameTag = useCallback(() => {
-    setRenamingTagId(null);
-    setRenameTagValue('');
-  }, []);
-
-  const handleDeleteTag = useCallback(async (tagId: string) => {
-    await bookTagStorage.delete(tagId);
-    setSelection(prev => (prev.kind === 'tag' && prev.id === tagId ? { kind: 'all' } : prev));
-    await loadTags();
+  const handleToggleProject = useCallback(async (bookIds: string[], folderId: string) => {
+    const allHave = bookIds.every(id => books.find(b => b.id === id)?.folderIds.includes(folderId));
+    await Promise.all(bookIds.map(async id => {
+      const current = books.find(b => b.id === id)?.folderIds ?? [];
+      const next = allHave ? current.filter(f => f !== folderId) : current.includes(folderId) ? current : [...current, folderId];
+      await attachmentStorage.setFolders(id, next);
+    }));
     await loadBooks();
-  }, [loadTags, loadBooks]);
+  }, [books, loadBooks]);
 
-  // Apply a tag to a set of books: if every book already has the tag, remove
-  // it; otherwise add it to those missing it.
+  const handleSetDone = useCallback(async (bookIds: string[], done: boolean) => {
+    await Promise.all(bookIds.map(id => attachmentStorage.setStatus(id, done ? 'done' : null)));
+    await loadBooks();
+  }, [loadBooks]);
+
   const handleToggleBookTag = useCallback(async (bookIds: string[], tagId: string) => {
     const allHave = bookIds.every(bid => books.find(b => b.id === bid)?.tags?.includes(tagId));
     await Promise.all(bookIds.map(async bid => {
-      const book = books.find(b => b.id === bid);
-      const current = book?.tags ?? [];
-      const next = allHave
-        ? current.filter(t => t !== tagId)
-        : current.includes(tagId) ? current : [...current, tagId];
+      const current = books.find(b => b.id === bid)?.tags ?? [];
+      const next = allHave ? current.filter(t => t !== tagId) : current.includes(tagId) ? current : [...current, tagId];
       await attachmentStorage.setTags(bid, next);
     }));
     await loadBooks();
   }, [books, loadBooks]);
 
-  const handleShuffleTagColors = useCallback(async () => {
-    if (tags.length === 0) return;
-    await Promise.all(tags.map(t => bookTagStorage.update(t.id, { color: randomCategorical() })));
-    await loadTags();
-  }, [tags, loadTags]);
-
   const handleRemoveBookTag = useCallback(async (bookId: string, tagId: string) => {
     const book = books.find(b => b.id === bookId);
     if (!book) return;
-    const next = (book.tags ?? []).filter(t => t !== tagId);
-    await attachmentStorage.setTags(bookId, next);
+    await attachmentStorage.setTags(bookId, (book.tags ?? []).filter(t => t !== tagId));
     await loadBooks();
   }, [books, loadBooks]);
 
-  // Context menu for books
+  const handleCreateProject = useCallback(async (name: string) => {
+    const created = await folderStorage.create(name);
+    await loadFolders();
+    setView({ kind: 'folder', id: created.id });
+  }, [loadFolders, setView]);
+
+  // --- Context menu ----------------------------------------------------------
   const openBookContextMenu = useCallback((e: React.MouseEvent, book: AttachmentMeta) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, book });
-    setFolderContextMenu(null);
-    setTagContextMenu(null);
-    setMoveMenu(null);
+    setKindMenu(null);
+    setProjectMenu(null);
   }, []);
 
-  const closeContextMenu = useCallback(() => setContextMenu(null), []);
-  const closeFolderContextMenu = useCallback(() => setFolderContextMenu(null), []);
-  const closeTagContextMenu = useCallback(() => setTagContextMenu(null), []);
-  const closeMoveMenu = useCallback(() => setMoveMenu(null), []);
+  // --- Derived collections --------------------------------------------------
+  const tagsById = useMemo(() => new Map(tags.map(t => [t.id, t])), [tags]);
+  const foldersById = useMemo(() => new Map(folders.map(f => [f.id, f])), [folders]);
+  const activeFolders = useMemo(() => folders.filter(f => !f.archivedAt), [folders]);
+  const now = useNow();
 
-  // Filtered and sorted books.
-  // Folders exclude books from "All"; tags do NOT — a tag is an overlay filter
-  // that shows matching books regardless of folder, and tagged books remain
-  // visible in All as long as they're not inside a folder.
-  const filteredBooks = useMemo(() => {
-    let result = books;
-    if (selection.kind === 'folder') {
-      result = result.filter(b => b.folderId === selection.id);
-    } else if (selection.kind === 'tag') {
-      result = result.filter(b => b.tags?.includes(selection.id));
-    } else {
-      result = result.filter(b => !b.folderId);
-    }
-    if (searchQuery) {
-      result = result.filter(b =>
-        b.filename.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-    }
-    return result;
-  }, [books, selection, searchQuery]);
-
-  const sortedBooks = useMemo(() => {
-    const sorted = [...filteredBooks].sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'name':
-          cmp = a.filename.localeCompare(b.filename);
-          break;
-        case 'uploaded':
-          cmp = a.createdAt.localeCompare(b.createdAt);
-          break;
-        case 'lastOpened':
-          cmp = (a.lastOpenedAt ?? '').localeCompare(b.lastOpenedAt ?? '');
-          break;
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return sorted;
-  }, [filteredBooks, sortField, sortDir]);
+  // Base = selection + search; chips count within it, then kind/activity narrow it.
+  const baseBooks = useMemo(
+    () => books.filter(b => matchesSelection(b, selection) && matchesQuery(b, searchQuery, tagsById, foldersById)),
+    [books, selection, searchQuery, tagsById, foldersById],
+  );
+  const kindCounts = useMemo(() => countByKind(baseBooks.filter(b => matchesActivity(b, filters.activity, now))), [baseBooks, filters.activity, now]);
+  const activityCounts = useMemo(() => countByActivity(baseBooks.filter(b => matchesKind(b, filters.kind)), now), [baseBooks, filters.kind, now]);
+  const filteredBooks = useMemo(
+    () => baseBooks.filter(b => matchesKind(b, filters.kind) && matchesActivity(b, filters.activity, now)),
+    [baseBooks, filters, now],
+  );
+  const sortedBooks = useMemo(
+    () => [...filteredBooks].sort((a, b) => compareBooks(a, b, sortField, sortDir)),
+    [filteredBooks, sortField, sortDir],
+  );
+  const triageBooks = useMemo(
+    () => triageIds.map(id => books.find(b => b.id === id)).filter((b): b is AttachmentMeta => !!b),
+    [triageIds, books],
+  );
 
   // Clear selection state when the visible set changes meaningfully.
   useEffect(() => {
     setSelectedIds(new Set());
     setActiveId(null);
     setAnchorId(null);
-  }, [selection, searchQuery]);
+  }, [selection, filters, searchQuery]);
 
-  const tagsById = useMemo(() => {
-    const map = new Map<string, BookTag>();
-    for (const t of tags) map.set(t.id, t);
-    return map;
-  }, [tags]);
-
-  // Books link to flowchart nodes through `book.nodeAttachments`. To keep list
-  // rows one line regardless of how many nodes a book is attached to, render a
-  // single "N nodes" chip with a hover tooltip listing each.
-  const renderNodeChips = (book: AttachmentMeta) => {
-    const links = book.nodeAttachments ?? [];
-    if (links.length === 0) return null;
-    return (
-      <span className={styles.nodeChip}>
-        <span className={styles.nodeChipLabel}>
-          {links.length} {links.length === 1 ? 'node' : 'nodes'}
-        </span>
-        <span className={styles.nodeChipTooltip} role="tooltip">
-          {links.map(link => (
-            <span key={`${link.flowchartId}:${link.nodeKey}`} className={styles.nodeChipTooltipRow}>
-              <span className={styles.nodeChipTooltipNode}>{link.title}</span>
-              <span className={styles.nodeChipTooltipFlowchart}>{link.flowchartName}</span>
-            </span>
-          ))}
-        </span>
-      </span>
-    );
-  };
-
-  // Selection helpers
+  // --- Selection helpers -----------------------------------------------------
   const rangeBetween = useCallback((fromId: string, toId: string): Set<string> => {
     const fromIdx = sortedBooks.findIndex(b => b.id === fromId);
     const toIdx = sortedBooks.findIndex(b => b.id === toId);
@@ -523,25 +380,17 @@ export function LibraryPage() {
   }, [sortedBooks]);
 
   const scrollIntoView = useCallback((id: string) => {
-    const el = cardRefs.current.get(id);
-    if (el) el.scrollIntoView({ block: 'nearest' });
+    cardRefs.current.get(id)?.scrollIntoView({ block: 'nearest' });
   }, []);
 
   const handleCardClick = useCallback((book: AttachmentMeta, e: React.MouseEvent) => {
-    // Ignore clicks bubbled from interactive children
     const target = e.target as HTMLElement;
     if (target.closest('input, button, select, textarea')) return;
-
     if (e.shiftKey && anchorId !== null) {
       setSelectedIds(rangeBetween(anchorId, book.id));
       setActiveId(book.id);
     } else if (e.ctrlKey || e.metaKey) {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        if (next.has(book.id)) next.delete(book.id);
-        else next.add(book.id);
-        return next;
-      });
+      setSelectedIds(prev => { const next = new Set(prev); if (next.has(book.id)) next.delete(book.id); else next.add(book.id); return next; });
       setActiveId(book.id);
       setAnchorId(book.id);
     } else {
@@ -557,31 +406,30 @@ export function LibraryPage() {
     handleOpen(book);
   }, [handleOpen]);
 
-  // Keyboard navigation: arrow keys to move, shift to extend, enter to open,
-  // delete/backspace to delete, escape to clear.
+  // Keyboard navigation (browse only): arrows move, shift extends, enter opens,
+  // delete removes, escape clears, 'a' opens the assign popup.
   useEffect(() => {
+    if (isHome) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target) {
         const tag = target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
       }
       if (sortedBooks.length === 0) return;
+      const horizontal = viewMode === 'grid';
+      const isNext = e.key === 'ArrowDown' || (horizontal && e.key === 'ArrowRight');
+      const isPrev = e.key === 'ArrowUp' || (horizontal && e.key === 'ArrowLeft');
 
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (isNext || isPrev) {
         e.preventDefault();
         let newActiveId: string;
-        if (activeId === null) {
+        const currentIdx = activeId === null ? -1 : sortedBooks.findIndex(b => b.id === activeId);
+        if (currentIdx === -1) {
           newActiveId = sortedBooks[0].id;
         } else {
-          const currentIdx = sortedBooks.findIndex(b => b.id === activeId);
-          if (currentIdx === -1) {
-            newActiveId = sortedBooks[0].id;
-          } else {
-            const delta = e.key === 'ArrowDown' ? 1 : -1;
-            const nextIdx = Math.max(0, Math.min(sortedBooks.length - 1, currentIdx + delta));
-            newActiveId = sortedBooks[nextIdx].id;
-          }
+          const nextIdx = Math.max(0, Math.min(sortedBooks.length - 1, currentIdx + (isNext ? 1 : -1)));
+          newActiveId = sortedBooks[nextIdx].id;
         }
         if (e.shiftKey && anchorId !== null) {
           setSelectedIds(rangeBetween(anchorId, newActiveId));
@@ -594,19 +442,11 @@ export function LibraryPage() {
         scrollIntoView(newActiveId);
       } else if (e.key === 'Enter') {
         if (selectedIds.size === 1) {
-          const id = Array.from(selectedIds)[0];
-          const book = books.find(b => b.id === id);
-          if (book) {
-            e.preventDefault();
-            handleOpen(book);
-          }
+          const book = books.find(b => b.id === Array.from(selectedIds)[0]);
+          if (book) { e.preventDefault(); handleOpen(book); }
         }
       } else if (e.key === 'Escape') {
-        if (selectedIds.size > 0) {
-          setSelectedIds(new Set());
-          setActiveId(null);
-          setAnchorId(null);
-        }
+        if (selectedIds.size > 0) { setSelectedIds(new Set()); setActiveId(null); setAnchorId(null); }
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedIds.size === 0) return;
         e.preventDefault();
@@ -619,18 +459,26 @@ export function LibraryPage() {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sortedBooks, activeId, anchorId, selectedIds, books, handleOpen, handleDelete, rangeBetween, scrollIntoView]);
+  }, [isHome, viewMode, sortedBooks, activeId, anchorId, selectedIds, books, handleOpen, handleDelete, rangeBetween, scrollIntoView]);
 
-  // Sidebar tag click: apply to selection if any, otherwise filter.
-  const handleSidebarTagClick = useCallback(async (tag: BookTag) => {
-    if (selectedIds.size > 0) {
-      await handleToggleBookTag(Array.from(selectedIds), tag.id);
-      return;
-    }
-    setSelection(prev =>
-      prev.kind === 'tag' && prev.id === tag.id ? { kind: 'all' } : { kind: 'tag', id: tag.id },
+  // --- Chips -----------------------------------------------------------------
+  const renderNodeChips = (book: AttachmentMeta) => {
+    const links = book.nodeAttachments ?? [];
+    if (links.length === 0) return null;
+    return (
+      <span className={styles.nodeChip}>
+        <span className={styles.nodeChipLabel}>{links.length} {links.length === 1 ? 'node' : 'nodes'}</span>
+        <span className={styles.nodeChipTooltip} role="tooltip">
+          {links.map(link => (
+            <span key={`${link.flowchartId}:${link.nodeKey}`} className={styles.nodeChipTooltipRow}>
+              <span className={styles.nodeChipTooltipNode}>{link.title}</span>
+              <span className={styles.nodeChipTooltipFlowchart}>{link.flowchartName}</span>
+            </span>
+          ))}
+        </span>
+      </span>
     );
-  }, [selectedIds, handleToggleBookTag]);
+  };
 
   const renderTagChips = (book: AttachmentMeta) => {
     if (!book.tags || book.tags.length === 0) return null;
@@ -665,50 +513,124 @@ export function LibraryPage() {
     );
   };
 
-  // Right-click context menu acts on the selection when the right-clicked
-  // book is part of the selection; otherwise it acts on just that book.
+  const renderProjectChips = (book: AttachmentMeta) => {
+    const names = book.folderIds.map(id => foldersById.get(id)).filter((f): f is Folder => !!f);
+    if (names.length === 0) return null;
+    return (
+      <span className={styles.projectChipRow}>
+        {names.map(f => (
+          <button
+            key={f.id}
+            type="button"
+            className={styles.projectChip}
+            onClick={e => { e.stopPropagation(); setView({ kind: 'folder', id: f.id }); }}
+            onDoubleClick={e => e.stopPropagation()}
+            title={`Open project ${f.name}`}
+          >
+            {f.name}
+          </button>
+        ))}
+      </span>
+    );
+  };
+
+  const renderKindBadge = (book: AttachmentMeta) => (
+    <span className={`${styles.kindBadge} ${book.kind ? styles[`kind_${book.kind}`] : styles.kindUnsorted} ${book.kind && !book.kindManual ? styles.kindGuess : ''}`} title={book.kind && !book.kindManual ? 'Guessed — right-click to set' : undefined}>
+      {book.kind ? KIND_LABELS[book.kind].singular : 'Unsorted'}
+    </span>
+  );
+
+  const renderProgress = (book: AttachmentMeta) => {
+    const p = getProgress(book);
+    const activity = getActivity(book, now);
+    if (p === null) {
+      return <span className={styles.progressText}>{ACTIVITY_LABELS[activity]}</span>;
+    }
+    return (
+      <span className={styles.progressCell} title={`${book.currentPage ?? 0} / ${book.pageCount ?? '?'} pages`}>
+        <span className={styles.progressBar}><span className={styles.progressFill} style={{ width: `${Math.round(p * 100)}%` }} /></span>
+        <span className={styles.progressText}>{activity === 'done' ? 'Done' : `${Math.round(p * 100)}%`}</span>
+      </span>
+    );
+  };
+
+  const subtitleFor = (book: AttachmentMeta) => {
+    const bits = [book.authors, book.year ? String(book.year) : null, book.pageCount ? `${book.pageCount} pp` : null].filter(Boolean);
+    return bits.join(' · ');
+  };
+
+  // Right-click acts on the selection when the clicked item is part of it.
+  const contextTargetIds = useMemo(() => {
+    if (!contextMenu) return [];
+    return selectedIds.has(contextMenu.book.id) ? Array.from(selectedIds) : [contextMenu.book.id];
+  }, [contextMenu, selectedIds]);
+
   const bookContextMenuItems = useMemo((): ContextMenuItem[] => {
     if (!contextMenu) return [];
-    const targetIds = selectedIds.has(contextMenu.book.id)
-      ? Array.from(selectedIds)
-      : [contextMenu.book.id];
+    const targetIds = contextTargetIds;
+    const targets = targetIds.map(id => books.find(b => b.id === id)).filter((b): b is AttachmentMeta => !!b);
     const items: ContextMenuItem[] = [];
     if (targetIds.length === 1) {
+      items.push({ label: 'Open in new tab', onClick: () => handleOpen(contextMenu.book, true) });
       items.push({ label: 'Rename', onClick: () => startRename(contextMenu.book) });
     }
-    if (folders.length > 0) {
+    items.push({ label: 'Set kind…', onClick: () => setKindMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: targetIds }) });
+    if (activeFolders.length > 0) {
+      items.push({ label: 'Projects…', onClick: () => setProjectMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: targetIds }) });
+    }
+    if (selection.kind === 'folder') {
+      const folderId = selection.id;
       items.push({
-        label: 'Move to folder...',
-        onClick: () => {
-          setMoveMenu({ x: contextMenu.x, y: contextMenu.y, bookIds: targetIds });
+        label: `Remove from ${foldersById.get(folderId)?.name ?? 'project'}`,
+        onClick: async () => {
+          await Promise.all(targets.map(b => attachmentStorage.setFolders(b.id, b.folderIds.filter(f => f !== folderId))));
+          await loadBooks();
         },
       });
     }
-    if (targetIds.length === 1 && contextMenu.book.folderId) {
-      items.push({
-        label: 'Remove from folder',
-        onClick: () => handleMoveToFolder([contextMenu.book.id], null),
-      });
-    }
+    const allDone = targets.length > 0 && targets.every(b => b.status === 'done');
+    items.push({ label: allDone ? 'Mark as not done' : 'Mark as done', onClick: () => handleSetDone(targetIds, !allDone) });
     items.push({
       label: targetIds.length === 1 ? 'Delete' : `Delete ${targetIds.length}`,
       onClick: () => handleDelete(targetIds),
       danger: true,
     });
     return items;
-  }, [contextMenu, selectedIds, folders, startRename, handleMoveToFolder, handleDelete]);
+  }, [contextMenu, contextTargetIds, books, activeFolders, selection, foldersById, handleOpen, startRename, handleSetDone, handleDelete, loadBooks]);
 
-  // Move menu items
-  const moveMenuItems = useMemo((): ContextMenuItem[] => {
-    if (!moveMenu) return [];
-    const items: ContextMenuItem[] = folders.map(f => ({
-      label: f.name,
-      onClick: () => handleMoveToFolder(moveMenu.bookIds, f.id),
+  const kindMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!kindMenu) return [];
+    const targets = kindMenu.bookIds.map(id => books.find(b => b.id === id)).filter((b): b is AttachmentMeta => !!b);
+    const common = <T,>(pick: (b: AttachmentMeta) => T | undefined): T | undefined => {
+      const v = targets.map(pick);
+      return v.every(x => x === v[0]) ? v[0] : undefined;
+    };
+    const currentKind = common(b => b.kind);
+    const currentManual = common(b => (b.kindManual ? 'y' : 'n'));
+    const items: ContextMenuItem[] = ATTACHMENT_KINDS.map(k => ({
+      label: KIND_LABELS[k].singular,
+      checked: currentKind === k && currentManual === 'y',
+      onClick: () => handleSetKind(kindMenu.bookIds, k),
     }));
-    items.push({ label: 'No folder', onClick: () => handleMoveToFolder(moveMenu.bookIds, null) });
+    items.push({
+      label: currentKind && currentManual === 'n' ? `Automatic (${KIND_LABELS[currentKind].singular})` : 'Automatic',
+      checked: currentManual === 'n',
+      onClick: () => handleSetKind(kindMenu.bookIds, null),
+    });
     return items;
-  }, [moveMenu, folders, handleMoveToFolder]);
+  }, [kindMenu, books, handleSetKind]);
 
+  const projectMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!projectMenu) return [];
+    return activeFolders.map(f => ({
+      label: f.name,
+      checked: projectMenu.bookIds.every(id => books.find(b => b.id === id)?.folderIds.includes(f.id)),
+      keepOpen: true,
+      onClick: () => handleToggleProject(projectMenu.bookIds, f.id),
+    }));
+  }, [projectMenu, activeFolders, books, handleToggleProject]);
+
+  // --- Render ------------------------------------------------------------------
   if (loading) {
     return (
       <div className={styles.page}>
@@ -723,9 +645,7 @@ export function LibraryPage() {
         <div className={styles.empty}>
           <p className={styles.emptyTitle}>Connection error</p>
           <p className={styles.emptyText}>{error}</p>
-          <button className={styles.uploadButton} onClick={loadBooks}>
-            Retry
-          </button>
+          <button className={styles.uploadButton} onClick={loadBooks}>Retry</button>
         </div>
       </div>
     );
@@ -736,418 +656,285 @@ export function LibraryPage() {
     return <span className={styles.sortArrow}>{sortDir === 'asc' ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}</span>;
   };
 
-  const sidebarTagTooltip = (tag: BookTag) =>
-    selectedIds.size > 0
-      ? `Apply "${tag.name}" to ${selectedIds.size} selected book(s)`
-      : `Filter by ${tag.name}`;
+  const headingFor = (): string => {
+    switch (selection.kind) {
+      case 'home': return 'Library';
+      case 'all': return 'All items';
+      case 'folder': return foldersById.get(selection.id)?.name ?? 'Project';
+      case 'tag': return tagsById.get(selection.id)?.name ?? 'Tag';
+    }
+  };
+
+  const emptyState = () => {
+    if (books.length === 0) {
+      return (<><p className={styles.emptyTitle}>No items yet</p><p className={styles.emptyText}>Upload a PDF or drop files here to get started.</p></>);
+    }
+    if (baseBooks.length === 0 && selection.kind === 'folder' && !searchQuery) {
+      return (<><p className={styles.emptyTitle}>This project is empty</p><p className={styles.emptyText}>Drop files here, or right-click items elsewhere and choose &quot;Projects…&quot;.</p></>);
+    }
+    if (baseBooks.length === 0 && selection.kind === 'tag' && !searchQuery) {
+      return (<><p className={styles.emptyTitle}>No items with this tag</p><p className={styles.emptyText}>Select items and click the tag in the sidebar to apply it.</p></>);
+    }
+    return (<><p className={styles.emptyTitle}>No matching items</p><p className={styles.emptyText}>Try adjusting your search or filters.</p></>);
+  };
 
   return (
-    <div className={styles.page}>
+    <div
+      className={`${styles.page} ${dragging ? styles.pageDragging : ''}`}
+      onDragOver={handlePageDragOver}
+      onDragLeave={handlePageDragLeave}
+      onDrop={handlePageDrop}
+    >
       <div className={styles.header}>
-        <h1 className={styles.title}>Library</h1>
+        <h1 className={styles.title}>{headingFor()}</h1>
+        {enrichment.active && enrichment.pending > 0 && (
+          <span className={styles.enrichBadge} title="Reading page counts, metadata and covers from files">
+            Indexing {enrichment.total - enrichment.pending + 1}/{enrichment.total}
+          </span>
+        )}
         <div className={styles.headerActions}>
-          <div className={styles.viewToggle}>
-            <button
-              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.viewToggleActive : ''}`}
-              onClick={() => setViewMode('card')}
-              title="Card view"
-              aria-label="Card view"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="1" y="1" width="6" height="6" rx="1" />
-                <rect x="9" y="1" width="6" height="6" rx="1" />
-                <rect x="1" y="9" width="6" height="6" rx="1" />
-                <rect x="9" y="9" width="6" height="6" rx="1" />
-              </svg>
-            </button>
-            <button
-              className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
-              onClick={() => setViewMode('list')}
-              title="List view"
-              aria-label="List view"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <line x1="1" y1="3" x2="15" y2="3" />
-                <line x1="1" y1="8" x2="15" y2="8" />
-                <line x1="1" y1="13" x2="15" y2="13" />
-              </svg>
-            </button>
-          </div>
-          <button
-            className={styles.uploadButton}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            + Upload Book
+          {!isHome && (
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'grid' ? styles.viewToggleActive : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Cover grid"
+                aria-label="Cover grid"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="1" y="1" width="6" height="6" rx="1" />
+                  <rect x="9" y="1" width="6" height="6" rx="1" />
+                  <rect x="1" y="9" width="6" height="6" rx="1" />
+                  <rect x="9" y="9" width="6" height="6" rx="1" />
+                </svg>
+              </button>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List view"
+                aria-label="List view"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <line x1="1" y1="3" x2="15" y2="3" />
+                  <line x1="1" y1="8" x2="15" y2="8" />
+                  <line x1="1" y1="13" x2="15" y2="13" />
+                </svg>
+              </button>
+            </div>
+          )}
+          <button className={styles.uploadButton} onClick={() => fileInputRef.current?.click()}>
+            + Upload
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className={styles.hiddenInput}
-            onChange={handleUpload}
-          />
+          <input ref={fileInputRef} type="file" multiple className={styles.hiddenInput} onChange={handleUploadInput} />
         </div>
       </div>
 
       <div className={styles.layout}>
-        {/* Sidebar: All, folders, then tags */}
-        <nav className={styles.sidebar}>
-          <button
-            className={`${styles.sidebarItem} ${selection.kind === 'all' ? styles.sidebarItemActive : ''}`}
-            onClick={() => setSelection({ kind: 'all' })}
-          >
-            Default
-          </button>
-          {folders.map(folder => (
-            <div key={folder.id}>
-              {renamingFolderId === folder.id ? (
-                <input
-                  ref={renameFolderInputRef}
-                  className={styles.sidebarRenameInput}
-                  value={renameFolderValue}
-                  onChange={e => setRenameFolderValue(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') commitRenameFolder();
-                    if (e.key === 'Escape') cancelRenameFolder();
-                  }}
-                  onBlur={commitRenameFolder}
-                />
-              ) : (
-                <button
-                  className={`${styles.sidebarItem} ${selection.kind === 'folder' && selection.id === folder.id ? styles.sidebarItemActive : ''}`}
-                  onClick={() => setSelection({ kind: 'folder', id: folder.id })}
-                  onContextMenu={e => {
-                    e.preventDefault();
-                    setFolderContextMenu({ x: e.clientX, y: e.clientY, folder });
-                    setContextMenu(null);
-                    setTagContextMenu(null);
-                    setMoveMenu(null);
-                  }}
-                >
-                  {folder.name}
-                </button>
-              )}
-            </div>
-          ))}
-          {creatingFolder ? (
-            <input
-              ref={newFolderInputRef}
-              className={styles.sidebarRenameInput}
-              value={newFolderName}
-              placeholder="Folder name"
-              onChange={e => setNewFolderName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCreateFolder();
-                if (e.key === 'Escape') {
-                  setCreatingFolder(false);
-                  setNewFolderName('');
-                }
-              }}
-              onBlur={handleCreateFolder}
-            />
-          ) : (
-            <button
-              className={styles.newFolderBtn}
-              onClick={() => setCreatingFolder(true)}
-            >
-              + New Folder
-            </button>
-          )}
+        <LibrarySidebar
+          books={books}
+          folders={folders}
+          tags={tags}
+          selection={selection}
+          selectedCount={selectedIds.size}
+          onSelect={sel => setView(sel)}
+          onApplyTagToSelection={tag => handleToggleBookTag(Array.from(selectedIds), tag.id)}
+          onFoldersChanged={loadFolders}
+          onTagsChanged={loadTags}
+          onBooksChanged={loadBooks}
+        />
 
-          <div className={styles.sidebarSectionHeader}>
-            <span className={styles.sidebarSectionLabel}>Tags</span>
-            {tags.length > 0 && (
-              <button
-                type="button"
-                className={styles.sidebarHelpBtn}
-                onClick={handleShuffleTagColors}
-                title="Shuffle all tag colors"
-                aria-label="Shuffle all tag colors"
-              >
-                ⤭
-              </button>
-            )}
-          </div>
-          {tags.map(tag => (
-            <div key={tag.id}>
-              {renamingTagId === tag.id ? (
-                <input
-                  ref={renameTagInputRef}
-                  className={styles.sidebarRenameInput}
-                  value={renameTagValue}
-                  onChange={e => setRenameTagValue(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') commitRenameTag();
-                    if (e.key === 'Escape') cancelRenameTag();
-                  }}
-                  onBlur={commitRenameTag}
-                />
-              ) : (
-                <button
-                  className={`${styles.sidebarItem} ${selection.kind === 'tag' && selection.id === tag.id ? styles.sidebarItemActive : ''}`}
-                  onClick={() => handleSidebarTagClick(tag)}
-                  onContextMenu={e => {
-                    e.preventDefault();
-                    setTagContextMenu({ x: e.clientX, y: e.clientY, tag });
-                    setContextMenu(null);
-                    setFolderContextMenu(null);
-                    setMoveMenu(null);
-                  }}
-                  title={sidebarTagTooltip(tag)}
-                >
-                  <span
-                    className={styles.sidebarTagDot}
-                    style={tag.color ? { backgroundColor: tag.color } : undefined}
-                    aria-hidden="true"
-                  />
-                  {tag.name}
-                </button>
-              )}
-            </div>
-          ))}
-          {creatingTag ? (
-            <input
-              ref={newTagInputRef}
-              className={styles.sidebarRenameInput}
-              value={newTagName}
-              placeholder="Tag name"
-              onChange={e => setNewTagName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCreateTag();
-                if (e.key === 'Escape') {
-                  setCreatingTag(false);
-                  setNewTagName('');
-                }
-              }}
-              onBlur={handleCreateTag}
-            />
-          ) : (
-            <button
-              className={styles.newFolderBtn}
-              onClick={() => setCreatingTag(true)}
-            >
-              + New Tag
-            </button>
-          )}
-        </nav>
-
-        {/* Main content */}
         <div className={styles.content}>
           {books.length > 0 && (
             <div className={styles.searchRow}>
-              <SearchBar ref={searchInputRef} value={searchQuery} onChange={setSearchQuery} />
-              {selectedIds.size > 0 && (
-                <span className={styles.selectionCount}>
-                  {selectedIds.size} selected
-                </span>
-              )}
+              <SearchBar ref={searchInputRef} value={searchQuery} onChange={handleSearchChange} placeholder="Search titles, authors, tags, projects…" />
+              {selectedIds.size > 0 && <span className={styles.selectionCount}>{selectedIds.size} selected</span>}
             </div>
           )}
 
-          <div className={styles.listArea}>
-          {sortedBooks.length === 0 ? (
-            <div className={styles.empty}>
-              {books.length === 0 ? (
-                <>
-                  <p className={styles.emptyTitle}>No books yet</p>
-                  <p className={styles.emptyText}>
-                    Upload your first book to get started.
-                  </p>
-                </>
-              ) : filteredBooks.length === 0 && selection.kind === 'folder' && !searchQuery ? (
-                <>
-                  <p className={styles.emptyTitle}>This folder is empty</p>
-                  <p className={styles.emptyText}>
-                    Right-click a book and choose &quot;Move to folder&quot; to add books here.
-                  </p>
-                </>
-              ) : filteredBooks.length === 0 && selection.kind === 'tag' && !searchQuery ? (
-                <>
-                  <p className={styles.emptyTitle}>No books with this tag</p>
-                  <p className={styles.emptyText}>
-                    Select books and click the tag in the sidebar to apply it.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className={styles.emptyTitle}>No matching books</p>
-                  <p className={styles.emptyText}>
-                    Try adjusting your search.
-                  </p>
-                </>
-              )}
-            </div>
-          ) : viewMode === 'card' ? (
-            <div className={styles.cardList}>
-              {sortedBooks.map(book => {
-                const isSelected = selectedIds.has(book.id);
-                const isActive = activeId === book.id;
-                return (
-                  <article
-                    key={book.id}
-                    ref={el => {
-                      if (el) cardRefs.current.set(book.id, el);
-                      else cardRefs.current.delete(book.id);
-                    }}
-                    className={`${styles.card} ${isSelected ? styles.cardSelected : ''} ${isActive ? styles.cardActive : ''}`}
-                    onClick={e => handleCardClick(book, e)}
-                    onDoubleClick={e => handleCardDoubleClick(book, e)}
-                    onAuxClick={e => {
-                      if (e.button === 1) handleOpen(book, true);
-                    }}
-                    onContextMenu={e => openBookContextMenu(e, book)}
-                  >
-                    <div className={styles.cardTitle}>
-                      {renamingId === book.id ? (
-                        <input
-                          ref={renameInputRef}
-                          className={styles.renameInput}
-                          value={renameValue}
-                          onChange={e => setRenameValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') commitRename();
-                            if (e.key === 'Escape') cancelRename();
-                          }}
-                          onBlur={commitRename}
-                          onClick={e => e.stopPropagation()}
-                        />
-                      ) : (
-                        stripExtension(book.filename)
-                      )}
-                    </div>
-                    <div className={styles.cardMeta}>
-                      {renderNodeChips(book)}
-                      {renderTagChips(book)}
-                      <span className={styles.cardDates}>
-                        <span title="Last opened">
-                          {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
-                        </span>
-                        <span className={styles.cardDatesSep} aria-hidden="true" />
-                        <span title="Added">
-                          {formatDate(book.createdAt)}
-                        </span>
-                      </span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+          <UploadTriage
+            books={triageBooks}
+            folders={folders}
+            tags={tags}
+            onChanged={loadBooks}
+            onDismiss={id => setTriageIds(prev => prev.filter(x => x !== id))}
+            onDismissAll={() => setTriageIds([])}
+          />
+
+          {isHome ? (
+            <LibraryHome
+              books={books}
+              folders={folders}
+              onOpen={handleOpen}
+              onBrowse={(sel, f) => setView(sel, { kind: null, activity: null, ...f })}
+              onCreateProject={handleCreateProject}
+              onDropFiles={uploadFiles}
+              onContextMenu={openBookContextMenu}
+            />
           ) : (
-            <div className={styles.listContainer}>
-              <table className={styles.listTable}>
-                <thead>
-                  <tr className={styles.listHeaderRow}>
-                    <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>
-                      Name{sortIndicator('name')}
-                    </th>
-                    <th className={styles.listHeaderCell}>Tags</th>
-                    <th className={styles.listHeaderCell}>Nodes</th>
-                    <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>
-                      Uploaded{sortIndicator('uploaded')}
-                    </th>
-                    <th className={styles.listHeaderCell} onClick={() => handleSort('lastOpened')}>
-                      Last Opened{sortIndicator('lastOpened')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedBooks.map(book => {
-                    const isSelected = selectedIds.has(book.id);
-                    const isActive = activeId === book.id;
-                    return (
-                      <tr
-                        key={book.id}
-                        ref={el => {
-                          if (el) cardRefs.current.set(book.id, el);
-                          else cardRefs.current.delete(book.id);
-                        }}
-                        className={`${styles.listRow} ${isSelected ? styles.listRowSelected : ''} ${isActive ? styles.listRowActive : ''}`}
-                        onClick={e => handleCardClick(book, e)}
-                        onDoubleClick={e => handleCardDoubleClick(book, e)}
-                        onAuxClick={e => {
-                          if (e.button === 1) handleOpen(book, true);
-                        }}
-                        onContextMenu={e => openBookContextMenu(e, book)}
-                      >
-                        <td className={styles.listNameCell}>
-                          {renamingId === book.id ? (
-                            <input
-                              ref={renameInputRef}
-                              className={styles.renameInput}
-                              value={renameValue}
-                              onChange={e => setRenameValue(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') commitRename();
-                                if (e.key === 'Escape') cancelRename();
-                              }}
-                              onBlur={commitRename}
-                              onClick={e => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span className={styles.listFileName}>{stripExtension(book.filename)}</span>
-                          )}
-                        </td>
-                        <td className={styles.listCell}>{renderTagChips(book)}</td>
-                        <td className={styles.listNodesCell}>{renderNodeChips(book)}</td>
-                        <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
-                        <td className={styles.listCell}>
-                          {book.lastOpenedAt ? formatDate(book.lastOpenedAt) : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {baseBooks.length > 0 && (
+                <LibraryFilterBar
+                  filters={filters}
+                  onChange={setFilters}
+                  kindCounts={kindCounts}
+                  activityCounts={activityCounts}
+                  total={baseBooks.filter(b => matchesActivity(b, filters.activity, now)).length}
+                  sortField={sortField}
+                  sortDir={sortDir}
+                  onSort={(f, d) => handleSort(f, d)}
+                  showSort={viewMode === 'grid'}
+                />
+              )}
+
+              <div className={styles.listArea}>
+                {sortedBooks.length === 0 ? (
+                  <div className={styles.empty}>{emptyState()}</div>
+                ) : viewMode === 'grid' ? (
+                  <div className={styles.grid}>
+                    {sortedBooks.map(book => {
+                      const isSelected = selectedIds.has(book.id);
+                      const isActive = activeId === book.id;
+                      return (
+                        <article
+                          key={book.id}
+                          ref={el => { if (el) cardRefs.current.set(book.id, el); else cardRefs.current.delete(book.id); }}
+                          className={`${styles.gridCard} ${isSelected ? styles.gridCardSelected : ''} ${isActive ? styles.gridCardActive : ''}`}
+                          onClick={e => handleCardClick(book, e)}
+                          onDoubleClick={e => handleCardDoubleClick(book, e)}
+                          onAuxClick={e => { if (e.button === 1) handleOpen(book, true); }}
+                          onContextMenu={e => openBookContextMenu(e, book)}
+                        >
+                          <BookCover book={book} size="md" showProgress />
+                          <div className={styles.gridBody}>
+                            {renamingId === book.id ? (
+                              <input
+                                ref={renameInputRef}
+                                className={styles.renameInput}
+                                value={renameValue}
+                                onChange={e => setRenameValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
+                                onBlur={commitRename}
+                                onClick={e => e.stopPropagation()}
+                              />
+                            ) : (
+                              <div className={styles.gridTitle} title={displayTitle(book)}>{displayTitle(book)}</div>
+                            )}
+                            <div className={styles.gridMeta}>
+                              {renderKindBadge(book)}
+                              <span className={styles.gridMetaText}>{subtitleFor(book) || formatRelativeDate(book.lastOpenedAt, now)}</span>
+                            </div>
+                            {(book.tags?.length || book.nodeAttachments?.length) ? (
+                              <div className={styles.gridChips}>{renderTagChips(book)}{renderNodeChips(book)}</div>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.listContainer}>
+                    <table className={styles.listTable}>
+                      <colgroup>
+                        <col />
+                        <col className={styles.colKind} />
+                        <col className={styles.colChips} />
+                        <col className={styles.colChips} />
+                        <col className={styles.colProgress} />
+                        <col className={styles.colDate} />
+                        <col className={styles.colAdded} />
+                      </colgroup>
+                      <thead>
+                        <tr className={styles.listHeaderRow}>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>Title{sortIndicator('name')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('kind')}>Kind{sortIndicator('kind')}</th>
+                          <th className={`${styles.listHeaderCell} ${styles.listHeaderStatic}`}>Projects</th>
+                          <th className={`${styles.listHeaderCell} ${styles.listHeaderStatic}`}>Tags</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('progress')}>Progress{sortIndicator('progress')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('lastOpened')}>Opened{sortIndicator('lastOpened')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>Added{sortIndicator('uploaded')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedBooks.map(book => {
+                          const isSelected = selectedIds.has(book.id);
+                          const isActive = activeId === book.id;
+                          return (
+                            <tr
+                              key={book.id}
+                              ref={el => { if (el) cardRefs.current.set(book.id, el); else cardRefs.current.delete(book.id); }}
+                              className={`${styles.listRow} ${isSelected ? styles.listRowSelected : ''} ${isActive ? styles.listRowActive : ''}`}
+                              onClick={e => handleCardClick(book, e)}
+                              onDoubleClick={e => handleCardDoubleClick(book, e)}
+                              onAuxClick={e => { if (e.button === 1) handleOpen(book, true); }}
+                              onContextMenu={e => openBookContextMenu(e, book)}
+                            >
+                              <td className={styles.listNameCell}>
+                                <div className={styles.listTitleWrap}>
+                                  <BookCover book={book} size="sm" />
+                                  <div className={styles.listTitleText}>
+                                    {renamingId === book.id ? (
+                                      <input
+                                        ref={renameInputRef}
+                                        className={styles.renameInput}
+                                        value={renameValue}
+                                        onChange={e => setRenameValue(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
+                                        onBlur={commitRename}
+                                        onClick={e => e.stopPropagation()}
+                                      />
+                                    ) : (
+                                      <span className={styles.listFileName} title={book.filename}>{displayTitle(book)}</span>
+                                    )}
+                                    <span className={styles.listSubtitle}>
+                                      <span className={styles.listSubtitleText}>{subtitleFor(book)}</span>
+                                      {renderNodeChips(book)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className={styles.listCell}>{renderKindBadge(book)}</td>
+                              <td className={`${styles.listCell} ${styles.listWrapCell}`}>{renderProjectChips(book)}</td>
+                              <td className={`${styles.listCell} ${styles.listWrapCell}`}>{renderTagChips(book)}</td>
+                              <td className={styles.listCell}>{renderProgress(book)}</td>
+                              <td className={styles.listCell} title={book.lastOpenedAt ? formatDate(book.lastOpenedAt) : undefined}>
+                                {book.lastOpenedAt ? formatRelativeDate(book.lastOpenedAt, now) : '—'}
+                              </td>
+                              <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
           )}
-          </div>
         </div>
       </div>
 
-      {/* Context menus */}
+      {dragging && (
+        <div className={styles.dropOverlay} aria-hidden="true">
+          <span className={styles.dropOverlayText}>
+            {selection.kind === 'folder' ? `Drop to add to ${foldersById.get(selection.id)?.name ?? 'project'}` : 'Drop files to upload'}
+          </span>
+        </div>
+      )}
+
       {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={bookContextMenuItems}
-          onClose={closeContextMenu}
-        />
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} items={bookContextMenuItems} onClose={() => setContextMenu(null)} />
       )}
-      {folderContextMenu && (
-        <ContextMenu
-          x={folderContextMenu.x}
-          y={folderContextMenu.y}
-          items={[
-            { label: 'Rename', onClick: () => startRenameFolder(folderContextMenu.folder) },
-            { label: 'Delete folder', onClick: () => handleDeleteFolder(folderContextMenu.folder.id), danger: true },
-          ]}
-          onClose={closeFolderContextMenu}
-        />
+      {kindMenu && (
+        <ContextMenu x={kindMenu.x} y={kindMenu.y} items={kindMenuItems} onClose={() => setKindMenu(null)} />
       )}
-      {tagContextMenu && (
-        <ContextMenu
-          x={tagContextMenu.x}
-          y={tagContextMenu.y}
-          items={[
-            { label: 'Rename', onClick: () => startRenameTag(tagContextMenu.tag) },
-            { label: 'Delete tag', onClick: () => handleDeleteTag(tagContextMenu.tag.id), danger: true },
-          ]}
-          onClose={closeTagContextMenu}
-        />
-      )}
-      {moveMenu && (
-        <ContextMenu
-          x={moveMenu.x}
-          y={moveMenu.y}
-          items={moveMenuItems}
-          onClose={closeMoveMenu}
-        />
+      {projectMenu && (
+        <ContextMenu x={projectMenu.x} y={projectMenu.y} items={projectMenuItems} onClose={() => setProjectMenu(null)} />
       )}
       {showAssign && selectedIds.size > 0 && (
         <AssignPopup
           selectedBookIds={selectedIds}
           books={books}
-          folders={folders}
+          folders={activeFolders}
           tags={tags}
           nodes={nodes}
           onClose={() => setShowAssign(false)}

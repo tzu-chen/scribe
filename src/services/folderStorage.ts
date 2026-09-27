@@ -26,6 +26,15 @@ export const folderStorage = {
     if (!res.ok) throw new Error(`Failed to rename folder: ${res.status}`);
   },
 
+  async setArchived(id: string, archived: boolean): Promise<void> {
+    const res = await fetch(`/api/folders/${id}/archived`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived }),
+    });
+    if (!res.ok) throw new Error(`Failed to archive folder: ${res.status}`);
+  },
+
   async delete(id: string): Promise<void> {
     const res = await fetch(`/api/folders/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Failed to delete folder: ${res.status}`);

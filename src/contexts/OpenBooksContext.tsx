@@ -9,6 +9,7 @@ import {
   type DjvuDocument,
   type PageDims,
 } from '../services/documentLoader';
+import { enrichFromOpenPdf } from '../services/attachmentEnrichment';
 
 export interface OpenBookTab {
   id: string;
@@ -167,6 +168,9 @@ export function OpenBooksProvider({ children }: { children: React.ReactNode }) {
           r.pdfDoc.destroy();
           return;
         }
+        // Library metadata (page count, title, thumbnail) piggybacks on the
+        // document we already parsed; no-op once the record is enriched.
+        void enrichFromOpenPdf(id, r.pdfDoc);
         setDocs(prev => ({
           ...prev,
           [id]: {

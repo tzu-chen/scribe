@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { db, ATTACHMENTS_DIR } from '../db.ts';
+import { db, ATTACHMENTS_DIR, THUMBNAILS_DIR } from '../db.ts';
+import { guessKind, isAttachmentKind, type AttachmentKind } from '../lib/kindGuess.ts';
 
 const router = Router();
 
@@ -35,7 +36,26 @@ interface AttachmentRow {
   created_at: string;
   last_opened_at: string | null;
   folder_id: string | null;
+  kind: string | null;
+  kind_manual: number;
+  title: string | null;
+  authors: string | null;
+  year: number | null;
+  page_count: number | null;
+  status: string | null;
+  thumbnail_path: string | null;
+  enriched_at: string | null;
+  /** From the LEFT JOIN on viewer_prefs; absent on rows fetched without it. */
+  current_page?: number | null;
 }
+
+// Every list/detail query goes through this so the derived `current_page`
+// (reading progress) is always present.
+const SELECT_WITH_PROGRESS = `
+  SELECT a.*, vp.current_page
+  FROM attachments a
+  LEFT JOIN viewer_prefs vp ON vp.attachment_id = a.id
+`;
 
 function loadTagsMap(attachmentIds: string[]): Map<string, string[]> {
   const map = new Map<string, string[]>();
@@ -47,6 +67,21 @@ function loadTagsMap(attachmentIds: string[]): Map<string, string[]> {
   for (const row of rows) {
     const list = map.get(row.attachment_id) ?? [];
     list.push(row.tag_id);
+    map.set(row.attachment_id, list);
+  }
+  return map;
+}
+
+function loadFoldersMap(attachmentIds: string[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  if (attachmentIds.length === 0) return map;
+  const placeholders = attachmentIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT attachment_id, folder_id FROM attachment_folders WHERE attachment_id IN (${placeholders})`)
+    .all(...attachmentIds) as Array<{ attachment_id: string; folder_id: string }>;
+  for (const row of rows) {
+    const list = map.get(row.attachment_id) ?? [];
+    list.push(row.folder_id);
     map.set(row.attachment_id, list);
   }
   return map;
@@ -91,7 +126,12 @@ function loadNodeAttachmentsMap(attachmentIds: string[]): Map<string, NodeAttach
   return map;
 }
 
-function rowToMeta(row: AttachmentRow, tagIds: string[] = [], nodeAttachments: NodeAttachmentLink[] = []) {
+function rowToMeta(
+  row: AttachmentRow,
+  tagIds: string[] = [],
+  nodeAttachments: NodeAttachmentLink[] = [],
+  folderIds: string[] = [],
+) {
   return {
     id: row.id,
     subject: row.subject,
@@ -100,19 +140,43 @@ function rowToMeta(row: AttachmentRow, tagIds: string[] = [], nodeAttachments: N
     size: row.size,
     createdAt: row.created_at,
     lastOpenedAt: row.last_opened_at ?? undefined,
-    folderId: row.folder_id ?? undefined,
+    folderIds,
     tags: tagIds,
     nodeAttachments,
+    kind: isAttachmentKind(row.kind) ? row.kind : undefined,
+    kindManual: row.kind_manual === 1,
+    title: row.title ?? undefined,
+    authors: row.authors ?? undefined,
+    year: row.year ?? undefined,
+    pageCount: row.page_count ?? undefined,
+    status: row.status === 'done' ? ('done' as const) : undefined,
+    currentPage: row.current_page ?? undefined,
+    hasThumbnail: !!row.thumbnail_path,
+    enrichedAt: row.enriched_at ?? undefined,
   };
+}
+
+/** Hydrate rows with their tag, node and project relations in three batched queries. */
+function rowsToMeta(rows: AttachmentRow[]) {
+  const ids = rows.map(r => r.id);
+  const tagsMap = loadTagsMap(ids);
+  const nodesMap = loadNodeAttachmentsMap(ids);
+  const foldersMap = loadFoldersMap(ids);
+  return rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [], nodesMap.get(r.id) ?? [], foldersMap.get(r.id) ?? []));
+}
+
+function getRow(id: string): AttachmentRow | undefined {
+  return db.prepare(`${SELECT_WITH_PROGRESS} WHERE a.id = ?`).get(id) as AttachmentRow | undefined;
+}
+
+function thumbnailFile(id: string): string {
+  return path.join(THUMBNAILS_DIR, `${id}.jpg`);
 }
 
 // GET /api/attachments
 router.get('/', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM attachments ORDER BY created_at DESC').all() as AttachmentRow[];
-  const ids = rows.map(r => r.id);
-  const tagsMap = loadTagsMap(ids);
-  const nodesMap = loadNodeAttachmentsMap(ids);
-  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [], nodesMap.get(r.id) ?? [])));
+  const rows = db.prepare(`${SELECT_WITH_PROGRESS} ORDER BY a.created_at DESC`).all() as AttachmentRow[];
+  res.json(rowsToMeta(rows));
 });
 
 // GET /api/attachments/by-node?flowchartId=X&nodeKey=Y
@@ -124,15 +188,12 @@ router.get('/by-node', (req, res) => {
     return;
   }
   const rows = db.prepare(`
-    SELECT a.* FROM attachments a
+    ${SELECT_WITH_PROGRESS}
     JOIN attachment_nodes an ON an.attachment_id = a.id
     WHERE an.flowchart_id = ? AND an.node_key = ?
     ORDER BY a.created_at DESC
   `).all(flowchartId, nodeKey) as AttachmentRow[];
-  const ids = rows.map(r => r.id);
-  const tagsMap = loadTagsMap(ids);
-  const nodesMap = loadNodeAttachmentsMap(ids);
-  res.json(rows.map(r => rowToMeta(r, tagsMap.get(r.id) ?? [], nodesMap.get(r.id) ?? [])));
+  res.json(rowsToMeta(rows));
 });
 
 // GET /api/attachments/counts-by-node?flowchartId=X
@@ -167,15 +228,13 @@ router.post('/', upload.single('file'), (req, res) => {
   // Hash the upload before persisting so we can reject duplicates.
   const sha256 = crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex');
   const existing = db.prepare(
-    'SELECT * FROM attachments WHERE sha256 = ? LIMIT 1'
+    `${SELECT_WITH_PROGRESS} WHERE a.sha256 = ? LIMIT 1`
   ).get(sha256) as AttachmentRow | undefined;
   if (existing) {
     fs.unlinkSync(file.path);
-    const tagIds = loadTagsMap([existing.id]).get(existing.id) ?? [];
-    const nodes = loadNodeAttachmentsMap([existing.id]).get(existing.id) ?? [];
     res.status(409).json({
       error: 'Duplicate file',
-      duplicate: rowToMeta(existing, tagIds, nodes),
+      duplicate: rowsToMeta([existing])[0],
     });
     return;
   }
@@ -197,22 +256,31 @@ router.post('/', upload.single('file'), (req, res) => {
   const subject = (req.body.subject as string) ?? '';
   const folderId = (req.body.folder_id as string) || null;
   const now = new Date().toISOString();
+  const kind = guessKind({ filename: file.originalname });
 
-  db.prepare(`
-    INSERT INTO attachments (id, subject, filename, type, size, file_path, sha256, created_at, folder_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, subject, file.originalname, mimeType, file.size, storedFilename, sha256, now, folderId);
-
-  res.json({
-    id,
-    subject,
-    filename: file.originalname,
-    type: mimeType,
-    size: file.size,
-    createdAt: now,
-    folderId: folderId ?? undefined,
-    tags: [],
+  const insert = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO attachments (id, subject, filename, type, size, file_path, sha256, created_at, kind)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, subject, file.originalname, mimeType, file.size, storedFilename, sha256, now, kind);
+    if (folderId) {
+      db.prepare('INSERT OR IGNORE INTO attachment_folders (attachment_id, folder_id) VALUES (?, ?)').run(id, folderId);
+    }
   });
+  insert();
+
+  const row = getRow(id)!;
+  res.json(rowsToMeta([row])[0]);
+});
+
+// GET /api/attachments/:id — single record with relations
+router.get('/:id', (req, res) => {
+  const row = getRow(req.params.id);
+  if (!row) {
+    res.status(404).json({ error: 'Attachment not found' });
+    return;
+  }
+  res.json(rowsToMeta([row])[0]);
 });
 
 // GET /api/attachments/:id/blob
@@ -233,6 +301,124 @@ router.get('/:id/blob', (req, res) => {
   res.setHeader('Content-Length', row.size);
   res.setHeader('Content-Disposition', contentDisposition(row.filename));
   fs.createReadStream(filePath).pipe(res);
+});
+
+// GET /api/attachments/:id/thumbnail — first-page JPEG, if enriched
+router.get('/:id/thumbnail', (req, res) => {
+  const row = db.prepare('SELECT thumbnail_path FROM attachments WHERE id = ?').get(req.params.id) as
+    | { thumbnail_path: string | null }
+    | undefined;
+  if (!row?.thumbnail_path) {
+    res.status(404).end();
+    return;
+  }
+  const filePath = path.join(THUMBNAILS_DIR, row.thumbnail_path);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).end();
+    return;
+  }
+  // The client appends ?v=<enrichedAt>, so a long cache lifetime is safe.
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// PUT /api/attachments/:id/enrichment
+// Body: { pageCount?, title?, authors?, year?, creator?, producer?, thumbnail?: "data:image/jpeg;base64,..." }
+// Written by the client after it has parsed the PDF (the browser already has
+// pdf.js; the server does not). Re-runs the kind guess unless the kind was set
+// by hand.
+router.put('/:id/enrichment', (req, res) => {
+  const id = req.params.id;
+  const row = getRow(id);
+  if (!row) {
+    res.status(404).json({ error: 'Attachment not found' });
+    return;
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 500) : null);
+  const int = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null);
+
+  const pageCount = int(body.pageCount);
+  const title = str(body.title);
+  const authors = str(body.authors);
+  const year = int(body.year);
+  const creator = str(body.creator);
+  const producer = str(body.producer);
+
+  let thumbnailPath: string | null = row.thumbnail_path;
+  if (typeof body.thumbnail === 'string') {
+    const m = /^data:image\/jpeg;base64,(.+)$/.exec(body.thumbnail);
+    if (!m) {
+      res.status(400).json({ error: 'thumbnail must be a JPEG data URL' });
+      return;
+    }
+    fs.writeFileSync(thumbnailFile(id), Buffer.from(m[1], 'base64'));
+    thumbnailPath = `${id}.jpg`;
+  }
+
+  let kind: string | null = row.kind;
+  if (row.kind_manual !== 1) {
+    kind = guessKind({
+      filename: row.filename,
+      pageCount: pageCount ?? row.page_count,
+      title: title ?? row.title,
+      authors: authors ?? row.authors,
+      creator,
+      producer,
+    });
+  }
+
+  db.prepare(`
+    UPDATE attachments SET
+      page_count = COALESCE(?, page_count),
+      title = COALESCE(?, title),
+      authors = COALESCE(?, authors),
+      year = COALESCE(?, year),
+      thumbnail_path = ?,
+      kind = ?,
+      enriched_at = ?
+    WHERE id = ?
+  `).run(pageCount, title, authors, year, thumbnailPath, kind, new Date().toISOString(), id);
+
+  res.json(rowsToMeta([getRow(id)!])[0]);
+});
+
+// PATCH /api/attachments/:id/kind — { kind: AttachmentKind | null }
+// A kind chosen by hand sticks; null resets to automatic guessing.
+router.patch('/:id/kind', (req, res) => {
+  const { kind } = (req.body ?? {}) as { kind?: unknown };
+  const row = getRow(req.params.id);
+  if (!row) {
+    res.status(404).json({ error: 'Attachment not found' });
+    return;
+  }
+  if (kind === null) {
+    const guessed = guessKind({
+      filename: row.filename,
+      pageCount: row.page_count,
+      title: row.title,
+      authors: row.authors,
+    });
+    db.prepare('UPDATE attachments SET kind = ?, kind_manual = 0 WHERE id = ?').run(guessed, row.id);
+  } else if (isAttachmentKind(kind)) {
+    db.prepare('UPDATE attachments SET kind = ?, kind_manual = 1 WHERE id = ?').run(kind satisfies AttachmentKind, row.id);
+  } else {
+    res.status(400).json({ error: 'kind must be one of book, paper, draft, notes, other, or null' });
+    return;
+  }
+  res.json(rowsToMeta([getRow(row.id)!])[0]);
+});
+
+// PATCH /api/attachments/:id/status — { status: 'done' | null }
+router.patch('/:id/status', (req, res) => {
+  const { status } = (req.body ?? {}) as { status?: unknown };
+  if (status !== null && status !== 'done') {
+    res.status(400).json({ error: "status must be 'done' or null" });
+    return;
+  }
+  db.prepare('UPDATE attachments SET status = ? WHERE id = ?').run(status, req.params.id);
+  res.json({ ok: true });
 });
 
 // PATCH /api/attachments/:id/subject
@@ -286,6 +472,17 @@ router.patch('/:id/filename', (req, res) => {
   res.json({ ok: true });
 });
 
+// PATCH /api/attachments/:id/title — { title } display title override ('' clears it)
+router.patch('/:id/title', (req, res) => {
+  const { title } = req.body ?? {};
+  if (typeof title !== 'string') {
+    res.status(400).json({ error: 'title is required' });
+    return;
+  }
+  db.prepare('UPDATE attachments SET title = ? WHERE id = ?').run(title.trim() || null, req.params.id);
+  res.json({ ok: true });
+});
+
 // PATCH /api/attachments/:id/last-opened
 router.patch('/:id/last-opened', (req, res) => {
   const now = new Date().toISOString();
@@ -317,25 +514,48 @@ router.put('/:id/tags', (req, res) => {
   res.json({ ok: true });
 });
 
-// PATCH /api/attachments/:id/folder
-router.patch('/:id/folder', (req, res) => {
-  const { folderId } = req.body;
-  db.prepare('UPDATE attachments SET folder_id = ? WHERE id = ?').run(folderId ?? null, req.params.id);
+// PUT /api/attachments/:id/folders — replace the set of projects (folders) on an attachment
+router.put('/:id/folders', (req, res) => {
+  const { folderIds } = req.body ?? {};
+  if (!Array.isArray(folderIds) || folderIds.some(id => typeof id !== 'string')) {
+    res.status(400).json({ error: 'folderIds must be an array of strings' });
+    return;
+  }
+  const attachmentId = req.params.id;
+  const existing = db.prepare('SELECT id FROM attachments WHERE id = ?').get(attachmentId);
+  if (!existing) {
+    res.status(404).json({ error: 'Attachment not found' });
+    return;
+  }
+  const txn = db.transaction((ids: string[]) => {
+    db.prepare('DELETE FROM attachment_folders WHERE attachment_id = ?').run(attachmentId);
+    const insert = db.prepare('INSERT OR IGNORE INTO attachment_folders (attachment_id, folder_id) VALUES (?, ?)');
+    for (const folderId of ids) {
+      insert.run(attachmentId, folderId);
+    }
+  });
+  txn(folderIds);
   res.json({ ok: true });
 });
 
 // DELETE /api/attachments/:id
 router.delete('/:id', (req, res) => {
-  const row = db.prepare('SELECT file_path FROM attachments WHERE id = ?').get(req.params.id) as { file_path: string } | undefined;
+  const row = db.prepare('SELECT file_path, thumbnail_path FROM attachments WHERE id = ?').get(req.params.id) as
+    | { file_path: string; thumbnail_path: string | null }
+    | undefined;
 
-  // Delete from DB (cascading deletes will remove highlights & comments)
+  // Delete from DB (cascading deletes will remove highlights, comments, links)
   db.prepare('DELETE FROM attachments WHERE id = ?').run(req.params.id);
 
-  // Delete file from disk
+  // Delete file + thumbnail from disk
   if (row) {
     const filePath = path.join(ATTACHMENTS_DIR, row.file_path);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
+    }
+    if (row.thumbnail_path) {
+      const thumbPath = path.join(THUMBNAILS_DIR, row.thumbnail_path);
+      if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
     }
   }
 
