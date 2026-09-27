@@ -227,6 +227,7 @@ SQLite features enabled: WAL mode, foreign key constraints, CASCADE deletes.
 | `scribe_theme` | string | `'default'` or `'dark'` |
 | `scribe_ui_prefs` | JSON | Global UI preferences — currently `{ tocMode: 'panel' \| 'floating' }` (see `UiPrefsContext`) |
 | `scribe_library_view` | string | Library Browse layout: `'grid'` or `'list'` |
+| `scribe_library_columns` | JSON | Library list-view column widths in px, keyed by column (`title`, `kind`, `projects`, `tags`, `progress`, `opened`, `added`); see `useListColumns` |
 
 ### File Storage
 

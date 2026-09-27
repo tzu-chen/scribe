@@ -23,6 +23,8 @@ import { LibraryHome } from './LibraryHome';
 import { LibraryFilterBar } from './LibraryFilterBar';
 import { UploadTriage } from './UploadTriage';
 import { useLibraryEnrichment } from './useLibraryEnrichment';
+import { useListColumns } from './useListColumns';
+import type { ListColumn } from './useListColumns';
 import { useNow } from '../../hooks/useNow';
 import {
   type Selection,
@@ -84,6 +86,7 @@ export function LibraryPage() {
   });
   const [sortField, setSortField] = useState<SortField>('lastOpened');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const listColumns = useListColumns();
 
   // Selection state (always-on, no select mode)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -709,6 +712,16 @@ export function LibraryPage() {
     return <span className={styles.sortArrow}>{sortDir === 'asc' ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}</span>;
   };
 
+  const colResizer = (col: ListColumn) => (
+    <span
+      className={styles.colResizer}
+      onPointerDown={e => listColumns.startResize(col, e)}
+      onDoubleClick={() => listColumns.resetWidth(col)}
+      title="Drag to resize · double-click to reset"
+      aria-hidden="true"
+    />
+  );
+
   const headingFor = (): string => {
     switch (selection.kind) {
       case 'home': return 'Library';
@@ -903,25 +916,27 @@ export function LibraryPage() {
                   </div>
                 ) : (
                   <div className={styles.listContainer}>
-                    <table className={styles.listTable}>
+                    <table ref={listColumns.tableRef} className={styles.listTable} style={listColumns.tableStyle}>
                       <colgroup>
-                        <col />
+                        <col className={styles.colTitle} />
                         <col className={styles.colKind} />
-                        <col className={styles.colChips} />
-                        <col className={styles.colChips} />
+                        <col className={styles.colProjects} />
+                        <col className={styles.colTags} />
                         <col className={styles.colProgress} />
-                        <col className={styles.colDate} />
+                        <col className={styles.colOpened} />
                         <col className={styles.colAdded} />
+                        <col />
                       </colgroup>
                       <thead>
                         <tr className={styles.listHeaderRow}>
-                          <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>Title{sortIndicator('name')}</th>
-                          <th className={styles.listHeaderCell} onClick={() => handleSort('kind')}>Kind{sortIndicator('kind')}</th>
-                          <th className={`${styles.listHeaderCell} ${styles.listHeaderStatic}`}>Projects</th>
-                          <th className={`${styles.listHeaderCell} ${styles.listHeaderStatic}`}>Tags</th>
-                          <th className={styles.listHeaderCell} onClick={() => handleSort('progress')}>Progress{sortIndicator('progress')}</th>
-                          <th className={styles.listHeaderCell} onClick={() => handleSort('lastOpened')}>Opened{sortIndicator('lastOpened')}</th>
-                          <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>Added{sortIndicator('uploaded')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('name')}>Title{sortIndicator('name')}{colResizer('title')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('kind')}>Kind{sortIndicator('kind')}{colResizer('kind')}</th>
+                          <th className={`${styles.listHeaderCell} ${styles.listHeaderStatic}`}>Projects{colResizer('projects')}</th>
+                          <th className={`${styles.listHeaderCell} ${styles.listHeaderStatic}`}>Tags{colResizer('tags')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('progress')}>Progress{sortIndicator('progress')}{colResizer('progress')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('lastOpened')}>Opened{sortIndicator('lastOpened')}{colResizer('opened')}</th>
+                          <th className={styles.listHeaderCell} onClick={() => handleSort('uploaded')}>Added{sortIndicator('uploaded')}{colResizer('added')}</th>
+                          <th className={styles.listFillerCell} aria-hidden="true" />
                         </tr>
                       </thead>
                       <tbody>
@@ -971,6 +986,7 @@ export function LibraryPage() {
                                 {book.lastOpenedAt ? formatRelativeDate(book.lastOpenedAt, now) : '—'}
                               </td>
                               <td className={styles.listCell}>{formatDate(book.createdAt)}</td>
+                              <td className={styles.listFillerCell} />
                             </tr>
                           );
                         })}

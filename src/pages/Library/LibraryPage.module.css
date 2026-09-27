@@ -483,12 +483,15 @@
 }
 
 .listHeaderCell {
-  padding: var(--spacing-sm) var(--spacing-md);
+  position: relative;
+  padding: var(--spacing-sm) 12px;
   text-align: left;
   font-weight: 600;
   font-size: 0.75rem;
   color: var(--color-text-secondary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   user-select: none;
 }
@@ -531,7 +534,7 @@
 }
 
 .listNameCell {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-sm) 12px;
   max-width: 300px;
 }
 
@@ -549,7 +552,7 @@
 }
 
 .listCell {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-sm) 12px;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
@@ -973,16 +976,55 @@
   overflow-x: auto;
 }
 
-/* Fixed layout: the title column takes whatever the fixed columns leave. */
+/* Fixed layout with user-sized columns (--col-* set by useListColumns). The
+   table is as wide as its columns, scrolling sideways past the container;
+   any room left over goes to the empty filler column on the right. */
 .listTable {
   table-layout: fixed;
+  width: max(100%, calc(var(--col-title) + var(--col-kind) + var(--col-projects) + var(--col-tags)
+    + var(--col-progress) + var(--col-opened) + var(--col-added)));
 }
 
-.colKind { width: 92px; }
-.colChips { width: 128px; }
-.colProgress { width: 124px; }
-.colDate { width: 104px; }
-.colAdded { width: 124px; }
+.colTitle { width: var(--col-title); }
+.colKind { width: var(--col-kind); }
+.colProjects { width: var(--col-projects); }
+.colTags { width: var(--col-tags); }
+.colProgress { width: var(--col-progress); }
+.colOpened { width: var(--col-opened); }
+.colAdded { width: var(--col-added); }
+
+.listFillerCell {
+  padding: 0;
+}
+
+/* Drag handle on each header cell's right edge. */
+.colResizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.colResizer::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 1px;
+  height: 14px;
+  transform: translateY(-50%);
+  background: var(--color-border);
+  transition: background 0.1s;
+}
+
+.colResizer:hover::after,
+.colResizer:active::after {
+  background: var(--color-primary);
+  height: 100%;
+}
 
 .listNameCell {
   max-width: none;
