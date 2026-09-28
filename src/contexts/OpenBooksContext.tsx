@@ -53,6 +53,8 @@ interface OpenBooksContextValue {
   docs: Record<string, TabDocState>;
   openBook: (id: string, filename: string) => void;
   closeBook: (id: string) => OpenBookTab[];
+  /** Moves a tab so it ends up at `toIndex` in the bar. */
+  moveTab: (id: string, toIndex: number) => void;
   setActiveId: (id: string | null) => void;
   /** Marks an id as most-recently-used. Used by the LRU eviction policy to
    *  keep recently-active docs hot. Safe to call repeatedly. */
@@ -271,6 +273,16 @@ export function OpenBooksProvider({ children }: { children: React.ReactNode }) {
     return next;
   }, []);
 
+  const moveTab = useCallback((id: string, toIndex: number) => {
+    setTabs(prev => {
+      const from = prev.findIndex(t => t.id === id);
+      if (from < 0 || from === toIndex) return prev;
+      const next = prev.filter(t => t.id !== id);
+      next.splice(toIndex, 0, prev[from]);
+      return next;
+    });
+  }, []);
+
   const prefetchTab = useCallback((id: string) => {
     const state = docsRef.current[id];
     if (state && state.status !== 'idle') return;
@@ -323,6 +335,7 @@ export function OpenBooksProvider({ children }: { children: React.ReactNode }) {
         docs,
         openBook,
         closeBook,
+        moveTab,
         setActiveId,
         touchTab,
         prefetchTab,

@@ -56,9 +56,14 @@ export function PersistentPdfHost() {
     return () => { cancelled = true; };
   }, [needsRegister, openBook]);
 
+  // Instances render in a fixed order (by id), not tab-bar order: reordering
+  // the tabs would otherwise make React move a viewer's DOM node, and a moved
+  // node loses its scroll position.
+  const instances = [...tabs].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
   return (
     <div className={styles.host} hidden={!isPdfRoute}>
-      {tabs.map(tab => {
+      {instances.map(tab => {
         const isActive = isPdfRoute && tab.id === urlAttachmentId;
         return (
           <div

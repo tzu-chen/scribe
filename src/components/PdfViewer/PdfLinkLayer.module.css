@@ -1,0 +1,24 @@
+/* Sits above the text and highlight layers: only the link rects take pointer
+   events, so selecting and clicking highlights work everywhere else. */
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.link {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.link:hover {
+  background: var(--color-primary-light);
+  mix-blend-mode: var(--pdf-highlight-blend);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}

@@ -600,11 +600,16 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
     setActiveHighlight(null);
   }, []);
 
-  const handleTocNavigate = useCallback((page: number, destTop: number | null) => {
-    recordJump({ pageIndex: page, withinPageOffset: destTop ?? 0 });
+  // Shared by the TOC and in-document links. `destTop` is measured from the top
+  // of the full page, but positions are measured from the top of the page as
+  // displayed, so a trimmed top margin has to come off or the jump overshoots.
+  const handleDestNavigate = useCallback((page: number, destTop: number | null) => {
+    const cropTop = (cropForPage(page)?.top ?? 0) * (pageDimensions[page - 1]?.height ?? pageHeight);
+    const offset = destTop === null ? null : Math.max(0, destTop - cropTop);
+    recordJump({ pageIndex: page, withinPageOffset: offset ?? 0 });
     showJumpHint(page);
-    docViewRef.current?.scrollToPage(page, destTop, 'instant');
-  }, [recordJump, showJumpHint]);
+    docViewRef.current?.scrollToPage(page, offset, 'instant');
+  }, [recordJump, showJumpHint, cropForPage, pageDimensions, pageHeight]);
 
   // Arrow keys walk the jump-history stack. Only the active instance binds so
   // arrow presses while a different tab is foregrounded don't fight for the key.
@@ -688,7 +693,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
       floating={floatingToc}
       onClose={handleTocToggle}
       outline={customOutline.outline}
-      onNavigate={handleTocNavigate}
+      onNavigate={handleDestNavigate}
       onAddItem={customOutline.addItem}
       onRenameItem={customOutline.renameItem}
       onDeleteItem={customOutline.deleteItem}
@@ -746,6 +751,7 @@ export function PdfViewerInstance({ attachmentId, filename, subject: subjectFrom
           onTextSelected={isDjvu ? undefined : handleTextSelected}
           onSelectionCleared={isDjvu ? undefined : handleSelectionCleared}
           onHighlightClick={isDjvu ? undefined : handleHighlightClick}
+          onLinkNavigate={isDjvu ? undefined : handleDestNavigate}
           onPageChange={handlePageChange}
           restorePosition={restorePosition}
           onPositionChange={handlePositionChange}

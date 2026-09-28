@@ -4,6 +4,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import type { PdfHighlight, HighlightRect } from '../../types/annotation';
 import type { CropBox } from '../../types/crop';
 import { PdfHighlightLayer } from './PdfHighlightLayer';
+import { PdfLinkLayer } from './PdfLinkLayer';
 import { filterTinyRects, mergeRectsOnSameLine } from './rectUtils';
 import styles from './PdfPageView.module.css';
 
@@ -44,6 +45,8 @@ interface Props {
   onTextSelected: (selection: TextSelection) => void;
   onSelectionCleared: () => void;
   onHighlightClick: (highlightId: string, anchorRect: DOMRect) => void;
+  /** Follows an internal link; `destTop` is from the top of the full page at scale 1. */
+  onLinkNavigate: (page: number, destTop: number | null) => void;
 }
 
 export function PdfPageView({
@@ -58,6 +61,7 @@ export function PdfPageView({
   onTextSelected,
   onSelectionCleared,
   onHighlightClick,
+  onLinkNavigate,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
@@ -340,6 +344,7 @@ export function PdfPageView({
           pageHeight={dimensions.height}
           onHighlightClick={onHighlightClick}
         />
+        <PdfLinkLayer pdfDoc={pdfDoc} pageNumber={pageNumber} onNavigate={onLinkNavigate} />
       </div>
     </div>
   );

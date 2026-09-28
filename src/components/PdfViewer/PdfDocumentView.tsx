@@ -28,6 +28,8 @@ interface Props {
   onTextSelected?: (selection: TextSelection) => void;
   onSelectionCleared?: () => void;
   onHighlightClick?: (highlightId: string, anchorRect: DOMRect) => void;
+  /** Follows an internal link; `destTop` is from the top of the full page at scale 1. */
+  onLinkNavigate?: (page: number, destTop: number | null) => void;
   onPageChange: (page: number) => void;
   /** Initial position to restore on first mount, and whenever the parent
    *  externally swaps it (e.g. after a server-prefs fetch lands). Internal
@@ -59,7 +61,7 @@ const DEFAULT_CONSTANTS: LayoutConstants = { paddingTopPx: 16, marginPx: 8 };
 
 export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
   function PdfDocumentView(
-    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, cropForPage, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onPageChange, restorePosition, onPositionChange, onContainerResize, renderVisiblePage },
+    { pdfDoc, numPages, scale, pageWidth, pageHeight, pageDimensions, highlights, cropForPage, twoPageView, onTextSelected, onSelectionCleared, onHighlightClick, onLinkNavigate, onPageChange, restorePosition, onPositionChange, onContainerResize, renderVisiblePage },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -344,6 +346,7 @@ export const PdfDocumentView = forwardRef<PdfDocumentViewHandle, Props>(
             onTextSelected={onTextSelected!}
             onSelectionCleared={onSelectionCleared!}
             onHighlightClick={onHighlightClick!}
+            onLinkNavigate={onLinkNavigate!}
           />
         );
       }

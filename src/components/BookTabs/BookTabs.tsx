@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { CloseIcon } from '../Icons/Icons';
 import { useOpenBooks } from '../../contexts/OpenBooksContext';
+import { useTabReorder } from './useTabReorder';
 import styles from './BookTabs.module.css';
 
 interface BookTabsProps {
@@ -8,8 +9,9 @@ interface BookTabsProps {
 }
 
 export function BookTabs({ activeId }: BookTabsProps) {
-  const { tabs, closeBook, prefetchTab } = useOpenBooks();
+  const { tabs, closeBook, moveTab, prefetchTab } = useOpenBooks();
   const navigate = useNavigate();
+  const { barRef, draggingId, startDrag, tabStyle } = useTabReorder(tabs.map(t => t.id), moveTab);
 
   if (tabs.length <= 1) return null;
 
@@ -32,15 +34,21 @@ export function BookTabs({ activeId }: BookTabsProps) {
   };
 
   return (
-    <div className={styles.tabBar} role="tablist">
-      {tabs.map(tab => {
+    <div
+      ref={barRef}
+      className={`${styles.tabBar} ${draggingId ? styles.tabBarDragging : ''}`}
+      role="tablist"
+    >
+      {tabs.map((tab, index) => {
         const isActive = tab.id === activeId;
         return (
           <div
             key={tab.id}
             role="tab"
             aria-selected={isActive}
-            className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
+            className={`${styles.tab} ${isActive ? styles.tabActive : ''} ${tab.id === draggingId ? styles.tabDragging : ''}`}
+            style={tabStyle(index)}
+            onPointerDown={(e) => startDrag(tab.id, e)}
             onClick={() => handleSelect(tab.id)}
             onMouseEnter={() => prefetchTab(tab.id)}
             onFocus={() => prefetchTab(tab.id)}

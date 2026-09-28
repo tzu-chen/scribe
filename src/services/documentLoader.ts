@@ -85,6 +85,32 @@ function extractDestTop(dest: unknown[], viewportHeight: number): number | null 
   return viewportHeight - pdfTop;
 }
 
+/** Resolves a PDF destination — a named dest or an explicit dest array, as
+ *  found on outline items and link annotations — to a 1-indexed page and the
+ *  target's offset from the top of the full (untrimmed) page at scale 1.
+ *  Returns null when the destination doesn't resolve. */
+export async function resolvePdfDest(
+  doc: PDFDocumentProxy,
+  rawDest: unknown,
+): Promise<{ pageNumber: number; destTop: number | null } | null> {
+  const dest = typeof rawDest === 'string' ? await doc.getDestination(rawDest) : rawDest;
+  if (!Array.isArray(dest) || dest.length === 0) return null;
+  const ref = dest[0];
+  let pageNumber: number;
+  if (typeof ref === 'object' && ref !== null) {
+    pageNumber = (await doc.getPageIndex(ref as Parameters<PDFDocumentProxy['getPageIndex']>[0])) + 1;
+  } else if (Number.isInteger(ref)) {
+    // Some producers write a 0-based page index instead of a page reference.
+    pageNumber = (ref as number) + 1;
+  } else {
+    return null;
+  }
+  if (pageNumber < 1 || pageNumber > doc.numPages) return null;
+  const page = await doc.getPage(pageNumber);
+  const vp = page.getViewport({ scale: 1 });
+  return { pageNumber, destTop: extractDestTop(dest, vp.height) };
+}
+
 async function resolvePdfOutline(
   doc: PDFDocumentProxy,
   items: { title: string; dest: unknown; items: unknown[] }[] | null,
@@ -95,23 +121,8 @@ async function resolvePdfOutline(
     let pageNumber = 1;
     let destTop: number | null = null;
     try {
-      let dest: unknown[] | null = null;
-      if (typeof item.dest === 'string') {
-        dest = await doc.getDestination(item.dest);
-        if (dest) {
-          const ref = dest[0] as Parameters<PDFDocumentProxy['getPageIndex']>[0];
-          pageNumber = (await doc.getPageIndex(ref)) + 1;
-        }
-      } else if (Array.isArray(item.dest) && item.dest.length > 0) {
-        dest = item.dest as unknown[];
-        const ref = item.dest[0] as Parameters<PDFDocumentProxy['getPageIndex']>[0];
-        pageNumber = (await doc.getPageIndex(ref)) + 1;
-      }
-      if (dest) {
-        const page = await doc.getPage(pageNumber);
-        const vp = page.getViewport({ scale: 1 });
-        destTop = extractDestTop(dest, vp.height);
-      }
+      const target = await resolvePdfDest(doc, item.dest);
+      if (target) ({ pageNumber, destTop } = target);
     } catch {
       /* fallback to page 1 / top */
     }
